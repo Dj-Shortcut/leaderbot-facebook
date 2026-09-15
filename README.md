@@ -39,15 +39,28 @@ subscription, and OpenClaw state safely. See
 - `apps/image-gen/storage-proxy`: bounded Cloudflare R2 storage service.
 - `deploy/production`: reviewed production manifest and rollback metadata.
 - `docs`: architecture, setup, security, operations, and legal runbooks.
-- `src` and the root npm package: transitional OpenClaw Facebook channel. It
-  will move to a standalone plugin project after its package identity, channel
-  index entry, install path, and ClawHub release route are proven there.
+- `src` and the root npm package: retained OpenClaw compatibility code awaiting
+  retirement. Active plugin development and dependency upgrades belong to
+  [openclaw-facebook-messenger](https://github.com/Dj-Shortcut/openclaw-facebook-messenger).
 - `deploy/fly-gateway`: legacy personal OpenClaw gateway; retirement-only.
 
 New Leaderbot product work belongs in `apps/image-gen`. Do not route the owner
-bot through OpenClaw or add commercial features to the root plugin. Until the
-standalone extraction is proven, the root package stays buildable so existing
-OpenClaw/ClawHub users are not broken by the migration.
+bot through OpenClaw or add commercial features to the root plugin. The retained
+root package stays buildable until its remaining retirement gates are completed.
+
+### Dependency ownership
+
+- Update the standalone OpenClaw plugin in `openclaw-facebook-messenger`, which
+  has its own Dependabot configuration. Do not duplicate its routine version
+  bumps in this repository's root package.
+- Update Leaderbot dependencies in `apps/image-gen` here; its Dependabot groups
+  remain enabled.
+- The root Dependabot configuration allows security updates while
+  `open-pull-requests-limit: 0` disables routine version updates. Automatic
+  security-fix PRs also require GitHub's separate security-updates setting. Root tooling
+  changes needed by this repository can still be made explicitly. Removing its
+  dependencies, compatibility code or release workflows remains part of the
+  retirement work in `docs/operations/todo.md`.
 
 ## Core guarantees
 
