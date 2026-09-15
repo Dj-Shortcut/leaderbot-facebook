@@ -3,6 +3,8 @@ import { isGdprActionId } from "./consentActionIds";
 import { detectAck, type FacebookWebhookEvent } from "./webhookHelpers";
 import { decodeMessengerActionInput } from "./messengerActionPayload";
 
+import { getSocialReply } from "./socialReply";
+
 export type InboundEventClassification = {
   isInboundUserEvent: boolean;
   eventPayload: string | undefined;
@@ -30,7 +32,9 @@ export function classifyInboundEvent(
   const isInboundUserEvent = Boolean(
     event.postback || (event.message && !event.message.is_echo)
   );
-  const isIntentionalSilentAck = Boolean(detectAck(event.message?.text));
+  const isIntentionalSilentAck = Boolean(
+    detectAck(event.message?.text) && !getSocialReply(event.message?.text, "nl")
+  );
   const eventPayload =
     event.message?.quick_reply?.payload ?? event.postback?.payload;
   const isIntentionalSilentUnknownPayload = Boolean(

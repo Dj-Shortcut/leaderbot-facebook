@@ -1,3 +1,7 @@
+import {
+  holdPendingConsentInput,
+  takePendingConsentInput,
+} from "./_core/pendingConsentInput";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 
 import {
@@ -35,6 +39,61 @@ suite("Messenger state Redis privacy fence", () => {
     resetRedisClientForTests();
     if (originalPepper === undefined) delete process.env.PRIVACY_PEPPER;
     else process.env.PRIVACY_PEPPER = originalPepper;
+  });
+
+  it("claims pending consent input once across concurrent Redis workers", async () => {
+    const psid = "pending-consent-concurrent";
+    await withFence(psid, 42, 7, 3, 5, async () => {
+      await getOrCreateState(psid);
+      await Promise.all([
+        holdPendingConsentInput(psid, {
+          attachments: [
+            {
+              type: "image",
+              payload: { url: "https://example.test/pending.jpg" },
+            },
+          ],
+        }),
+        holdPendingConsentInput(psid, { text: "Maak een schilderij" }),
+      ]);
+      await setConsentState(psid, true);
+      const results = await Promise.all([
+        takePendingConsentInput(psid),
+        takePendingConsentInput(psid),
+      ]);
+      expect(results.filter(Boolean)).toHaveLength(1);
+      expect(results.find(Boolean)).toEqual(
+        expect.objectContaining({
+          text: "Maak een schilderij",
+          imageUrls: ["https://example.test/pending.jpg"],
+        })
+      );
+    });
+  });
+
+  it("fences pending input after erasure and across privacy epochs", async () => {
+    const psid = "pending-consent-erasure";
+    const userKey = await withFence(psid, 42, 7, 3, 5, async () => {
+      const state = await getOrCreateState(psid);
+      await holdPendingConsentInput(psid, { text: "Maak een schilderij" });
+      return state.userKey;
+    });
+    await withFence(psid, 42, 7, 3, 6, async () => {
+      await setConsentState(psid, true);
+      expect(await takePendingConsentInput(psid)).toBeNull();
+    });
+    await beginMessengerStatePrivacyErasure({
+      workspaceId: 42,
+      channelConnectionId: 7,
+      bindingEpoch: 3,
+      privacyEpoch: 6,
+      userKey,
+    });
+    await expect(
+      withFence(psid, 42, 7, 3, 5, () =>
+        holdPendingConsentInput(psid, { text: "Late input" })
+      )
+    ).rejects.toThrow("subject is erased");
   });
 
   it("atomically rejects stale state writes after the subject is erased", async () => {

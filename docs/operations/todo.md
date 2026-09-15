@@ -88,6 +88,12 @@ Live payment enablement remains gated by the relevant P1 through P4 evidence.
       volume data under an explicit privacy/retention decision. Extract the
       generic OpenClaw channel to its standalone project before removing the
       root package and ClawHub workflows from this repository.
+  - [ ] Verify and release Messenger social replies and pending consent input:
+        emoji/like stickers must preserve the generated photo, clicked reactions
+        require the Page's `message_reactions` subscription, and up to four photo
+        references plus 32 KB text may wait at most 15 minutes for initial
+        consent. Prove automatic continuation once, expiry and refusal in the
+        direct Page smoke before claiming this prepared change is live.
   - [x] PR #479 removed the automatic gateway health probe at exact `main`
         merge `6f48774d9ffdb744441570ed0da619bf08be6fb7` on
         `2026-08-30T17:37:55Z`. Because the observation duration had not yet

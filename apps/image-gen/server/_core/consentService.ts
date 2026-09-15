@@ -111,6 +111,8 @@ type MessengerConsentGateInput = {
     actions: ConversationAction[]
   ) => Promise<boolean | void>;
   onConsentControlsError?: (error: unknown) => void;
+  holdPendingInput?: () => Promise<void>;
+  resumePendingInput?: () => Promise<boolean>;
 };
 
 type WhatsAppConsentGateInput = {
@@ -523,6 +525,7 @@ async function acceptMessengerConsent(
 ): Promise<void> {
   await Promise.resolve(setConsentState(input.psid, true));
   await input.sendText(messengerConsentAcceptedText(input.lang));
+  if (await input.resumePendingInput?.()) return;
   const response = buildQuickStartResponse(input.lang);
   await input.sendActions(response.text ?? "", response.actions ?? []);
 }
@@ -640,6 +643,7 @@ export async function handleMessengerConsentGate(
       return true;
     }
 
+    await input.holdPendingInput?.();
     const notice = consentText(input.lang);
     let controlsDelivered: boolean | void;
     try {
