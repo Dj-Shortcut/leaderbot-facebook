@@ -140,11 +140,12 @@ it("binds the Test request and retains the exact settled payment predecessor", (
     },
   });
   expect(predecessor.image).toBe(
-    "registry.fly.io/leaderbot-fb-image-gen@sha256:b1f3996faff2406eba3383465974895dc2dcbacd6432f5ab1591cb1e76be4bdf",
+    "registry.fly.io/leaderbot-fb-image-gen@sha256:c04c742f56de06cddb72907ca0bdc989200babd0ea7dcb73b318bf96a327b548",
   );
-  expect(predecessor.identity).toBe("deploy-34628911410-1");
+  expect(predecessor.identity).toBe("deploy-34590370389-1");
   expect(app.reviewedRollbackConfigs[predecessor.image]).toEqual({
-    path: "deploy/production/rollback-configs/image-gen-b1f3996faff2-emergency-dark.toml",
-    sha256: "f0253b74e85b1cefc4e99d537eafa6dfd687167010834066353c2595c94a02db",
+    path: "deploy/production/rollback-configs/image-gen-c04c742f56de-emergency-dark.toml",
+    sha256:
+      "96954feccc90b1885c4b6b6684b56b83b5fbd64f07fbfa15057b0a0a52400649",
   });
 });

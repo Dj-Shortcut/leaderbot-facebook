@@ -2,7 +2,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const { log } = vi.hoisted(() => ({ log: vi.fn() }));
 vi.mock("./_core/logger", () => ({ safeLog: log }));
 import { createConversationEvaluation } from "./_core/conversationEvaluation";
-import type { HandlerContext } from "./_core/webhookHandlerTypes";
+import type {
+  HandlerContext,
+  MessengerSendOutcome,
+} from "./_core/webhookHandlerTypes";
 import type { MessengerUserState } from "./_core/messengerState";
 import { t } from "./_core/i18n";
 
@@ -11,6 +14,11 @@ function fixture(text: string, consentGiven = true) {
     sendLoggedText: vi.fn(async () => ({ sent: true })),
     sendLoggedActions: vi.fn(async () => ({ sent: true })),
     sendLoggedImage: vi.fn(async () => ({ sent: true })),
+    sendPhotoReceivedPrompt: vi.fn(async (): Promise<MessengerSendOutcome> => ({
+      sent: true,
+    })),
+    sendFaceMemoryConsentPrompt: vi.fn(async () => ({ sent: true })),
+    sendFlowExplanation: vi.fn(async () => ({ sent: true })),
     runImageGeneration: vi.fn(async () => ({ sent: true })),
     maybeSendInFlightMessage: vi.fn(async () => ({ handled: false })),
   };
@@ -63,6 +71,44 @@ describe("bounded conversation evaluation", () => {
     expect(log.mock.calls[0][1].findings).toContain(
       "social_started_generation"
     );
+  });
+  it.each([
+    "sendPhotoReceivedPrompt",
+    "sendFaceMemoryConsentPrompt",
+    "sendFlowExplanation",
+  ] as const)(
+    "counts an accepted %s without a false missing reply",
+    async method => {
+      const { evaluation, ctx, original } = fixture("Een gewone vraag");
+      await ctx[method]("user", "nl", "req");
+      evaluation.finish();
+      expect(original[method]).toHaveBeenCalledWith("user", "nl", "req");
+      expect(log.mock.calls[0][1]).toMatchObject({
+        accepted: true,
+        findings: [],
+      });
+    }
+  );
+  it("still detects an image request receiving high-level generic guidance", async () => {
+    const { evaluation, ctx } = fixture(
+      "Maak een afbeelding van een rode fiets"
+    );
+    await ctx.sendFlowExplanation("user", "nl", "req");
+    evaluation.finish();
+    expect(log.mock.calls[0][1].findings).toEqual(["image_request_unhandled"]);
+  });
+  it("does not count a rejected high-level send as accepted", async () => {
+    const { evaluation, ctx, original } = fixture("Een gewone vraag");
+    original.sendPhotoReceivedPrompt.mockResolvedValueOnce({
+      sent: false,
+      reason: "response_window_closed",
+    });
+    await ctx.sendPhotoReceivedPrompt("user", "nl", "req");
+    evaluation.finish();
+    expect(log.mock.calls[0][1]).toMatchObject({
+      accepted: false,
+      findings: ["window_closed"],
+    });
   });
   it("finds an explicit image request that receives only quick-start guidance", async () => {
     const { evaluation, ctx } = fixture(
