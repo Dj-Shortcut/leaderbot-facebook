@@ -11,35 +11,23 @@ Last state reset: **2026-08-27**.
 
 ## Messenger bot and evaluator release gate
 
-Owner authorization (2026-09-15): merge and deploy the bot improvements from
-#541 together with the simple evaluator. Production rollout is still pending.
+Owner authorization (2026-09-15): merge and deploy the bot improvements and
+simple evaluator. The combined runtime is deployed; user-journey verification
+and sampled-monitor coverage remain open.
 
-- [x] Social replies and pending consent input [#541](https://github.com/Dj-Shortcut/openclaw-facebook/pull/541),
-  evaluator [#542](https://github.com/Dj-Shortcut/openclaw-facebook/pull/542),
-  reply-observation fix [#543](https://github.com/Dj-Shortcut/openclaw-facebook/pull/543),
-  and consent recovery [#545](https://github.com/Dj-Shortcut/openclaw-facebook/pull/545)
-  are merged. CodeRabbit approved #545 at `b8c9657`. Combined runtime source:
-  `afb6c8cd48e7e795ee05eba0283d2ba165d15881`.
-- [x] Trusted combined build
+- [x] Protected [deployment 34969598237/1](https://github.com/Dj-Shortcut/openclaw-facebook/actions/runs/34969598237)
+  passed from `bbdfb77c978dae186dff9a6856b2f5d9ec1c94f6`. Production is independently
+  verified as `deploy-34969598237-1`, Fly release 386, with image
+  `registry.fly.io/leaderbot-fb-image-gen@sha256:4b211aa3d68a7599bd3f18f4d166b9223f442332ff02528a99daa180b7d9afbd`.
+  Runtime source is `afb6c8cd48e7e795ee05eba0283d2ba165d15881`, built by
   [34960072965](https://github.com/Dj-Shortcut/openclaw-facebook/actions/runs/34960072965)
-  passed after exact-source CI. Its image is `registry.fly.io/leaderbot-fb-image-gen@sha256:4b211aa3d68a7599bd3f18f4d166b9223f442332ff02528a99daa180b7d9afbd`,
   with [provenance 47594509](https://github.com/Dj-Shortcut/openclaw-facebook/attestations/47594509).
-  Earlier evaluator-only artifacts are superseded.
-- [x] [Release #544](https://github.com/Dj-Shortcut/openclaw-facebook/pull/544)
-  merged as `d3465280ee605c88b75e35f13cb972aaec976616`; exact main production
-  contracts, Image Gen CI and migration smoke passed. Code and security reviews
-  completed without open findings.
-- [ ] Diagnose `Produce fresh bounded Test database and runtime proof` in
-  [deployment 34962875066](https://github.com/Dj-Shortcut/openclaw-facebook/actions/runs/34962875066).
-  Use content-free stage diagnostics from [#546](https://github.com/Dj-Shortcut/openclaw-facebook/pull/546)
-  on protected main, correct the identified failure and rerun every release gate.
-  Production remains `deploy-34628911410-1` / digest
-  `b1f3996faff2406eba3383465974895dc2dcbacd6432f5ab1591cb1e76be4bdf`;
-  the combined runtime is not deployed.
-- [ ] Run protected `Deploy production` for image-gen only. Record final release
-  identity, immutable digest, provenance, settled-live verification, readiness
-  and Meta callback results. Meta callback validation passed in both blocked
-  attempts; an actual clicked-reaction user journey remains unverified.
+  Exact source CI, bounded Test proof and recheck, drift, health and readiness
+  passed. The retained release artifact contains the exact prior image and
+  reviewed rollback config.
+- [x] Meta callback validation, including required `message_reactions`, passed.
+  This verifies subscription configuration; the clicked-reaction journey below
+  still requires a real Messenger interaction.
 - [ ] Complete a consented Messenger smoke: prompt-first generation, source-photo
   edit, emoji/like sticker, clicked reaction, courtesy, pre-consent input and
   typed-consent photo. Confirm accepted-response signals, no false missing reply,
@@ -96,21 +84,12 @@ Live payment enablement remains gated by the relevant P1 through P4 evidence.
       volume data under an explicit privacy/retention decision. Extract the
       generic OpenClaw channel to its standalone project before removing the
       root package and ClawHub workflows from this repository.
-  - [ ] Verify and release Messenger social replies and pending consent input:
-        emoji/like stickers must preserve the generated photo, clicked reactions
-        require the Page's `message_reactions` subscription, and up to four photo
-        references plus 32 KB text may wait at most 15 minutes for initial
-        consent. PR #541 is merged but must not ship without the follow-up
-        [PR #545](https://github.com/Dj-Shortcut/openclaw-facebook/pull/545)
-        consent-input recovery fix: separate expiring storage for rollback,
-        recoverable claims, concurrent grant rerouting, optional notices and
-        photos attached to typed agreement. Targeted Redis tests cover CAS,
-        physical expiry after an old-runtime state rewrite, legacy-field
-        stripping, atomic refusal (including uncertain commit), and scoped erasure.
-        The operator reports `message_reactions` enabled on 2026-09-15; verify
-        the actual subscription in the protected release checks. Prove automatic
-        continuation once, expiry and refusal in the direct Page smoke before
-        claiming this prepared change is live.
+  - [ ] Complete the deployed Messenger social-reply and pending-consent smoke
+        in the release gate above. Verify emoji/like stickers preserve the
+        generated photo, clicked reactions obey consent/window rules, and up
+        to four photo references plus 32 KB text wait at most 15 minutes for
+        initial consent. Prove continuation once, expiry, refusal and photos
+        attached to typed agreement in the direct Page journey.
   - [x] PR #479 removed the automatic gateway health probe at exact `main`
         merge `6f48774d9ffdb744441570ed0da619bf08be6fb7` on
         `2026-08-30T17:37:55Z`. Because the observation duration had not yet
