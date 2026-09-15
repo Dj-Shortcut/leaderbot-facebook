@@ -36,11 +36,16 @@ class CreditTestProofStageError extends Error {
 
 // Only internal constant stage names are exposed. Never retain command output,
 // SQL, credentials, provider errors or their original exception as a cause.
-async function proofStage(stage, action) {
+async function proofStage(stage, action, signal) {
   try {
     return await action();
   } catch (error) {
-    throw new CreditTestProofStageError(stage, error?.code === "ETIMEDOUT");
+    throw new CreditTestProofStageError(
+      stage,
+      error?.code === "ETIMEDOUT" ||
+        error?.name === "TimeoutError" ||
+        signal?.aborted === true,
+    );
   }
 }
 
@@ -384,16 +389,18 @@ export async function collectCreditTestProof({
   const runContext = await proofStage("protected_run", () =>
     assertProtectedCreditTestRun(env, fetchImpl),
   );
-  if (
-    !env.CREDIT_TEST_IMAGE_TOKEN ||
-    !env.CREDIT_TEST_DATABASE_TOKEN ||
-    !env.DATABASE_PROVISIONER_URL ||
-    !sha(app.databaseSchemaTransition?.runtimePrincipalSha256) ||
-    !sha(app.creditTestActivation?.obsoletePrincipalSha256) ||
-    app.databaseSchemaTransition.runtimePrincipalSha256 ===
-      app.creditTestActivation.obsoletePrincipalSha256
-  )
-    fail();
+  await proofStage("configuration", () => {
+    if (
+      !env.CREDIT_TEST_IMAGE_TOKEN ||
+      !env.CREDIT_TEST_DATABASE_TOKEN ||
+      !env.DATABASE_PROVISIONER_URL ||
+      !sha(app.databaseSchemaTransition?.runtimePrincipalSha256) ||
+      !sha(app.creditTestActivation?.obsoletePrincipalSha256) ||
+      app.databaseSchemaTransition.runtimePrincipalSha256 ===
+        app.creditTestActivation.obsoletePrincipalSha256
+    )
+      fail();
+  });
   const imageEnv = { ...env, FLY_API_TOKEN: env.CREDIT_TEST_IMAGE_TOKEN };
   const databaseEnv = { ...env, FLY_API_TOKEN: env.CREDIT_TEST_DATABASE_TOKEN };
   for (const context of [imageEnv, databaseEnv]) {
@@ -403,8 +410,12 @@ export async function collectCreditTestProof({
     delete context.IMAGE_GEN_DATABASE_PROVISIONER_URL;
   }
   delete databaseEnv.GITHUB_TOKEN;
-  if (execute("git", ["rev-parse", "HEAD"], imageEnv) !== runContext.sourceHead)
-    fail();
+  await proofStage("checkout", () => {
+    if (
+      execute("git", ["rev-parse", "HEAD"], imageEnv) !== runContext.sourceHead
+    )
+      fail();
+  });
   const flyJson = (args, context) =>
     JSON.parse(execute("flyctl", args, context));
   const settled = () =>
@@ -422,12 +433,14 @@ export async function collectCreditTestProof({
     );
   const baseline = await proofStage("settled_runtime", settled);
   const predecessor = app.reviewedSettledPredecessor;
-  if (
-    !predecessor ||
-    baseline.identity !== predecessor.identity ||
-    baseline.expectedImage !== predecessor.image
-  )
-    fail();
+  await proofStage("baseline_binding", () => {
+    if (
+      !predecessor ||
+      baseline.identity !== predecessor.identity ||
+      baseline.expectedImage !== predecessor.image
+    )
+      fail();
+  });
   await proofStage("baseline_evidence", () =>
     execute(
       "node",
@@ -471,11 +484,13 @@ export async function collectCreditTestProof({
     });
   }
   const recovery = app.databaseRecovery;
-  if (
-    recovery.app !== "leaderbot-portal-mysql" ||
-    recovery.databaseName !== "leaderbot"
-  )
-    fail();
+  await proofStage("database_contract", () => {
+    if (
+      recovery.app !== "leaderbot-portal-mysql" ||
+      recovery.databaseName !== "leaderbot"
+    )
+      fail();
+  });
   const databaseTarget = () =>
     selectReviewedDatabaseTarget({
       machines: flyJson(
@@ -495,37 +510,51 @@ export async function collectCreditTestProof({
   let state;
   let activation;
   try {
-    session = await proofStage("database_connection", () =>
-      sessionFactory({
-        recovery,
-        machine: target.machine,
-        url: env.DATABASE_PROVISIONER_URL,
-        signal: controller.signal,
-        env: databaseEnv,
-      }),
+    session = await proofStage(
+      "database_connection",
+      () =>
+        sessionFactory({
+          recovery,
+          machine: target.machine,
+          url: env.DATABASE_PROVISIONER_URL,
+          signal: controller.signal,
+          env: databaseEnv,
+        }),
+      controller.signal,
     );
-    await proofStage("database_identity", () =>
-      session.initialize(controller.signal),
+    await proofStage(
+      "database_identity",
+      () => session.initialize(controller.signal),
+      controller.signal,
     );
-    state = await proofStage("obsolete_principal", () =>
-      inspectLockedObsoletePrincipal(
-        session,
-        app.creditTestActivation.obsoletePrincipalSha256,
-        controller.signal,
-      ),
+    state = await proofStage(
+      "obsolete_principal",
+      () =>
+        inspectLockedObsoletePrincipal(
+          session,
+          app.creditTestActivation.obsoletePrincipalSha256,
+          controller.signal,
+        ),
+      controller.signal,
     );
-    await proofStage("activation_audit", async () => {
-      activation = await inspectCommittedTestPaymentActivation(session, {
-        workspaceId: 1,
-        app,
-        baseline,
-        signal: controller.signal,
-        githubToken: env.GITHUB_TOKEN,
-        fetchImpl,
-      });
-    });
-    await proofStage("database_identity_recheck", () =>
-      session.initialize(controller.signal),
+    await proofStage(
+      "activation_audit",
+      async () => {
+        activation = await inspectCommittedTestPaymentActivation(session, {
+          workspaceId: 1,
+          app,
+          baseline,
+          signal: controller.signal,
+          githubToken: env.GITHUB_TOKEN,
+          fetchImpl,
+        });
+      },
+      controller.signal,
+    );
+    await proofStage(
+      "database_identity_recheck",
+      () => session.initialize(controller.signal),
+      controller.signal,
     );
   } finally {
     clearTimeout(timeout);
@@ -551,7 +580,7 @@ export async function collectCreditTestProof({
     )
       fail();
   });
-  return {
+  return proofStage("evidence_snapshot", () => ({
     version: 1,
     repository: REPOSITORY,
     workflow: WORKFLOW,
@@ -573,31 +602,50 @@ export async function collectCreditTestProof({
     ...state,
     activation,
     checkedAt: new Date(now()).toISOString(),
-  };
+  }));
+}
+
+export async function consumeCreditTestEvidence(evidencePath, current) {
+  return proofStage("evidence_consume", () => {
+    const stat = fs.lstatSync(evidencePath);
+    if (!stat.isFile() || stat.isSymbolicLink() || stat.size > 32_768) fail();
+    assertCreditTestEvidence(
+      JSON.parse(fs.readFileSync(evidencePath, "utf8")),
+      current,
+    );
+  });
 }
 
 async function main() {
   const operation = process.argv[2];
-  if (
-    !["request", "prove", "consume", "guard-unlock"].includes(operation) ||
-    process.argv.length !== 3
-  )
-    fail();
-  const { app, active } = readCreditTestActivation();
+  await proofStage("operation", () => {
+    if (
+      !["request", "prove", "consume", "guard-unlock"].includes(operation) ||
+      process.argv.length !== 3
+    )
+      fail();
+  });
+  const { app, active } = await proofStage("activation_request", () =>
+    readCreditTestActivation(),
+  );
   if (operation === "request") {
-    if (!process.env.GITHUB_OUTPUT) fail();
-    fs.appendFileSync(process.env.GITHUB_OUTPUT, `active=${active}\n`);
+    await proofStage("activation_output", () => {
+      if (!process.env.GITHUB_OUTPUT) fail();
+      fs.appendFileSync(process.env.GITHUB_OUTPUT, `active=${active}\n`);
+    });
     return;
   }
   if (operation === "guard-unlock") {
-    const machines = JSON.parse(
-      run(
-        "flyctl",
-        ["machine", "list", "--app", app.app, "--json"],
-        process.env,
-      ),
-    );
-    assertCreditTestUnlockAllowed({ app, machines });
+    await proofStage("guard_unlock", () => {
+      const machines = JSON.parse(
+        run(
+          "flyctl",
+          ["machine", "list", "--app", app.app, "--json"],
+          process.env,
+        ),
+      );
+      assertCreditTestUnlockAllowed({ app, machines });
+    });
     process.stdout.write("credit_test_unlock_guard_passed\n");
     return;
   }
@@ -605,26 +653,22 @@ async function main() {
     process.stdout.write("credit_test_activation_disabled\n");
     return;
   }
-  assertCreditTestRun(process.env);
-  const directory = path.join(
-    process.env.RUNNER_TEMP,
-    "leaderbot-credit-test-proof",
+  await proofStage("run_binding", () => assertCreditTestRun(process.env));
+  const directory = await proofStage("evidence_path", () =>
+    path.join(process.env.RUNNER_TEMP, "leaderbot-credit-test-proof"),
   );
   const evidencePath = path.join(directory, "evidence.json");
   const current = await collectCreditTestProof({ app });
   if (operation === "prove") {
-    fs.mkdirSync(directory, { mode: 0o700 });
-    fs.writeFileSync(evidencePath, `${JSON.stringify(current)}\n`, {
-      flag: "wx",
-      mode: 0o600,
+    await proofStage("evidence_write", () => {
+      fs.mkdirSync(directory, { mode: 0o700 });
+      fs.writeFileSync(evidencePath, `${JSON.stringify(current)}\n`, {
+        flag: "wx",
+        mode: 0o600,
+      });
     });
   } else {
-    const stat = fs.lstatSync(evidencePath);
-    if (!stat.isFile() || stat.isSymbolicLink() || stat.size > 32_768) fail();
-    assertCreditTestEvidence(
-      JSON.parse(fs.readFileSync(evidencePath, "utf8")),
-      current,
-    );
+    await consumeCreditTestEvidence(evidencePath, current);
   }
   process.stdout.write(
     `credit_test_proof_${operation === "prove" ? "recorded" : "consumed"}\n`,
