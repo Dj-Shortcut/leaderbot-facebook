@@ -153,6 +153,6 @@ export async function createTrackedEventContext(
     markResponseSentFromOutcome: responseTracker.markResponseSentFromOutcome,
     sendFallbackIfNeeded,
     trackedCtx,
-    finishEvaluation: evaluation.finish,
+    finishEvaluation: failed => evaluation.finish(failed),
   };
 }

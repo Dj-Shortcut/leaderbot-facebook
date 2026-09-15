@@ -7,8 +7,10 @@ import {
 } from "./imageIntent";
 import { detectAck, type FacebookWebhookEvent } from "./webhookHelpers";
 import type { MessengerUserState } from "./messengerState";
-import type { HandlerContext } from "./webhookHandlerTypes";
-import type { MessengerSendOutcome } from "./messengerApi";
+import type {
+  HandlerContext,
+  MessengerSendOutcome,
+} from "./webhookHandlerTypes";
 
 type Finding =
   | "missing_reply"
