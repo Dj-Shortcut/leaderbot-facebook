@@ -32,6 +32,34 @@ type StatePatch =
   PartialState | ((current: MessengerUserState) => PartialState);
 const MESSENGER_PAGE_STATE_KEY_PREFIX = "messenger-page-v2";
 const MESSENGER_USER_PAGE_INDEX_SCOPE = "messenger-user-page-v1";
+const PENDING_CONSENT_SCOPE = "messenger-pending-consent-v1";
+
+/** Separate expiring content: legacy state writers cannot extend its lifetime. */
+export function getPendingConsentStorageScope(psid: string) {
+  const subject = getMessengerRequestPrivacySubject();
+  if (subject && subject.userKey !== toUserKey(psid)) {
+    throw new Error("Messenger pending input subject is inconsistent");
+  }
+  const fence = requestStateFence();
+  if (!fence && process.env.NODE_ENV === "production") {
+    throw new Error("Messenger state privacy fence is required");
+  }
+  const stateKey = getPersistedStateKey(psid);
+  return {
+    scope: PENDING_CONSENT_SCOPE,
+    key: stateKey,
+    stateKey: getStateStorageKey(stateKey),
+    storageKey: getScopedStateStorageKey(PENDING_CONSENT_SCOPE, stateKey),
+    tombstoneKey: fence
+      ? getStatePrivacyTombstoneKey(toUserKey(psid), fence)
+      : getScopedStateStorageKey(PENDING_CONSENT_SCOPE, `${stateKey}:unused`),
+    privacyEpoch: fence?.privacyEpoch ?? 1,
+  };
+}
+
+export function clearPendingConsentStorage(psid: string): MaybePromise<void> {
+  return deleteScopedState(PENDING_CONSENT_SCOPE, getPersistedStateKey(psid));
+}
 
 type MessengerUserPageIndex = {
   stateKey: string | null;
@@ -411,7 +439,7 @@ export function deletePersistedStateForErasure(
     return getRedisClient().then(async redis => {
       await redis.eval(
         `
-          redis.call("DEL", KEYS[1])
+          redis.call("DEL", KEYS[1], KEYS[3])
           local index = redis.call("GET", KEYS[2])
           if index then
             local ok, decoded = pcall(cjson.decode, index)
@@ -421,15 +449,19 @@ export function deletePersistedStateForErasure(
           end
           return 1
         `,
-        2,
+        3,
         getStateStorageKey(stateKey),
         getScopedStateStorageKey(MESSENGER_USER_PAGE_INDEX_SCOPE, indexKey),
+        getScopedStateStorageKey(PENDING_CONSENT_SCOPE, stateKey),
         stateKey
       );
     });
   }
 
-  const deleted = deleteState(stateKey);
+  const pendingDeleted = deleteScopedState(PENDING_CONSENT_SCOPE, stateKey);
+  const deleted = isPromiseLike(pendingDeleted)
+    ? pendingDeleted.then(() => deleteState(stateKey))
+    : deleteState(stateKey);
   const deleteIndex = () =>
     deleteScopedState(MESSENGER_USER_PAGE_INDEX_SCOPE, indexKey);
   return isPromiseLike(deleted)
@@ -639,7 +671,7 @@ export function deletePersistedState(psid: string): MaybePromise<void> {
       return getRedisClient().then(async redis => {
         await redis.eval(
           `
-            redis.call("DEL", KEYS[1])
+            redis.call("DEL", KEYS[1], KEYS[3])
             local index = redis.call("GET", KEYS[2])
             if index then
               local ok, decoded = pcall(cjson.decode, index)
@@ -649,14 +681,18 @@ export function deletePersistedState(psid: string): MaybePromise<void> {
             end
             return 1
           `,
-          2,
+          3,
           getStateStorageKey(stateKey),
           getScopedStateStorageKey(MESSENGER_USER_PAGE_INDEX_SCOPE, indexKey),
+          getScopedStateStorageKey(PENDING_CONSENT_SCOPE, stateKey),
           stateKey
         );
       });
     }
-    const deleted = deleteState(stateKey);
+    const pendingDeleted = deleteScopedState(PENDING_CONSENT_SCOPE, stateKey);
+    const deleted = isPromiseLike(pendingDeleted)
+      ? pendingDeleted.then(() => deleteState(stateKey))
+      : deleteState(stateKey);
     const deleteIndex = () => {
       const pageId = stored?.pageId?.trim();
       const userKey = stored?.userKey?.trim();

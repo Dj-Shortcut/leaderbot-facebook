@@ -12,6 +12,7 @@ import { toUserKey } from "./privacy";
 import { MAX_SOURCE_IMAGES } from "./image-generation/generationTypes";
 import { getMessengerRequestPageId } from "./messengerRequestContext";
 import {
+  clearPendingConsentStorage,
   deletePersistedState,
   findPersistedStateByUserKeyForPage,
   getOrCreatePersistedState,
@@ -51,14 +52,7 @@ export type PendingVideoGeneration = {
   requestedAt: number;
 };
 
-export type PendingConsentInput = {
-  text?: string;
-  imageUrls: string[];
-  expiresAt: number;
-};
-
 export type MessengerUserState = {
-  pendingConsentInput?: PendingConsentInput | null;
   psid: string;
   userKey: string;
   /** Receiving Facebook Page for this Page-scoped sender state. */
@@ -345,7 +339,6 @@ export function setConsentState(
     psid,
     {
       consentGiven,
-      ...(!consentGiven ? { pendingConsentInput: null } : {}),
       consentTimestamp: consentGiven ? now : undefined,
       consentDeclinedAt: consentGiven ? undefined : now,
       consentPromptedAt: undefined,
@@ -356,8 +349,11 @@ export function setConsentState(
   );
 
   if (isPromiseLike(result)) {
-    return result.then(() => undefined);
+    return result.then(() =>
+      consentGiven ? undefined : clearPendingConsentStorage(psid)
+    );
   }
+  if (!consentGiven) return clearPendingConsentStorage(psid);
 }
 
 export function setConsentPromptedAt(

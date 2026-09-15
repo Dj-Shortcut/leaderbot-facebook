@@ -1,8 +1,10 @@
 import {
+  finishPendingConsentInput,
   holdPendingConsentInput,
+  PENDING_CONSENT_TTL_MS,
   takePendingConsentInput,
 } from "./_core/pendingConsentInput";
-import { afterAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   getOrCreateState,
@@ -16,6 +18,7 @@ import {
   setMessengerRequestPrivacySubject,
 } from "./_core/messengerRequestContext";
 import {
+  getPendingConsentStorageScope,
   beginMessengerStatePrivacyErasure,
   deletePersistedStateForErasure,
   getPersistedStateForErasure,
@@ -94,6 +97,87 @@ suite("Messenger state Redis privacy fence", () => {
         holdPendingConsentInput(psid, { text: "Late input" })
       )
     ).rejects.toThrow("subject is erased");
+  });
+
+  it("does not let a rollback state rewrite retain pending raw input", async () => {
+    const psid = "pending-rollback";
+    await withFence(psid, 42, 7, 3, 5, async () => {
+      await holdPendingConsentInput(
+        psid,
+        { text: "private-pending-prompt" },
+        Date.now() - PENDING_CONSENT_TTL_MS + 1000
+      );
+      const scope = getPendingConsentStorageScope(psid);
+      const redis = await getRedisClient();
+      const raw = (await redis.get(scope.stateKey))!;
+      expect(raw).not.toContain("private-pending-prompt");
+      expect(raw).not.toContain("pendingConsentInput");
+      await redis.set(scope.stateKey, raw, "EX", 172800);
+      expect(await redis.ttl(scope.storageKey)).toBeLessThanOrEqual(1);
+      await new Promise(resolve => setTimeout(resolve, 1100));
+      expect(await redis.get(scope.storageKey)).toBeNull();
+      expect(await redis.get(scope.stateKey)).not.toBeNull();
+    });
+  });
+
+  it("reroutes a photo when a consent write wins an append CAS race", async () => {
+    const psid = "pending-consent-race";
+    await withFence(psid, 42, 7, 3, 5, async () => {
+      const redis = await getRedisClient();
+      const original = redis.eval.bind(redis);
+      let raced = false;
+      const spy = vi
+        .spyOn(redis, "eval")
+        .mockImplementation(async (script, count, ...args) => {
+          if (!raced && script.includes("PXAT")) {
+            raced = true;
+            await setConsentState(psid, true);
+          }
+          return original(script, count, ...args);
+        });
+      try {
+        expect(
+          await holdPendingConsentInput(psid, {
+            attachments: [
+              {
+                type: "image",
+                payload: { url: "https://example.test/race.jpg" },
+              },
+            ],
+          })
+        ).toBe("consented");
+      } finally {
+        spy.mockRestore();
+      }
+    });
+  });
+
+  it("keeps failed Redis claims recoverable until ack and deletes content on erasure", async () => {
+    const psid = "pending-claim-erasure";
+    const owned = await withFence(psid, 42, 7, 3, 5, async () => {
+      await holdPendingConsentInput(psid, { text: "pending-private" });
+      await setConsentState(psid, true);
+      const claimed = (await takePendingConsentInput(psid))!;
+      await finishPendingConsentInput(psid, claimed, false);
+      const retry = (await takePendingConsentInput(psid))!;
+      expect(retry.operationId).toBe(claimed.operationId);
+      const state = (await getState(psid))!;
+      return {
+        state,
+        storageKey: getPendingConsentStorageScope(psid).storageKey,
+      };
+    });
+    await beginMessengerStatePrivacyErasure({
+      workspaceId: 42,
+      channelConnectionId: 7,
+      bindingEpoch: 3,
+      privacyEpoch: 6,
+      userKey: owned.state.userKey,
+    });
+    await withErasureFence(psid, 42, 7, 3, 6, 5, async () => {
+      await deletePersistedStateForErasure(psid, owned.state);
+    });
+    expect(await (await getRedisClient()).get(owned.storageKey)).toBeNull();
   });
 
   it("atomically rejects stale state writes after the subject is erased", async () => {
@@ -180,6 +264,7 @@ suite("Messenger state Redis privacy fence", () => {
   it("lets an erasing epoch scrub only its immediately preceding data epoch", async () => {
     const psid = "state-privacy-erasure-retry";
     const oldState = await withFence(psid, 42, 7, 3, 5, async () => {
+      await getOrCreateState(psid);
       await Promise.resolve(
         setLastGenerationContext(psid, { prompt: "old-private-state" })
       );
@@ -207,6 +292,7 @@ suite("Messenger state Redis privacy fence", () => {
     );
 
     await withFence(psid, 42, 7, 3, 7, async () => {
+      await getOrCreateState(psid);
       await Promise.resolve(
         setLastGenerationContext(psid, { prompt: "reactivated-private-state" })
       );
