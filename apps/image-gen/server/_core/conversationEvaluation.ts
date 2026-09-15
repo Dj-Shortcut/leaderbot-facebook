@@ -139,6 +139,21 @@ export function createConversationEvaluation(input: {
           observeOutcome(outcome);
           return outcome;
         },
+        sendPhotoReceivedPrompt: async (...args) => {
+          const outcome = await ctx.sendPhotoReceivedPrompt(...args);
+          observeOutcome(outcome);
+          return outcome;
+        },
+        sendFaceMemoryConsentPrompt: async (...args) => {
+          const outcome = await ctx.sendFaceMemoryConsentPrompt(...args);
+          observeOutcome(outcome);
+          return outcome;
+        },
+        sendFlowExplanation: async (...args) => {
+          const outcome = await ctx.sendFlowExplanation(...args);
+          observeText(t(args[1], "flowExplanation"), outcome);
+          return outcome;
+        },
         runImageGeneration: async (...args) => {
           generationRequested = true;
           const outcome = await ctx.runImageGeneration(...args);
