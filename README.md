@@ -55,8 +55,9 @@ root package stays buildable until its remaining retirement gates are completed.
   bumps in this repository's root package.
 - Update Leaderbot dependencies in `apps/image-gen` here; its Dependabot groups
   remain enabled.
-- The retained root package receives security updates only through Dependabot
-  (`open-pull-requests-limit: 0` disables routine version updates). Root tooling
+- The root Dependabot configuration allows security updates while
+  `open-pull-requests-limit: 0` disables routine version updates. Automatic
+  security-fix PRs also require GitHub's separate security-updates setting. Root tooling
   changes needed by this repository can still be made explicitly. Removing its
   dependencies, compatibility code or release workflows remains part of the
   retirement work in `docs/operations/todo.md`.
