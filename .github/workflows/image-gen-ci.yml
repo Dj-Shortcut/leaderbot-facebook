@@ -114,6 +114,7 @@ jobs:
 
       - name: Test Messenger privacy stores with Redis
         run: |
+          pnpm exec vitest run server/messengerStatePrivacy.redis.test.ts
           pnpm exec vitest run server/messengerImageQuotaStore.redis.test.ts
           pnpm exec vitest run server/messengerGenerationCompletion.redis.test.ts
           pnpm exec vitest run server/messengerGenerationQueue.redis.test.ts

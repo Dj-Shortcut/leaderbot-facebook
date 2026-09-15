@@ -1,5 +1,8 @@
-import type { PendingConsentInput } from "./messengerState";
-import { patchState } from "./messengerStatePersistence";
+import { randomUUID } from "node:crypto";
+import {
+  updatePendingConsentInput,
+  type PendingConsentInput,
+} from "./pendingConsentInputStore";
 import { MAX_SOURCE_IMAGES } from "./image-generation/generationTypes";
 import { getMessengerMessageSocialReply } from "./messengerSocialReply";
 import type { FacebookWebhookEvent } from "./webhookHelpers";
@@ -10,8 +13,9 @@ export const PENDING_CONSENT_MAX_TEXT_BYTES = 32 * 1_024;
 export async function holdPendingConsentInput(
   psid: string,
   message: FacebookWebhookEvent["message"],
-  now = Date.now()
-): Promise<"held" | "limit" | "ignored"> {
+  now = Date.now(),
+  allowConsentedAttachments = false
+): Promise<"held" | "limit" | "ignored" | "consented"> {
   if (
     !message ||
     message.is_echo ||
@@ -19,7 +23,7 @@ export async function holdPendingConsentInput(
     getMessengerMessageSocialReply(message, "nl")
   )
     return "ignored";
-  const text = message.text?.trim();
+  const text = allowConsentedAttachments ? undefined : message.text?.trim();
   if (
     text &&
     /^(hi|hey|hello|hallo|hoi|goedemorgen|goedemiddag|goedenavond)$/iu.test(
@@ -42,58 +46,90 @@ export async function holdPendingConsentInput(
     return "ignored";
   const imageUrls = attachments.map(attachment => attachment.payload!.url!);
   if (!text && !imageUrls.length) return "ignored";
-  let result: "held" | "limit" | "ignored" = "ignored";
-  await patchState(psid, current => {
-    result = "ignored";
-    if (
-      current.consentGiven ||
-      current.consentDeclinedAt !== undefined ||
-      current.pendingDeleteConfirm
-    )
-      return {};
-    const pending = current.pendingConsentInput;
-    const previous = pending && pending.expiresAt > now ? pending : null;
-    const combinedText = [previous?.text, text].filter(Boolean).join("\n\n");
-    const combinedImages = [
-      ...new Set([...(previous?.imageUrls ?? []), ...imageUrls]),
-    ];
-    if (
-      Buffer.byteLength(combinedText, "utf8") >
-        PENDING_CONSENT_MAX_TEXT_BYTES ||
-      combinedImages.length > MAX_SOURCE_IMAGES ||
-      combinedImages.some(url => Buffer.byteLength(url, "utf8") > 8_192)
-    ) {
-      result = "limit";
-      return { pendingConsentInput: null };
+  return updatePendingConsentInput<"held" | "limit" | "ignored" | "consented">(
+    psid,
+    (current, stored) => {
+      const previous = stored && stored.expiresAt > now ? stored : null;
+      if (current.consentGiven && !allowConsentedAttachments) {
+        return { pending: previous, result: "consented" as const };
+      }
+      if (
+        current.consentDeclinedAt !== undefined ||
+        current.pendingDeleteConfirm
+      ) {
+        return { pending: null, result: "ignored" as const };
+      }
+      if (previous?.claim && previous.claim.expiresAt > now)
+        return { pending: previous, result: "ignored" as const };
+      const combinedText = [previous?.text, text].filter(Boolean).join("\n\n");
+      const combinedImages = [
+        ...new Set([...(previous?.imageUrls ?? []), ...imageUrls]),
+      ];
+      if (
+        Buffer.byteLength(combinedText, "utf8") >
+          PENDING_CONSENT_MAX_TEXT_BYTES ||
+        combinedImages.length > MAX_SOURCE_IMAGES ||
+        combinedImages.some(url => Buffer.byteLength(url, "utf8") > 8_192)
+      ) {
+        return { pending: null, result: "limit" as const };
+      }
+      return {
+        pending: {
+          text: combinedText || undefined,
+          imageUrls: combinedImages,
+          expiresAt: previous?.expiresAt ?? now + PENDING_CONSENT_TTL_MS,
+          operationId: previous?.operationId ?? randomUUID(),
+        },
+        result: "held" as const,
+      };
     }
-    result = "held";
-    return {
-      pendingConsentInput: {
-        text: combinedText || undefined,
-        imageUrls: combinedImages,
-        expiresAt: previous?.expiresAt ?? now + PENDING_CONSENT_TTL_MS,
-      },
-    };
-  });
-  return result;
+  );
 }
 
-/** Atomically remove the input before resuming; concurrent grants get it once. */
+/** Keep the only copy until routing succeeds; a failed attempt can be retried. */
 export async function takePendingConsentInput(
   psid: string,
   now = Date.now()
 ): Promise<PendingConsentInput | null> {
-  let claimed: PendingConsentInput | null = null;
-  await patchState(psid, current => {
-    claimed = null;
-    if (!current.consentGiven || current.pendingDeleteConfirm) return {};
-    if (
-      current.pendingConsentInput &&
-      current.pendingConsentInput.expiresAt > now
-    ) {
-      claimed = current.pendingConsentInput;
+  return updatePendingConsentInput<PendingConsentInput | null>(
+    psid,
+    (current, stored) => {
+      const pending = stored && stored.expiresAt > now ? stored : null;
+      if (
+        !current.consentGiven ||
+        current.pendingDeleteConfirm ||
+        (pending?.claim && pending.claim.expiresAt > now)
+      ) {
+        return { pending, result: null };
+      }
+      if (!pending) return { pending: null, result: null };
+      const claimed = {
+        ...pending,
+        claim: {
+          token: randomUUID(),
+          expiresAt: Math.min(pending.expiresAt, now + 5 * 60_000),
+        },
+      };
+      return { pending: claimed, result: claimed };
     }
-    return { pendingConsentInput: null };
+  );
+}
+
+export async function finishPendingConsentInput(
+  psid: string,
+  claimed: PendingConsentInput,
+  succeeded: boolean
+): Promise<void> {
+  await updatePendingConsentInput(psid, (state, pending) => {
+    if (!pending || pending.claim?.token !== claimed.claim?.token) {
+      return { pending, result: undefined };
+    }
+    return {
+      pending:
+        succeeded || !state.consentGiven || state.pendingDeleteConfirm
+          ? null
+          : { ...pending, claim: undefined },
+      result: undefined,
+    };
   });
-  return claimed;
 }
