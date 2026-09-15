@@ -62,9 +62,11 @@ The target product has:
 - purchased credits separate from the resetting free allowance;
 - premium quality selected by a server-owned offer policy.
 
-The reusable OpenClaw Facebook channel remains a separate open-source product.
-It will move out of this repository after its standalone package, channel-index,
-ClawHub, install, release, and rollback routes are proven.
+The reusable OpenClaw Facebook channel is maintained in
+[`openclaw-facebook-messenger`](https://github.com/Dj-Shortcut/openclaw-facebook-messenger),
+including its regular dependency upgrades. Retire the retained root copy after
+its standalone package, channel-index, ClawHub, install, release, and rollback
+routes are proven.
 
 ## Active order
 
