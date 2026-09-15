@@ -99,7 +99,7 @@
   },
   "devDependencies": {
     "@types/node": "^26.5.0",
-    "openclaw": "2026.7.2-beta.7",
+    "openclaw": "2026.9.4",
     "typescript": "^7.0.2",
     "vitest": "^5.0.0"
   },
