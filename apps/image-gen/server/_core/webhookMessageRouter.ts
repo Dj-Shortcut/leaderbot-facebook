@@ -25,6 +25,8 @@ import { handleTextMessage } from "./webhookTextMessageRouter";
 import { tryHandleImageMessage } from "./webhookImageMessageRouter";
 import { tryHandleAudioMessage } from "./webhookAudioMessageRouter";
 
+import { getMessengerMessageSocialReply } from "./messengerSocialReply";
+
 type MessageEventInput = {
   psid: string;
   userId: string;
@@ -121,6 +123,12 @@ export async function handleMessageEvent(
 ): Promise<void> {
   const message = input.event.message;
   if (!message || message.is_echo) return;
+
+  const socialReply = getMessengerMessageSocialReply(message, input.lang);
+  if (socialReply) {
+    await ctx.sendLoggedText(input.psid, socialReply, input.reqId);
+    return;
+  }
 
   if (
     (await ctx.maybeSendInFlightMessage(input.psid, input.reqId, input.lang))

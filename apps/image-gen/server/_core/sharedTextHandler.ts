@@ -13,7 +13,20 @@ import {
   buildQuickStartResponse,
 } from "./conversationActions";
 
-const GREETINGS = new Set(["hi", "hello", "hey", "yo", "hola"]);
+import { getSocialReply } from "./socialReply";
+
+const GREETINGS = new Set([
+  "hi",
+  "hello",
+  "hey",
+  "yo",
+  "hola",
+  "hallo",
+  "hoi",
+  "goedemorgen",
+  "goedemiddag",
+  "goedenavond",
+]);
 const SMALLTALK = new Set([
   "how are you",
   "how are you?",
@@ -207,6 +220,9 @@ export async function handleSharedTextMessage(
 
   const { trimmedText, normalizedText } = preparedMessage;
   logSharedTextExecution(input);
+
+  const socialReply = getSocialReply(trimmedText, input.lang);
+  if (socialReply) return { response: { text: socialReply } };
 
   const ackResult = tryHandleAck(input, trimmedText);
   if (ackResult) {
