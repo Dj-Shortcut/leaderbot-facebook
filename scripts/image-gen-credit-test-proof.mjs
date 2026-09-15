@@ -27,6 +27,29 @@ const fail = () => {
 };
 const digest = (value) => createHash("sha256").update(value).digest("hex");
 
+class CreditTestProofStageError extends Error {
+  constructor(stage, timedOut) {
+    super("credit_test_proof_rejected");
+    this.publicCode = `${stage}:${timedOut ? "timeout" : "failed"}`;
+  }
+}
+
+// Only internal constant stage names are exposed. Never retain command output,
+// SQL, credentials, provider errors or their original exception as a cause.
+async function proofStage(stage, action) {
+  try {
+    return await action();
+  } catch (error) {
+    throw new CreditTestProofStageError(stage, error?.code === "ETIMEDOUT");
+  }
+}
+
+export function creditTestProofPublicErrorCode(error) {
+  return error instanceof CreditTestProofStageError
+    ? error.publicCode
+    : "unclassified";
+}
+
 export function assertCreditTestRun(env) {
   if (
     env.GITHUB_REPOSITORY !== REPOSITORY ||
@@ -358,7 +381,9 @@ export async function collectCreditTestProof({
   fetchImpl = fetch,
   now = Date.now,
 }) {
-  const runContext = await assertProtectedCreditTestRun(env, fetchImpl);
+  const runContext = await proofStage("protected_run", () =>
+    assertProtectedCreditTestRun(env, fetchImpl),
+  );
   if (
     !env.CREDIT_TEST_IMAGE_TOKEN ||
     !env.CREDIT_TEST_DATABASE_TOKEN ||
@@ -395,7 +420,7 @@ export async function collectCreditTestProof({
         imageEnv,
       ),
     );
-  const baseline = settled();
+  const baseline = await proofStage("settled_runtime", settled);
   const predecessor = app.reviewedSettledPredecessor;
   if (
     !predecessor ||
@@ -403,41 +428,47 @@ export async function collectCreditTestProof({
     baseline.expectedImage !== predecessor.image
   )
     fail();
-  execute(
-    "node",
-    [
-      "scripts/validate-production-deployment.mjs",
-      "--verify-settled-baseline",
-      "image-gen",
-      baseline.identity,
-      "--expected-image",
-      baseline.expectedImage,
-    ],
-    imageEnv,
-  );
-  const runtimeIds = selectCreditTestRuntimeMachines(
-    flyJson(["machine", "list", "--app", app.app, "--json"], imageEnv),
-    app,
-    baseline.identity,
-    baseline.expectedImage,
-  );
-  for (const id of runtimeIds) {
-    const output = execute(
-      "flyctl",
+  await proofStage("baseline_evidence", () =>
+    execute(
+      "node",
       [
-        "ssh",
-        "console",
-        "--app",
-        app.app,
-        "--machine",
-        id,
-        "--quiet",
-        "--command",
-        `/usr/bin/env EXPECTED_RUNTIME_PRINCIPAL_SHA256=${app.databaseSchemaTransition.runtimePrincipalSha256} node /app/dist/billing-trigger-runtime-preflight.cjs`,
+        "scripts/validate-production-deployment.mjs",
+        "--verify-settled-baseline",
+        "image-gen",
+        baseline.identity,
+        "--expected-image",
+        baseline.expectedImage,
       ],
       imageEnv,
-    );
-    if (output !== "Billing trigger runtime preflight passed.") fail();
+    ),
+  );
+  const runtimeIds = await proofStage("runtime_inventory", () =>
+    selectCreditTestRuntimeMachines(
+      flyJson(["machine", "list", "--app", app.app, "--json"], imageEnv),
+      app,
+      baseline.identity,
+      baseline.expectedImage,
+    ),
+  );
+  for (const id of runtimeIds) {
+    await proofStage("runtime_trigger_probe", () => {
+      const output = execute(
+        "flyctl",
+        [
+          "ssh",
+          "console",
+          "--app",
+          app.app,
+          "--machine",
+          id,
+          "--quiet",
+          "--command",
+          `/usr/bin/env EXPECTED_RUNTIME_PRINCIPAL_SHA256=${app.databaseSchemaTransition.runtimePrincipalSha256} node /app/dist/billing-trigger-runtime-preflight.cjs`,
+        ],
+        imageEnv,
+      );
+      if (output !== "Billing trigger runtime preflight passed.") fail();
+    });
   }
   const recovery = app.databaseRecovery;
   if (
@@ -457,54 +488,69 @@ export async function collectCreditTestProof({
       ),
       recovery,
     });
-  const target = databaseTarget();
+  const target = await proofStage("database_inventory", databaseTarget);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 90_000);
   let session;
   let state;
   let activation;
   try {
-    session = await sessionFactory({
-      recovery,
-      machine: target.machine,
-      url: env.DATABASE_PROVISIONER_URL,
-      signal: controller.signal,
-      env: databaseEnv,
-    });
-    await session.initialize(controller.signal);
-    state = await inspectLockedObsoletePrincipal(
-      session,
-      app.creditTestActivation.obsoletePrincipalSha256,
-      controller.signal,
+    session = await proofStage("database_connection", () =>
+      sessionFactory({
+        recovery,
+        machine: target.machine,
+        url: env.DATABASE_PROVISIONER_URL,
+        signal: controller.signal,
+        env: databaseEnv,
+      }),
     );
-    activation = await inspectCommittedTestPaymentActivation(session, {
-      workspaceId: 1,
-      app,
-      baseline,
-      signal: controller.signal,
-      githubToken: env.GITHUB_TOKEN,
-      fetchImpl,
+    await proofStage("database_identity", () =>
+      session.initialize(controller.signal),
+    );
+    state = await proofStage("obsolete_principal", () =>
+      inspectLockedObsoletePrincipal(
+        session,
+        app.creditTestActivation.obsoletePrincipalSha256,
+        controller.signal,
+      ),
+    );
+    await proofStage("activation_audit", async () => {
+      activation = await inspectCommittedTestPaymentActivation(session, {
+        workspaceId: 1,
+        app,
+        baseline,
+        signal: controller.signal,
+        githubToken: env.GITHUB_TOKEN,
+        fetchImpl,
+      });
     });
-    await session.initialize(controller.signal);
+    await proofStage("database_identity_recheck", () =>
+      session.initialize(controller.signal),
+    );
   } finally {
     clearTimeout(timeout);
-    await session?.close();
+    await proofStage("database_cleanup", () => session?.close());
   }
-  const afterTarget = databaseTarget();
-  if (
-    JSON.stringify(settled()) !== JSON.stringify(baseline) ||
-    afterTarget.machine.id !== target.machine.id ||
-    afterTarget.machine.private_ip !== target.machine.private_ip ||
-    JSON.stringify(
-      selectCreditTestRuntimeMachines(
-        flyJson(["machine", "list", "--app", app.app, "--json"], imageEnv),
-        app,
-        baseline.identity,
-        baseline.expectedImage,
-      ),
-    ) !== JSON.stringify(runtimeIds)
-  )
-    fail();
+  const afterTarget = await proofStage(
+    "database_inventory_recheck",
+    databaseTarget,
+  );
+  await proofStage("baseline_recheck", () => {
+    if (
+      JSON.stringify(settled()) !== JSON.stringify(baseline) ||
+      afterTarget.machine.id !== target.machine.id ||
+      afterTarget.machine.private_ip !== target.machine.private_ip ||
+      JSON.stringify(
+        selectCreditTestRuntimeMachines(
+          flyJson(["machine", "list", "--app", app.app, "--json"], imageEnv),
+          app,
+          baseline.identity,
+          baseline.expectedImage,
+        ),
+      ) !== JSON.stringify(runtimeIds)
+    )
+      fail();
+  });
   return {
     version: 1,
     repository: REPOSITORY,
@@ -589,8 +635,10 @@ if (
   process.argv[1] &&
   import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href
 ) {
-  main().catch(() => {
-    process.stderr.write("credit_test_proof_rejected\n");
+  main().catch((error) => {
+    process.stderr.write(
+      `credit_test_proof_rejected:${creditTestProofPublicErrorCode(error)}\n`,
+    );
     process.exitCode = 1;
   });
 }

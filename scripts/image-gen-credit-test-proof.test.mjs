@@ -12,6 +12,7 @@ import {
   assertCreditTestUnlockAllowed,
   assertProtectedCreditTestRun,
   collectCreditTestProof,
+  creditTestProofPublicErrorCode,
   inspectLockedObsoletePrincipal,
   obsoletePrincipalProofQueries,
   openCreditTestProvisionerSession,
@@ -706,6 +707,40 @@ describe("protected metadata proof", () => {
       ),
     ).not.toThrow();
   });
+  it("classifies a runtime probe timeout without exposing its captured secrets or continuing", async () => {
+    const f = collectorFixture();
+    const execute = f.execute;
+    f.execute = (command, args, childEnv) => {
+      if (args[0] === "ssh")
+        throw Object.assign(new Error("mysql://secret-password/private-data"), {
+          code: "ETIMEDOUT",
+          stderr: "private customer text",
+          stdout: "secret-token",
+        });
+      return execute(command, args, childEnv);
+    };
+    const error = await collectCreditTestProof(f).catch((error) => error);
+    expect(creditTestProofPublicErrorCode(error)).toBe(
+      "runtime_trigger_probe:timeout",
+    );
+    expect(error.message).toBe("credit_test_proof_rejected");
+    expect(error.cause).toBeUndefined();
+    expect(JSON.stringify(error)).not.toMatch(/secret|password|customer|mysql/);
+    expect(f.session.initialize).not.toHaveBeenCalled();
+  });
+  it("classifies database initialization refusal and still closes the session", async () => {
+    const f = collectorFixture();
+    f.session.initialize.mockRejectedValue(new Error("secret database URL"));
+    const error = await collectCreditTestProof(f).catch((error) => error);
+    expect(creditTestProofPublicErrorCode(error)).toBe(
+      "database_identity:failed",
+    );
+    expect(f.session.close).toHaveBeenCalledOnce();
+    expect(error.cause).toBeUndefined();
+    expect(creditTestProofPublicErrorCode({ publicCode: "secret-value" })).toBe(
+      "unclassified",
+    );
+  });
   it.each([
     { afterBaseline: { identity: "deploy-101-1" } },
     { afterBaseline: { releaseWatermark: "f".repeat(64) } },
@@ -766,8 +801,9 @@ describe("protected metadata proof", () => {
       assertCreditTestEvidence(recorded, current, NOW),
     ).not.toThrow();
     f.activation.controls[0].enabled = 0;
-    await expect(collectCreditTestProof(f)).rejects.toThrow(
-      "credit_test_activation_audit_rejected",
+    const error = await collectCreditTestProof(f).catch((error) => error);
+    expect(creditTestProofPublicErrorCode(error)).toBe(
+      "activation_audit:failed",
     );
     expect(f.session.close).toHaveBeenCalledTimes(3);
   });

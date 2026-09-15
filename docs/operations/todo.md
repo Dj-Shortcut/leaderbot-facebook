@@ -25,16 +25,26 @@ Owner authorization (2026-09-15): merge and deploy the bot improvements from
   passed after exact-source CI. Its image is `registry.fly.io/leaderbot-fb-image-gen@sha256:4b211aa3d68a7599bd3f18f4d166b9223f442332ff02528a99daa180b7d9afbd`,
   with [provenance 47594509](https://github.com/Dj-Shortcut/openclaw-facebook/attestations/47594509).
   Earlier evaluator-only artifacts are superseded.
-- [ ] Merge [release #544](https://github.com/Dj-Shortcut/openclaw-facebook/pull/544)
-  with the combined attested image and matching exact contract tests after CI.
-  Current production remains metadata-verified `deploy-34628911410-1` /
-  image digest `b1f3996faff2406eba3383465974895dc2dcbacd6432f5ab1591cb1e76be4bdf`.
-  Its exact reviewed restore config and separate emergency rollback with
-  checkout and paid admission disabled are retained.
+- [x] [Release #544](https://github.com/Dj-Shortcut/openclaw-facebook/pull/544)
+  merged as `d3465280ee605c88b75e35f13cb972aaec976616`; exact main production
+  contracts, Image Gen CI and migration smoke passed. Code and security reviews
+  completed without open findings.
+- [ ] Unblock protected deployment [34962875066](https://github.com/Dj-Shortcut/openclaw-facebook/actions/runs/34962875066).
+  The initial SSH timeout was resolved by the owner-approved restart of app
+  Machine `28607e7c932038` with 60 seconds of shutdown grace. All four runtime
+  Machines now accept the bounded SSH no-op; the actual reversible billing
+  trigger preflight subsequently passed. Attempts 3 and 4 then stopped before
+  rollout in `Produce fresh bounded Test database and runtime proof` with only
+  `credit_test_proof_rejected`. Add content-free stage diagnostics, rerun through
+  protected main, and address the proven failure without bypassing any gate.
+  Provenance, Meta callbacks (including `message_reactions`) and rollback
+  capture passed. Current production remains verified `deploy-34628911410-1` /
+  digest `b1f3996faff2406eba3383465974895dc2dcbacd6432f5ab1591cb1e76be4bdf`;
+  health and readiness are green. The new combined runtime is not deployed.
 - [ ] Run protected `Deploy production` for image-gen only. Record final release
   identity, immutable digest, provenance, settled-live verification, readiness
-  and Meta callback results. The operator reports `message_reactions` enabled;
-  the release contract now requires that webhook field.
+  and Meta callback results. Meta callback validation passed in both blocked
+  attempts; an actual clicked-reaction user journey remains unverified.
 - [ ] Complete a consented Messenger smoke: prompt-first generation, source-photo
   edit, emoji/like sticker, clicked reaction, courtesy, pre-consent input and
   typed-consent photo. Confirm accepted-response signals, no false missing reply,
