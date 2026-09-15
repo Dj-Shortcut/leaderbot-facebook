@@ -106,64 +106,70 @@ async function handleEvent(
   const eventContext = await createTrackedEventContext(ctx, event, entryId);
   if (!eventContext) return;
 
-  const { psid, userId, reqId, state, trackedCtx } = eventContext;
-
-  logMessengerWebhookTrace("webhook_received", {
-    reqId,
-    user: toLogUser(userId),
-    hasReceivingPageContext: Boolean(entryId?.trim()),
-    hasMessage: Boolean(event.message),
-    hasPostback: Boolean(event.postback),
-    isEcho: Boolean(event.message?.is_echo),
-  });
-
+  let evaluationFailed = false;
   try {
-    trackedCtx.logIncomingMessage(psid, userId, event, reqId);
-    trackedCtx.logUserState(psid, userId, state, reqId, "handle_event");
+    const { psid, userId, reqId, state, trackedCtx } = eventContext;
 
-    if (eventContext.senderLocale) {
-      if (
-        eventContext.lang !== state.preferredLang ||
-        state.preferredLangSource !== "sender_locale"
-      ) {
-        await setPreferredLang(psid, eventContext.lang, "sender_locale");
-      }
-    } else if (
-      state.preferredLangSource !== "sender_locale" &&
-      (eventContext.lang !== state.preferredLang ||
-        state.preferredLangSource !== "account_default")
-    ) {
-      await setPreferredLang(psid, eventContext.lang, "account_default");
-    }
-
-    await routeTrackedEvent(eventContext, event);
-  } catch (error) {
-    logMessengerWebhookTrace("top_level_catch", {
+    logMessengerWebhookTrace("webhook_received", {
       reqId,
       user: toLogUser(userId),
-      errorCode:
-        error instanceof Error ? error.constructor.name : "UnknownError",
+      hasReceivingPageContext: Boolean(entryId?.trim()),
+      hasMessage: Boolean(event.message),
+      hasPostback: Boolean(event.postback),
+      isEcho: Boolean(event.message?.is_echo),
     });
-    captureException(error, {
-      reqId,
-      area: "webhook",
-      eventType: event.postback
-        ? "postback"
-        : event.message
-          ? "message"
-          : "unknown",
-      hasImage: Boolean(
-        event.message?.attachments?.some(
-          attachment => attachment.type === "image"
-        )
-      ),
-      hasText: Boolean(event.message?.text),
-    });
-    await eventContext.sendFallbackIfNeeded();
-    throw error;
-  }
 
-  await eventContext.sendFallbackIfNeeded();
+    try {
+      trackedCtx.logIncomingMessage(psid, userId, event, reqId);
+      trackedCtx.logUserState(psid, userId, state, reqId, "handle_event");
+
+      if (eventContext.senderLocale) {
+        if (
+          eventContext.lang !== state.preferredLang ||
+          state.preferredLangSource !== "sender_locale"
+        ) {
+          await setPreferredLang(psid, eventContext.lang, "sender_locale");
+        }
+      } else if (
+        state.preferredLangSource !== "sender_locale" &&
+        (eventContext.lang !== state.preferredLang ||
+          state.preferredLangSource !== "account_default")
+      ) {
+        await setPreferredLang(psid, eventContext.lang, "account_default");
+      }
+
+      await routeTrackedEvent(eventContext, event);
+    } catch (error) {
+      evaluationFailed = true;
+      logMessengerWebhookTrace("top_level_catch", {
+        reqId,
+        user: toLogUser(userId),
+        errorCode:
+          error instanceof Error ? error.constructor.name : "UnknownError",
+      });
+      captureException(error, {
+        reqId,
+        area: "webhook",
+        eventType: event.postback
+          ? "postback"
+          : event.message
+            ? "message"
+            : "unknown",
+        hasImage: Boolean(
+          event.message?.attachments?.some(
+            attachment => attachment.type === "image"
+          )
+        ),
+        hasText: Boolean(event.message?.text),
+      });
+      await eventContext.sendFallbackIfNeeded();
+      throw error;
+    }
+
+    await eventContext.sendFallbackIfNeeded();
+  } finally {
+    eventContext.finishEvaluation?.(evaluationFailed);
+  }
 }
 
 async function handleMessengerDeliveryReceipt(

@@ -1,3 +1,4 @@
+import { createConversationEvaluation } from "./conversationEvaluation";
 import { randomUUID } from "node:crypto";
 import type { MessengerSendOutcome } from "./messengerApi";
 import { recordActiveUserToday } from "./botRuntimeStats";
@@ -42,6 +43,7 @@ export type TrackedEventContext = {
   ) => void;
   sendFallbackIfNeeded: () => Promise<void>;
   trackedCtx: HandlerContext;
+  finishEvaluation?: (failed?: boolean) => void;
 };
 
 /** Creates per-event tracking, locale, state, and fallback context for webhook routing. */
@@ -84,10 +86,6 @@ export async function createTrackedEventContext(
     }
   }
   const responseTracker = createResponseSentTracker();
-  const trackedCtx = createTrackedHandlerContext(
-    ctx,
-    responseTracker.markResponseSentFromOutcome
-  );
 
   if (!(await ctx.claimEventReplayOrLog(event, entryId, userId, reqId))) {
     return null;
@@ -116,6 +114,16 @@ export async function createTrackedEventContext(
   const lang = senderLocale
     ? localeLang
     : storedSenderLanguage || ctx.defaultLang;
+  const evaluation = createConversationEvaluation({
+    event,
+    state,
+    lang,
+    reqId,
+  });
+  const trackedCtx = createTrackedHandlerContext(
+    evaluation.wrap(ctx),
+    responseTracker.markResponseSentFromOutcome
+  );
   const classification = classifyInboundEvent(event);
   await recordInboundUserActivity(psid, event, classification);
   const sendFallbackIfNeeded = () =>
@@ -145,5 +153,6 @@ export async function createTrackedEventContext(
     markResponseSentFromOutcome: responseTracker.markResponseSentFromOutcome,
     sendFallbackIfNeeded,
     trackedCtx,
+    finishEvaluation: evaluation.finish,
   };
 }

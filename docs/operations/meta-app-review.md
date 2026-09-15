@@ -139,3 +139,13 @@ For every new Messenger capability:
   and legal/privacy copy are ready.
 - Preserve webhook verification, request signatures, response-window behavior,
   quota enforcement, GDPR deletion, and privacy-safe observability.
+
+## Metadata-only conversation evaluation (candidate)
+
+The proposed operator evaluator adds no Messenger permissions or customer-facing
+flow. After existing consent it applies a few rules to the currently processed
+message and records only categories, outcome flags and request IDs. It does not
+retain conversation text or media and does not initiate messages or generation.
+Technical collection and coverage limits are documented in
+[Conversation evaluation](conversation-evaluation.md). Runtime activation still
+requires the protected production release and consented smoke verification.
