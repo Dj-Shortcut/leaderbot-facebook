@@ -454,6 +454,7 @@ function metaResponse(pageCallback, transform = (data) => data) {
               "messaging_postbacks",
               "message_deliveries",
               "message_reads",
+              "message_reactions",
             ],
           },
           {
@@ -1232,7 +1233,7 @@ describe("production deployment contract", () => {
     });
   });
 
-  it("pins the conversation evaluator runtime while retaining the settled payment predecessor and dark emergency rollback", () => {
+  it("pins the combined Messenger bot and evaluator runtime while retaining the settled payment predecessor and dark emergency rollback", () => {
     const manifest = JSON.parse(
       fs.readFileSync(
         path.join(repoRoot, "deploy/production/apps.json"),
@@ -1259,10 +1260,10 @@ describe("production deployment contract", () => {
     expect(app.deploymentEnabled).toBe(true);
     expect(app.reviewedArtifactKind).toBe("runtime");
     expect(app.reviewedImage).toBe(
-      "registry.fly.io/leaderbot-fb-image-gen@sha256:dee3deecd9c01e043c86fa88a38cc396d6a86169c799e6b68aa29190fc5d1df0",
+      "registry.fly.io/leaderbot-fb-image-gen@sha256:4b211aa3d68a7599bd3f18f4d166b9223f442332ff02528a99daa180b7d9afbd",
     );
     expect(app.reviewedSourceCommit).toBe(
-      "f3a335ea3587bd1f1d0af003f9aa2127c3d64894",
+      "afb6c8cd48e7e795ee05eba0283d2ba165d15881",
     );
     expect(app.reviewedImage).not.toBe(predecessorImage);
     expect(app.reviewedImageSchemaPhases).toEqual([
@@ -12305,6 +12306,32 @@ describe("Meta callback contract", () => {
 
     expect(result.errors).toContain(
       "Unreviewed Meta subscription object instagram",
+    );
+  });
+
+  it("requires reaction events for the released Messenger social flow", async () => {
+    const result = await checkMetaCallbacks({
+      rootDir: repoRoot,
+      appId: "test-app",
+      appSecret: "test-secret",
+      fetchImpl: async () =>
+        metaResponse(
+          "https://leaderbot-fb-image-gen.fly.dev/facebook/webhook",
+          (data) =>
+            data.map((subscription) =>
+              subscription.object === "page"
+                ? {
+                    ...subscription,
+                    fields: subscription.fields.filter(
+                      (field) => field !== "message_reactions",
+                    ),
+                  }
+                : subscription,
+            ),
+        ),
+    });
+    expect(result.errors).toContain(
+      "page is missing required field message_reactions",
     );
   });
 

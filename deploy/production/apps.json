@@ -94,9 +94,9 @@
       "sourceDeployEnabled": false,
       "sourceDeployBlockReason": "Production deploys require an immutable image built from reviewed source and recorded in this manifest before rollout.",
       "trustedBuilderWorkflow": ".github/workflows/build-production-artifacts.yml",
-      "reviewedImage": "registry.fly.io/leaderbot-fb-image-gen@sha256:dee3deecd9c01e043c86fa88a38cc396d6a86169c799e6b68aa29190fc5d1df0",
+      "reviewedImage": "registry.fly.io/leaderbot-fb-image-gen@sha256:4b211aa3d68a7599bd3f18f4d166b9223f442332ff02528a99daa180b7d9afbd",
       "reviewedArtifactKind": "runtime",
-      "reviewedSourceCommit": "f3a335ea3587bd1f1d0af003f9aa2127c3d64894",
+      "reviewedSourceCommit": "afb6c8cd48e7e795ee05eba0283d2ba165d15881",
       "reviewedSettledPredecessor": {
         "identity": "deploy-34628911410-1",
         "image": "registry.fly.io/leaderbot-fb-image-gen@sha256:b1f3996faff2406eba3383465974895dc2dcbacd6432f5ab1591cb1e76be4bdf",
@@ -255,7 +255,8 @@
         "messages",
         "messaging_postbacks",
         "message_deliveries",
-        "message_reads"
+        "message_reads",
+        "message_reactions"
       ]
     },
     "whatsapp_business_account": {
