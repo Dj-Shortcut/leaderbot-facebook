@@ -7,6 +7,7 @@ import {
 import { GDPR_DELETE_CONFIRM } from "./consentActionIds";
 import { safeLog } from "./logger";
 import {
+  finishPendingConsentInput,
   holdPendingConsentInput,
   takePendingConsentInput,
 } from "./pendingConsentInput";
@@ -376,43 +377,94 @@ async function routeConsentGate(
     state,
     holdPendingInput: async () => {
       const outcome = await holdPendingConsentInput(psid, event.message);
-      if (outcome === "held") {
-        await trackedCtx.sendLoggedText(
-          psid,
-          lang === "en"
-            ? "Your photos and request will stay ready for up to 15 minutes while you decide. After you agree, I’ll continue automatically. I won’t process them before then."
-            : "Je foto’s en opdracht blijven maximaal 15 minuten klaarstaan terwijl je beslist. Na je akkoord ga ik automatisch verder. Tot dan verwerk ik ze nog niet.",
-          reqId
-        );
-      } else if (outcome === "limit") {
-        await trackedCtx.sendLoggedText(
-          psid,
-          lang === "en"
-            ? "This request is too large to hold while waiting for consent (maximum 4 photos and 32 KB of text). Please give permission first, then send a smaller request."
-            : "Deze opdracht is te groot om op toestemming te wachten (maximaal 4 foto’s en 32 KB tekst). Geef eerst toestemming en stuur daarna een kleinere opdracht.",
-          reqId
-        );
+      if (outcome === "consented") return "consented";
+      try {
+        if (outcome === "held") {
+          await trackedCtx.sendLoggedText(
+            psid,
+            lang === "en"
+              ? "Your photos and request will stay ready for up to 15 minutes while you decide. After you agree, I’ll continue automatically. I won’t process them before then."
+              : "Je foto’s en opdracht blijven maximaal 15 minuten klaarstaan terwijl je beslist. Na je akkoord ga ik automatisch verder. Tot dan verwerk ik ze nog niet.",
+            reqId
+          );
+        } else if (outcome === "limit") {
+          await trackedCtx.sendLoggedText(
+            psid,
+            lang === "en"
+              ? "This request is too large to hold while waiting for consent (maximum 4 photos and 32 KB of text). Please give permission first, then send a smaller request."
+              : "Deze opdracht is te groot om op toestemming te wachten (maximaal 4 foto’s en 32 KB tekst). Geef eerst toestemming en stuur daarna een kleinere opdracht.",
+            reqId
+          );
+        }
+      } catch (error) {
+        safeLog("messenger_pending_consent_notice_failed", {
+          reqId,
+          errorCode:
+            error instanceof Error ? error.constructor.name : "UnknownError",
+        });
       }
     },
     resumePendingInput: async () => {
+      // A typed consent caption is control text; its attached photos are input.
+      const currentInput = await holdPendingConsentInput(
+        psid,
+        event.message
+          ? {
+              attachments: event.message.attachments,
+              sticker_id: event.message.sticker_id,
+            }
+          : undefined,
+        Date.now(),
+        true
+      );
+      if (currentInput === "limit") {
+        await trackedCtx.sendLoggedText(
+          psid,
+          lang === "en"
+            ? "This request exceeds 4 photos or 32 KB of text. Please send a smaller request."
+            : "Deze opdracht bevat meer dan 4 foto’s of 32 KB tekst. Stuur een kleinere opdracht.",
+          reqId
+        );
+        return true;
+      }
       const pending = await takePendingConsentInput(psid);
       if (!pending) return false;
-      await handleMessageEvent(trackedCtx, {
-        psid,
-        userId,
-        reqId,
-        lang,
-        event: {
-          timestamp: event.timestamp,
-          message: {
-            text: pending.text,
-            attachments: pending.imageUrls.map(url => ({
-              type: "image",
-              payload: { url },
-            })),
+      try {
+        setMessengerRequestOperationId(pending.operationId);
+        await handleMessageEvent(trackedCtx, {
+          psid,
+          userId,
+          reqId: pending.operationId,
+          lang,
+          event: {
+            timestamp: event.timestamp,
+            message: {
+              text: pending.text,
+              attachments: pending.imageUrls.map(url => ({
+                type: "image",
+                payload: { url },
+              })),
+            },
           },
-        },
-      });
+        });
+      } catch (error) {
+        try {
+          await finishPendingConsentInput(psid, pending, false);
+          await trackedCtx.sendLoggedText(
+            psid,
+            lang === "en"
+              ? "I could not continue your saved request. Tap Agree again within 15 minutes of your first message to retry."
+              : "Ik kon je bewaarde opdracht niet hervatten. Klik opnieuw op Akkoord binnen 15 minuten na je eerste bericht om opnieuw te proberen.",
+            reqId
+          );
+        } catch {
+          safeLog("messenger_pending_consent_recovery_failed", { reqId });
+        }
+        throw error;
+      }
+      // Routing succeeded. An uncertain completion write must not release the
+      // claim and immediately route the same input again.
+      await finishPendingConsentInput(psid, pending, true);
       return true;
     },
     sendText: async text => {

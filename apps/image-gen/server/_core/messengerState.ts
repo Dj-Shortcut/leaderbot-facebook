@@ -51,14 +51,7 @@ export type PendingVideoGeneration = {
   requestedAt: number;
 };
 
-export type PendingConsentInput = {
-  text?: string;
-  imageUrls: string[];
-  expiresAt: number;
-};
-
 export type MessengerUserState = {
-  pendingConsentInput?: PendingConsentInput | null;
   psid: string;
   userKey: string;
   /** Receiving Facebook Page for this Page-scoped sender state. */
@@ -345,7 +338,6 @@ export function setConsentState(
     psid,
     {
       consentGiven,
-      ...(!consentGiven ? { pendingConsentInput: null } : {}),
       consentTimestamp: consentGiven ? now : undefined,
       consentDeclinedAt: consentGiven ? undefined : now,
       consentPromptedAt: undefined,

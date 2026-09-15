@@ -1,3 +1,4 @@
+import { getPendingConsentStorageScope } from "./_core/messengerStatePersistence";
 import {
   afterAll,
   afterEach,
@@ -82,6 +83,7 @@ import {
 import { resetMessengerGenerationQueueForTests } from "./_core/messengerGenerationQueue";
 import { runWithMessengerRequestContext } from "./_core/messengerRequestContext";
 import {
+  readScopedState,
   deleteEphemeralKey,
   setEphemeralKey,
   writeScopedState,
@@ -1060,7 +1062,12 @@ describe("messenger webhook dedupe", () => {
     const before = await getTestMessengerState(psid);
     expect(before?.lastPhotoUrl).toBeNull();
     expect(before?.consentGiven).toBe(false);
-    expect(before?.pendingConsentInput).toEqual(
+    expect(
+      await runWithTestMessengerPageContext(() => {
+        const scope = getPendingConsentStorageScope(psid);
+        return readScopedState(scope.scope, scope.key);
+      })
+    ).toEqual(
       expect.objectContaining({
         text: prompt,
         imageUrls: ["https://img.example/before-consent.jpg"],
@@ -1083,7 +1090,12 @@ describe("messenger webhook dedupe", () => {
       ],
     });
     expect((await getTestMessengerState(psid))?.consentGiven).toBe(true);
-    expect((await getTestMessengerState(psid))?.pendingConsentInput).toBeNull();
+    expect(
+      await runWithTestMessengerPageContext(() => {
+        const scope = getPendingConsentStorageScope(psid);
+        return readScopedState(scope.scope, scope.key);
+      })
+    ).toBeNull();
     expect(fetchMock).toHaveBeenCalled();
     expect((await getTestMessengerState(psid))?.pendingImageUrl).toBeTruthy();
   });
