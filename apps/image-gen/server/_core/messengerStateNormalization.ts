@@ -104,6 +104,13 @@ export function normalizeState(
   psid: string,
   value: PartialState | null | undefined
 ): MessengerUserState {
+  // Never re-persist pre-sidecar content with the ordinary state lifetime.
+  // This also scrubs the embedded representation on refusal after a rollback.
+  if (value && "pendingConsentInput" in value) {
+    const clean = { ...value };
+    delete clean.pendingConsentInput;
+    value = clean;
+  }
   const base = createStateNormalizationBase(psid, value);
   const legacyFields = resolveLegacyStateFields(value, base.fallback);
 

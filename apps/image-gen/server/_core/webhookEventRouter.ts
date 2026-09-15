@@ -447,7 +447,6 @@ async function routeConsentGate(
             },
           },
         });
-        await finishPendingConsentInput(psid, pending, true);
       } catch (error) {
         try {
           await finishPendingConsentInput(psid, pending, false);
@@ -463,6 +462,9 @@ async function routeConsentGate(
         }
         throw error;
       }
+      // Routing succeeded. An uncertain completion write must not release the
+      // claim and immediately route the same input again.
+      await finishPendingConsentInput(psid, pending, true);
       return true;
     },
     sendText: async text => {

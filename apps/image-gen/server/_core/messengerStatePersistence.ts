@@ -57,10 +57,6 @@ export function getPendingConsentStorageScope(psid: string) {
   };
 }
 
-export function clearPendingConsentStorage(psid: string): MaybePromise<void> {
-  return deleteScopedState(PENDING_CONSENT_SCOPE, getPersistedStateKey(psid));
-}
-
 type MessengerUserPageIndex = {
   stateKey: string | null;
   userKey: string;
@@ -192,6 +188,7 @@ const FENCED_STATE_WRITE_SCRIPT = `
 
   redis.call("SET", KEYS[1], ARGV[1], "EX", ARGV[3])
   redis.call("SET", KEYS[2], ARGV[2], "EX", ARGV[3])
+  if ARGV[8] == "1" then redis.call("DEL", KEYS[4]) end
   return 1
 `;
 
@@ -201,12 +198,27 @@ async function writeFencedState(
   expectedRaw?: string | null
 ): Promise<"stored" | "conflict"> {
   const fence = stateFenceFromState(nextState);
+  const declined =
+    nextState.consentGiven !== true &&
+    nextState.consentDeclinedAt !== undefined;
   if (!fence || !nextState.pageId || !nextState.userKey) {
     if (process.env.NODE_ENV === "production") {
       throw new Error("Messenger state privacy fence is required");
     }
-    await Promise.resolve(
-      writeState(getPersistedStateKey(psid, nextState.pageId), nextState)
+    const stateKey = getPersistedStateKey(psid, nextState.pageId);
+    const redis = await getRedisClient();
+    await redis.eval(
+      `
+      redis.call("SET", KEYS[1], ARGV[1], "EX", ARGV[2])
+      if ARGV[3] == "1" then redis.call("DEL", KEYS[2]) end
+      return 1
+    `,
+      2,
+      getStateStorageKey(stateKey),
+      getScopedStateStorageKey(PENDING_CONSENT_SCOPE, stateKey),
+      JSON.stringify(nextState),
+      getStateTtlSeconds(nextState),
+      declined ? "1" : "0"
     );
     await Promise.resolve(
       writeUserPageIndex(
@@ -239,17 +251,19 @@ async function writeFencedState(
   const result = Number(
     await redis.eval(
       FENCED_STATE_WRITE_SCRIPT,
-      3,
+      4,
       getStateStorageKey(stateKey),
       getScopedStateStorageKey(MESSENGER_USER_PAGE_INDEX_SCOPE, indexKey),
       getStatePrivacyTombstoneKey(nextState.userKey, fence),
+      getScopedStateStorageKey(PENDING_CONSENT_SCOPE, stateKey),
       JSON.stringify(nextState),
       JSON.stringify(index),
       getStateTtlSeconds(nextState),
       stateKey,
       fence.privacyEpoch,
       mode,
-      expectedRaw ?? ""
+      expectedRaw ?? "",
+      declined ? "1" : "0"
     )
   );
   if (result === 1) return "stored";
@@ -314,7 +328,7 @@ function saveState(
   psid: string,
   nextState: MessengerUserState
 ): MaybePromise<MessengerUserState> {
-  if (isRedisStateStoreEnabled() && stateFenceFromState(nextState)) {
+  if (isRedisStateStoreEnabled()) {
     return writeFencedState(psid, nextState).then(() => nextState);
   }
   const stateKey = getPersistedStateKey(psid, nextState.pageId);
@@ -325,6 +339,13 @@ function saveState(
       .then(() => nextState);
   }
 
+  // Memory mode has no async yield between the state write and pending erasure.
+  if (
+    nextState.consentGiven !== true &&
+    nextState.consentDeclinedAt !== undefined
+  ) {
+    void deleteScopedState(PENDING_CONSENT_SCOPE, stateKey);
+  }
   const indexed = writeUserPageIndex(stateKey, nextState);
   if (isPromiseLike(indexed)) return indexed.then(() => nextState);
 

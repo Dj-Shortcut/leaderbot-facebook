@@ -59,7 +59,7 @@ export async function holdPendingConsentInput(
       ) {
         return { pending: null, result: "ignored" as const };
       }
-      if (previous?.claim)
+      if (previous?.claim && previous.claim.expiresAt > now)
         return { pending: previous, result: "ignored" as const };
       const combinedText = [previous?.text, text].filter(Boolean).join("\n\n");
       const combinedImages = [

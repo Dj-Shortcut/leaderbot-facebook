@@ -1,3 +1,4 @@
+import * as pendingInput from "./_core/pendingConsentInput";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { handleMessage } = vi.hoisted(() => ({ handleMessage: vi.fn() }));
@@ -54,7 +55,10 @@ describe("pending consent event routing", () => {
     resetStateStore();
     handleMessage.mockReset().mockResolvedValue(undefined);
   });
-  afterEach(() => vi.unstubAllEnvs());
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllEnvs();
+  });
 
   it("continues to consent controls if the optional held notice fails", async () =>
     scoped(async () => {
@@ -140,5 +144,50 @@ describe("pending consent event routing", () => {
       );
       await routeTrackedEvent(ctx, agree);
       expect(handleMessage).toHaveBeenCalledOnce();
+    }));
+  it("preserves a typed agreement photo after an abandoned claim expires", async () =>
+    scoped(async () => {
+      vi.useFakeTimers();
+      await holdPendingConsentInput(psid, { text: "Draw a portrait" });
+      await setConsentState(psid, true);
+      const first = (await pendingInput.takePendingConsentInput(psid))!;
+      vi.advanceTimersByTime(5 * 60_000 + 1);
+      const event = { message: { text: "I agree", attachments: [image] } };
+      await routeTrackedEvent(await context(event), event);
+      expect(handleMessage).toHaveBeenCalledOnce();
+      expect(handleMessage.mock.calls[0][1]).toEqual(
+        expect.objectContaining({
+          reqId: first.operationId,
+          event: expect.objectContaining({
+            message: {
+              text: "Draw a portrait",
+              attachments: [image],
+            },
+          }),
+        })
+      );
+    }));
+
+  it("does not release the claim if completion persistence fails after successful routing", async () =>
+    scoped(async () => {
+      await holdPendingConsentInput(psid, { text: "Draw a cat" });
+      const finish = vi
+        .spyOn(pendingInput, "finishPendingConsentInput")
+        .mockRejectedValueOnce(new Error("completion write failed"));
+      try {
+        await expect(
+          routeTrackedEvent(await context(agree), agree)
+        ).rejects.toThrow("completion write failed");
+        expect(finish).toHaveBeenCalledTimes(1);
+        expect(finish.mock.calls[0][2]).toBe(true);
+        const scope = getPendingConsentStorageScope(psid);
+        expect(await readScopedState(scope.scope, scope.key)).toEqual(
+          expect.objectContaining({ claim: expect.any(Object) })
+        );
+        await routeTrackedEvent(await context(agree), agree);
+        expect(handleMessage).toHaveBeenCalledTimes(1);
+      } finally {
+        finish.mockRestore();
+      }
     }));
 });

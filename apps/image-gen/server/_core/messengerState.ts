@@ -12,7 +12,6 @@ import { toUserKey } from "./privacy";
 import { MAX_SOURCE_IMAGES } from "./image-generation/generationTypes";
 import { getMessengerRequestPageId } from "./messengerRequestContext";
 import {
-  clearPendingConsentStorage,
   deletePersistedState,
   findPersistedStateByUserKeyForPage,
   getOrCreatePersistedState,
@@ -349,11 +348,8 @@ export function setConsentState(
   );
 
   if (isPromiseLike(result)) {
-    return result.then(() =>
-      consentGiven ? undefined : clearPendingConsentStorage(psid)
-    );
+    return result.then(() => undefined);
   }
-  if (!consentGiven) return clearPendingConsentStorage(psid);
 }
 
 export function setConsentPromptedAt(

@@ -180,6 +180,75 @@ suite("Messenger state Redis privacy fence", () => {
     expect(await (await getRedisClient()).get(owned.storageKey)).toBeNull();
   });
 
+  it.each([false, true])(
+    "refuses consent and removes pending content atomically, failure after commit=%s",
+    async afterCommit => {
+      const psid = "pending-refusal-failure";
+      await withFence(psid, 42, 7, 3, 5, async () => {
+        await getOrCreateState(psid);
+        await holdPendingConsentInput(psid, { text: "private-pending" });
+        const scope = getPendingConsentStorageScope(psid);
+        const redis = await getRedisClient();
+        const original = redis.eval.bind(redis);
+        const spy = vi
+          .spyOn(redis, "eval")
+          .mockImplementationOnce(async (...args) => {
+            if (afterCommit) await original(...args);
+            throw new Error("refusal write unavailable");
+          });
+        try {
+          await expect(setConsentState(psid, false)).rejects.toThrow(
+            "refusal write unavailable"
+          );
+        } finally {
+          spy.mockRestore();
+        }
+        const stored = JSON.parse((await redis.get(scope.stateKey))!);
+        const pending = await redis.get(scope.storageKey);
+        expect(stored.consentDeclinedAt !== undefined).toBe(afterCommit);
+        expect(pending === null).toBe(afterCommit);
+        if (!afterCommit) {
+          await setConsentState(psid, false);
+          expect(await redis.get(scope.storageKey)).toBeNull();
+        }
+      });
+    }
+  );
+
+  it.each([false, true])(
+    "strips legacy embedded content on state writes, refusal=%s",
+    async refusal => {
+      const psid = "legacy-embedded-pending";
+      await withFence(psid, 42, 7, 3, 5, async () => {
+        const state = await getOrCreateState(psid);
+        await holdPendingConsentInput(psid, { text: "sidecar-private" });
+        const scope = getPendingConsentStorageScope(psid);
+        const redis = await getRedisClient();
+        await redis.set(
+          scope.stateKey,
+          JSON.stringify({
+            ...state,
+            pendingConsentInput: {
+              text: "legacy-private",
+              imageUrls: ["https://example.test/legacy.jpg"],
+              expiresAt: Date.now() + 900000,
+            },
+          }),
+          "EX",
+          900
+        );
+        if (refusal) await setConsentState(psid, false);
+        else
+          await setLastGenerationContext(psid, { prompt: "consented-context" });
+        const raw = (await redis.get(scope.stateKey))!;
+        expect(raw).not.toContain("pendingConsentInput");
+        expect(raw).not.toContain("legacy-private");
+        expect(raw).not.toContain("legacy.jpg");
+        expect((await redis.get(scope.storageKey)) === null).toBe(refusal);
+      });
+    }
+  );
+
   it("atomically rejects stale state writes after the subject is erased", async () => {
     const psid = "state-privacy-user-a";
     const userKey = await withFence(psid, 42, 7, 3, 5, async () => {

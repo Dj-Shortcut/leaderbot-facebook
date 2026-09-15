@@ -87,11 +87,15 @@ and payment safety prerequisites afresh.
   and passed through the normal image, face-memory, quota and delivery paths.
   A separate owner/Page/privacy-epoch-scoped Redis key has a fixed absolute
   expiry; regular conversation state never contains this raw pending input.
-  Refusal and scoped erasure delete it. Its TTL also expires abandoned input
+  Refusal and pending erasure commit together; scoped erasure also deletes it.
+  State normalization strips the old embedded representation before any rewrite.
+  Its TTL also expires abandoned input
   after a rollback because older state writers never touch this separate key.
   Routing claims keep the input until success. A failed attempt releases its
   claim and asks the user to click Agree again before the original expiry;
   abandoned claims expire after five minutes, keeping the same operation ID.
+  Expired claims accept photos on a repeated typed agreement. If routing succeeds
+  but its completion write fails, the claim stays held until its lease expires.
   A concurrent consent grant routes the incoming event normally. Photos attached
   to typed agreement join earlier input; the agreement caption is not a prompt.
   Optional hold/accept notices cannot prevent the actual consent/resume path.

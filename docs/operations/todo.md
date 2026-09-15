@@ -93,10 +93,12 @@ Live payment enablement remains gated by the relevant P1 through P4 evidence.
         require the Page's `message_reactions` subscription, and up to four photo
         references plus 32 KB text may wait at most 15 minutes for initial
         consent. PR #541 is merged but must not ship without the follow-up
+        [PR #545](https://github.com/Dj-Shortcut/openclaw-facebook/pull/545)
         consent-input recovery fix: separate expiring storage for rollback,
         recoverable claims, concurrent grant rerouting, optional notices and
         photos attached to typed agreement. Targeted Redis tests cover CAS,
-        physical expiry after an old-runtime state rewrite, and scoped erasure.
+        physical expiry after an old-runtime state rewrite, legacy-field
+        stripping, atomic refusal (including uncertain commit), and scoped erasure.
         The operator reports `message_reactions` enabled on 2026-09-15; verify
         the actual subscription in the protected release checks. Prove automatic
         continuation once, expiry and refusal in the direct Page smoke before

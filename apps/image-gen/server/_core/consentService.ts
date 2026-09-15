@@ -626,6 +626,13 @@ export async function handleMessengerConsentGate(
     return true;
   }
 
+  if (
+    input.state.consentGiven === true &&
+    isConsentAgreeText(input.text, false) &&
+    (await input.resumePendingInput?.())
+  )
+    return true;
+
   if (input.state.consentGiven !== true) {
     if (
       isConsentAgreeText(
