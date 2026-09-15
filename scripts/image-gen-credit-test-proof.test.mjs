@@ -12,6 +12,8 @@ import {
   assertCreditTestUnlockAllowed,
   assertProtectedCreditTestRun,
   collectCreditTestProof,
+  consumeCreditTestEvidence,
+  creditTestProofPublicErrorCode,
   inspectLockedObsoletePrincipal,
   obsoletePrincipalProofQueries,
   openCreditTestProvisionerSession,
@@ -706,6 +708,118 @@ describe("protected metadata proof", () => {
       ),
     ).not.toThrow();
   });
+  it("classifies a runtime probe timeout without exposing its captured secrets or continuing", async () => {
+    const f = collectorFixture();
+    const execute = f.execute;
+    f.execute = (command, args, childEnv) => {
+      if (args[0] === "ssh")
+        throw Object.assign(new Error("mysql://secret-password/private-data"), {
+          code: "ETIMEDOUT",
+          stderr: "private customer text",
+          stdout: "secret-token",
+        });
+      return execute(command, args, childEnv);
+    };
+    const error = await collectCreditTestProof(f).catch((error) => error);
+    expect(creditTestProofPublicErrorCode(error)).toBe(
+      "runtime_trigger_probe:timeout",
+    );
+    expect(error.message).toBe("credit_test_proof_rejected");
+    expect(error.cause).toBeUndefined();
+    expect(JSON.stringify(error)).not.toMatch(/secret|password|customer|mysql/);
+    expect(f.session.initialize).not.toHaveBeenCalled();
+  });
+  it("classifies database initialization refusal and still closes the session", async () => {
+    const f = collectorFixture();
+    f.session.initialize.mockRejectedValue(new Error("secret database URL"));
+    const error = await collectCreditTestProof(f).catch((error) => error);
+    expect(creditTestProofPublicErrorCode(error)).toBe(
+      "database_identity:failed",
+    );
+    expect(f.session.close).toHaveBeenCalledOnce();
+    expect(error.cause).toBeUndefined();
+    expect(creditTestProofPublicErrorCode({ publicCode: "secret-value" })).toBe(
+      "unclassified",
+    );
+  });
+  it("recognizes the protected HTTP deadline without exposing the DOMException", async () => {
+    const f = collectorFixture();
+    f.fetchImpl = async () => {
+      throw new DOMException("secret URL", "TimeoutError");
+    };
+    const error = await collectCreditTestProof(f).catch((error) => error);
+    expect(creditTestProofPublicErrorCode(error)).toBe("protected_run:timeout");
+    expect(error.cause).toBeUndefined();
+  });
+  it("recognizes the database deadline even when a helper normalizes the error", async () => {
+    vi.useFakeTimers();
+    try {
+      const f = collectorFixture();
+      let opened;
+      const opening = new Promise((resolve) => {
+        opened = resolve;
+      });
+      f.sessionFactory = ({ signal }) =>
+        new Promise((_, reject) => {
+          signal.addEventListener(
+            "abort",
+            () => reject(new Error("normalized private error")),
+            { once: true },
+          );
+          opened();
+        });
+      const collecting = collectCreditTestProof(f).catch((error) => error);
+      await opening;
+      await vi.advanceTimersByTimeAsync(90_000);
+      expect(creditTestProofPublicErrorCode(await collecting)).toBe(
+        "database_connection:timeout",
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it("identifies missing configuration and a mismatched predecessor", async () => {
+    const f = collectorFixture();
+    const missing = await collectCreditTestProof({
+      ...f,
+      env: { ...f.env, CREDIT_TEST_IMAGE_TOKEN: "" },
+    }).catch((error) => error);
+    expect(creditTestProofPublicErrorCode(missing)).toBe(
+      "configuration:failed",
+    );
+    f.app.reviewedSettledPredecessor = undefined;
+    const mismatch = await collectCreditTestProof(f).catch((error) => error);
+    expect(creditTestProofPublicErrorCode(mismatch)).toBe(
+      "baseline_binding:failed",
+    );
+  });
+  it("identifies malformed, stale and mismatched consumed evidence", async () => {
+    const f = collectorFixture();
+    const current = {
+      ...(await collectCreditTestProof(f)),
+      checkedAt: new Date().toISOString(),
+    };
+    const evidencePath = path.join(f.rootDir, "evidence.json");
+    fs.writeFileSync(evidencePath, JSON.stringify(current));
+    await expect(
+      consumeCreditTestEvidence(evidencePath, current),
+    ).resolves.toBeUndefined();
+    for (const value of [
+      "{secret malformed JSON",
+      JSON.stringify({ ...current, checkedAt: "2000-01-01T00:00:00Z" }),
+      JSON.stringify({ ...current, runAttempt: "999" }),
+    ]) {
+      fs.writeFileSync(evidencePath, value);
+      const error = await consumeCreditTestEvidence(
+        evidencePath,
+        current,
+      ).catch((error) => error);
+      expect(creditTestProofPublicErrorCode(error)).toBe(
+        "evidence_consume:failed",
+      );
+      expect(error.cause).toBeUndefined();
+    }
+  });
   it.each([
     { afterBaseline: { identity: "deploy-101-1" } },
     { afterBaseline: { releaseWatermark: "f".repeat(64) } },
@@ -766,8 +880,9 @@ describe("protected metadata proof", () => {
       assertCreditTestEvidence(recorded, current, NOW),
     ).not.toThrow();
     f.activation.controls[0].enabled = 0;
-    await expect(collectCreditTestProof(f)).rejects.toThrow(
-      "credit_test_activation_audit_rejected",
+    const error = await collectCreditTestProof(f).catch((error) => error);
+    expect(creditTestProofPublicErrorCode(error)).toBe(
+      "activation_audit:failed",
     );
     expect(f.session.close).toHaveBeenCalledTimes(3);
   });
