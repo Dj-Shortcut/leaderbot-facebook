@@ -5,8 +5,44 @@ not an incident archive: completed deployment transcripts belong in Git history
 or a dedicated incident record and should be summarized here only when they
 change an open gate.
 
-Last reviewed: **2026-09-11**.
+Last reviewed: **2026-09-15** (conversation evaluator release gates; existing
+product gates retain their recorded evidence).
 Last state reset: **2026-08-27**.
+
+## Conversation evaluator release gate
+
+Owner authorization (2026-09-15): merge and deploy the simple conversation
+evaluator. Production rollout is still pending; merged code is not live proof.
+
+- [x] Evaluator PR [#542](https://github.com/Dj-Shortcut/openclaw-facebook/pull/542)
+  merged as `032167db39a9c2cd228dd0b8ccad69e0bb60f76e`; exact-source CI passed.
+- [x] Initial trusted build
+  [34945717514](https://github.com/Dj-Shortcut/openclaw-facebook/actions/runs/34945717514)
+  produced `registry.fly.io/leaderbot-fb-image-gen@sha256:9accf24a2a54eea7a3666ff58fef58b06aff7fdab29158c8aaafea2756022459`
+  with provenance [47559750](https://github.com/Dj-Shortcut/openclaw-facebook/attestations/47559750).
+  **Do not deploy this initial candidate:** later review found missing
+  high-level reply observations; release preparation PR
+  [#543](https://github.com/Dj-Shortcut/openclaw-facebook/pull/543) corrects them.
+- [ ] Merge the reply-observation correction after CI, then build a replacement
+  trusted runtime from its exact green `main` source. Pin that replacement
+  digest/source in a reviewed release PR and update the exact contract-test
+  expectations together. Keep current production
+  `deploy-34628911410-1` / image digest `b1f3996faff2406eba3383465974895dc2dcbacd6432f5ab1591cb1e76be4bdf`
+  as the metadata-verified predecessor, with its exact reviewed restore config
+  and separate emergency rollback with checkout and paid admission disabled.
+- [ ] Run protected `Deploy production` for image-gen only. Record its final
+  release identity, immutable digest, provenance, settled-live verification,
+  readiness and Meta callback results before marking runtime checks live.
+- [ ] Complete a consented Messenger smoke: prompt-first generation, source-photo
+  edit and courtesy; confirm correct accepted-response signals, no false missing
+  reply on photo/consent/guidance prompts, no extra provider work/credits, and
+  metadata-only logging. Do not infer this from health checks alone.
+- [ ] Confirm the Codex hourly monitor observes the new runtime signals when
+  traffic is available. Preserve the sampled-log coverage limitation and avoid
+  interpreting empty snapshots as complete conversation health.
+
+Executable procedure: [Conversation evaluation](conversation-evaluation.md).
+Only diagnostic metadata is retained; no transcript or photo collection.
 
 ## Product decision
 
