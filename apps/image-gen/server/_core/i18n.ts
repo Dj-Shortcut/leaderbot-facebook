@@ -6,6 +6,12 @@ type TranslationParams = {
 };
 
 type TranslationKey =
+  | "socialThanks"
+  | "socialPositive"
+  | "socialNegative"
+  | "socialReaction"
+  | "socialCourtesy"
+  | "socialGoodbye"
   | "flowExplanation"
   | "photoEditPrompt"
   | "multiPhotoPrompt"
@@ -85,6 +91,12 @@ type TranslationValue = string | ((params: TranslationParams) => string);
 
 const translations: Record<Lang, Record<TranslationKey, TranslationValue>> = {
   nl: {
+    socialThanks: "Graag gedaan! 😊",
+    socialPositive: "Fijn dat je blij bent met het resultaat! 😊",
+    socialNegative: "Wil je iets anders? Vertel gerust wat je wilt aanpassen.",
+    socialReaction: "Bedankt voor je reactie!",
+    socialCourtesy: "😊",
+    socialGoodbye: "Tot de volgende keer! 👋",
     flowExplanation:
       "Beschrijf wat je wilt maken, of stuur een foto als je die wilt bewerken.",
     photoEditPrompt:
@@ -217,6 +229,13 @@ const translations: Record<Lang, Record<TranslationKey, TranslationValue>> = {
       "Ik heb je voice ontvangen, maar kan die nog niet verwerken. Stuur tekst of een foto.",
   },
   en: {
+    socialThanks: "You’re welcome! 😊",
+    socialPositive: "Glad you like the result! 😊",
+    socialNegative:
+      "Would you like something different? Tell me what you’d like to change.",
+    socialReaction: "Thanks for your reaction!",
+    socialCourtesy: "😊",
+    socialGoodbye: "See you next time! 👋",
     flowExplanation:
       "Describe the image you want to make, or send a photo if you want me to edit it.",
     photoEditPrompt:

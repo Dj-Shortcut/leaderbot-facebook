@@ -28,6 +28,8 @@ import {
 import { toUserKey } from "./privacy";
 
 type PartialState = Partial<MessengerUserState>;
+type StatePatch =
+  PartialState | ((current: MessengerUserState) => PartialState);
 const MESSENGER_PAGE_STATE_KEY_PREFIX = "messenger-page-v2";
 const MESSENGER_USER_PAGE_INDEX_SCOPE = "messenger-user-page-v1";
 
@@ -565,14 +567,14 @@ export function getOrCreatePersistedState(
 
 function patchStateInMemory(
   psid: string,
-  patch: PartialState,
+  patch: StatePatch,
   now = Date.now()
 ): MessengerUserState {
   const current = getStateFromMemory(psid) ?? createDefaultState(psid);
 
   const nextState = normalizeState(psid, {
     ...current,
-    ...patch,
+    ...(typeof patch === "function" ? patch(current) : patch),
     updatedAt: now,
   });
 
@@ -586,7 +588,7 @@ function patchStateInMemory(
 
 function patchStateInRedis(
   psid: string,
-  patch: PartialState,
+  patch: StatePatch,
   now = Date.now()
 ): Promise<MessengerUserState> {
   return (async () => {
@@ -596,9 +598,10 @@ function patchStateInRedis(
     for (let attempt = 0; attempt < 4; attempt += 1) {
       const raw = await redis.get(getStateStorageKey(stateKey));
       const current = raw ? (JSON.parse(raw) as PartialState) : null;
+      const currentState = normalizeState(psid, current);
       const normalized = normalizeState(psid, {
-        ...normalizeState(psid, current),
-        ...patch,
+        ...currentState,
+        ...(typeof patch === "function" ? patch(currentState) : patch),
         updatedAt: now,
       });
       if (!fence && process.env.NODE_ENV === "production") {
@@ -611,9 +614,10 @@ function patchStateInRedis(
   })();
 }
 
+/** A transform may run again on contention; keep external side effects outside it. */
 export function patchState(
   psid: string,
-  patch: PartialState,
+  patch: StatePatch,
   now = Date.now()
 ): MaybePromise<MessengerUserState> {
   if (!isRedisStateStoreEnabled()) {

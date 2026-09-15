@@ -69,6 +69,31 @@ and payment safety prerequisites afresh.
 | Delivered-image failure suppression | No new user-facing feature. Once Messenger has durably delivered a generated image, a later failure in post-delivery bookkeeping no longer produces a generation-failure reply for that request; the conversation settles like a normal success. A send that Messenger only accepted (message ID recorded, delivery receipt still pending) and every failure before delivery keep the localized failure copy: with its `Nieuwe afbeelding` retry action in the conversation, and as plain text without an action when a queued job is dead-lettered after exhausting retries.                                                                                                                                                                                                                                                                                                                                                                                                                                                    | Demo a delivered image whose post-delivery bookkeeping fails: exactly one image, no failure copy after it, no second generation, and no extra credit or quota consumption. Then demo a paid send with only a pending delivery receipt and a provider failure before delivery, and confirm the localized failure copy still arrives with its retry action in the conversation, and as plain text from a dead-lettered job.                                                                                | No additional Meta permission or webhook field; uses the existing Page messaging surface and the Messenger delivery receipt already consumed as paid delivery proof.     |
 | Delete my data                      | User can send `delete my data` or `verwijder mijn data`; deletion also remains available by email.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | Demo cost ledger, generated assets, retained source images, face-memory state, and completion marker deletion in production-equivalent state.                                                                                                                                                                                                                                                                                                                                                            | Supports Meta data-deletion expectations; Meta-controlled Messenger history remains managed by Meta.                                                                     |
 
+## Emoji, sticker replies and courtesy (prepared locally)
+
+- Standalone emoji and short Dutch/English thanks receive a brief social reply.
+  Negative emoji invite a correction; no social reply starts generation or uses credits.
+- Messenger likes may arrive as image attachments with a message-level `sticker_id`.
+  These and explicit stickers are acknowledgements, including replies to generated
+  photos. `reply_to` alone never reclassifies a genuine photo upload.
+- Clicked `reaction` events use their own deduplication identity, preserve the
+  existing image, and reply only with prior processing consent and an already
+  open response window. Removal events stay silent. Reactions never grant
+  consent, reopen a response window, or select a paid action.
+- While waiting for initial processing consent, Messenger holds only the text
+  and up to four photo references for a fixed 15 minutes (32 KB text maximum).
+  It tells the user about this temporary hold. Photos are not downloaded or
+  analysed before consent. After consent, the input is atomically claimed once
+  and passed through the normal image, face-memory, quota and delivery paths.
+  Refusal clears it; deletion uses the existing state erasure; Redis/local state
+  TTL removes abandoned first-contact context even without another message.
+  Oversized requests get explicit guidance rather than silent truncation.
+- Before release, verify the Page subscription includes `message_reactions` and
+  demonstrate both actual clicked reactions and Messenger like stickers on a
+  generated photo. This local change does not prove subscription or deployment.
+- Roll back by reverting this change and building through the protected release
+  path. No schema, credit policy, provider model, or secret changes are needed.
+
 ## Review demo checklist
 
 Public quick-start actions contain only new image, edit photo and privacy.

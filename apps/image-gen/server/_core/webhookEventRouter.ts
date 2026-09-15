@@ -6,6 +6,12 @@ import {
 } from "./consentService";
 import { GDPR_DELETE_CONFIRM } from "./consentActionIds";
 import { safeLog } from "./logger";
+import {
+  holdPendingConsentInput,
+  takePendingConsentInput,
+} from "./pendingConsentInput";
+import { getMessengerReactionReply } from "./messengerSocialReply";
+import { hasOpenMessengerResponseWindow } from "./messengerState";
 import { setPreferredLang } from "./messengerState";
 import { normalizeLang } from "./i18n";
 import { toLogUser, toUserKey } from "./privacy";
@@ -314,6 +320,18 @@ export async function routeTrackedEvent(
   event: FacebookWebhookEvent
 ): Promise<void> {
   const { psid, userId, reqId, lang, trackedCtx } = context;
+  if (event.reaction && !event.message && !event.postback) {
+    if (!Number.isFinite(event.timestamp)) return;
+    // Reactions neither grant consent nor reopen the user messaging window.
+    if (
+      context.state.consentGiven !== true ||
+      !(await hasOpenMessengerResponseWindow(psid))
+    )
+      return;
+    const reply = getMessengerReactionReply(event.reaction, lang);
+    if (reply) await trackedCtx.sendLoggedText(psid, reply, reqId);
+    return;
+  }
   if (await routeConsentGate(context, event)) return;
   await recordInboundUserActivity(psid, event, context.classification);
 
@@ -350,6 +368,47 @@ async function routeConsentGate(
     text: event.message?.text,
     payload: classification.eventPayload,
     state,
+    holdPendingInput: async () => {
+      const outcome = await holdPendingConsentInput(psid, event.message);
+      if (outcome === "held") {
+        await trackedCtx.sendLoggedText(
+          psid,
+          lang === "en"
+            ? "Your photos and request will stay ready for up to 15 minutes while you decide. After you agree, I’ll continue automatically. I won’t process them before then."
+            : "Je foto’s en opdracht blijven maximaal 15 minuten klaarstaan terwijl je beslist. Na je akkoord ga ik automatisch verder. Tot dan verwerk ik ze nog niet.",
+          reqId
+        );
+      } else if (outcome === "limit") {
+        await trackedCtx.sendLoggedText(
+          psid,
+          lang === "en"
+            ? "This request is too large to hold while waiting for consent (maximum 4 photos and 32 KB of text). Please give permission first, then send a smaller request."
+            : "Deze opdracht is te groot om op toestemming te wachten (maximaal 4 foto’s en 32 KB tekst). Geef eerst toestemming en stuur daarna een kleinere opdracht.",
+          reqId
+        );
+      }
+    },
+    resumePendingInput: async () => {
+      const pending = await takePendingConsentInput(psid);
+      if (!pending) return false;
+      await handleMessageEvent(trackedCtx, {
+        psid,
+        userId,
+        reqId,
+        lang,
+        event: {
+          timestamp: event.timestamp,
+          message: {
+            text: pending.text,
+            attachments: pending.imageUrls.map(url => ({
+              type: "image",
+              payload: { url },
+            })),
+          },
+        },
+      });
+      return true;
+    },
     sendText: async text => {
       const outcome = await trackedCtx.sendLoggedText(psid, text, reqId);
       return outcome?.sent === true;

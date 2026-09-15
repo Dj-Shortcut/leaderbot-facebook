@@ -64,6 +64,21 @@ function readRawState<T>(storageKey: string): MaybePromise<T | null> {
 }
 
 export function getStateTtlSeconds<T>(value: T): number {
+  const pending = (
+    value as { pendingConsentInput?: { expiresAt?: number } } | null
+  )?.pendingConsentInput;
+  if (
+    pending &&
+    typeof pending.expiresAt === "number" &&
+    Number.isFinite(pending.expiresAt)
+  ) {
+    // First-contact state containing unprocessed input has a fixed short TTL.
+    // Subsequent notices and state writes must never extend this deadline.
+    return Math.max(
+      1,
+      Math.min(900, Math.floor((pending.expiresAt - Date.now()) / 1000))
+    );
+  }
   const faceMemoryValue = value as {
     faceMemoryConsent?: { given?: boolean } | null;
     lastSourceImageUrl?: string | null;
