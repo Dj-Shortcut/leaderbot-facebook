@@ -62,9 +62,11 @@ The target product has:
 - purchased credits separate from the resetting free allowance;
 - premium quality selected by a server-owned offer policy.
 
-The reusable OpenClaw Facebook channel remains a separate open-source product.
-It will move out of this repository after its standalone package, channel-index,
-ClawHub, install, release, and rollback routes are proven.
+The reusable OpenClaw Facebook channel is maintained in
+[`openclaw-facebook-messenger`](https://github.com/Dj-Shortcut/openclaw-facebook-messenger),
+including its regular dependency upgrades. Retire the retained root copy after
+its standalone package, channel-index, ClawHub, install, release, and rollback
+routes are proven.
 
 ## Active order
 
@@ -125,6 +127,11 @@ Live payment enablement remains gated by the relevant P1 through P4 evidence.
       Test Mode must exercise that same signed checkout path; the temporary
       direct Mollie command has been removed. The production trigger remains
       the daily free-credit exhaustion path only.
+  - [ ] Deploy the reservation outbox-epoch guard and complete the real Test
+        checkout journey. [2026-09-15 scheduler verification](credit-checkout-scheduler-verification.md)
+        records matching enabled production controls/lanes at epoch 2 and the
+        local second-user route-to-provider regression. No scheduler recovery
+        mutation was needed; real payment-to-delivery proof remains open.
 
 - [ ] **P4 - Premium quality and Test Mode journey.** Bind the paid offer to a
       versioned premium provider policy and prove unit economics. In Mollie Test
