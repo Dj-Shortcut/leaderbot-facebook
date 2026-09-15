@@ -16,20 +16,20 @@ evaluator. Production rollout is still pending; merged code is not live proof.
 
 - [x] Evaluator PR [#542](https://github.com/Dj-Shortcut/openclaw-facebook/pull/542)
   merged as `032167db39a9c2cd228dd0b8ccad69e0bb60f76e`; exact-source CI passed.
-- [x] Initial trusted build
-  [34945717514](https://github.com/Dj-Shortcut/openclaw-facebook/actions/runs/34945717514)
-  produced `registry.fly.io/leaderbot-fb-image-gen@sha256:9accf24a2a54eea7a3666ff58fef58b06aff7fdab29158c8aaafea2756022459`
-  with provenance [47559750](https://github.com/Dj-Shortcut/openclaw-facebook/attestations/47559750).
-  **Do not deploy this initial candidate:** later review found missing
-  high-level reply observations; release preparation PR
-  [#543](https://github.com/Dj-Shortcut/openclaw-facebook/pull/543) corrects them.
-- [ ] Merge the reply-observation correction after CI, then build a replacement
-  trusted runtime from its exact green `main` source. Pin that replacement
-  digest/source in a reviewed release PR and update the exact contract-test
-  expectations together. Keep current production
-  `deploy-34628911410-1` / image digest `b1f3996faff2406eba3383465974895dc2dcbacd6432f5ab1591cb1e76be4bdf`
-  as the metadata-verified predecessor, with its exact reviewed restore config
-  and separate emergency rollback with checkout and paid admission disabled.
+- [x] Reply-observation correction
+  [#543](https://github.com/Dj-Shortcut/openclaw-facebook/pull/543) merged as
+  `f3a335ea3587bd1f1d0af003f9aa2127c3d64894`; exact-source CI passed.
+- [x] Replacement trusted build
+  [34948647585](https://github.com/Dj-Shortcut/openclaw-facebook/actions/runs/34948647585)
+  produced `registry.fly.io/leaderbot-fb-image-gen@sha256:dee3deecd9c01e043c86fa88a38cc396d6a86169c799e6b68aa29190fc5d1df0`
+  with provenance [47567067](https://github.com/Dj-Shortcut/openclaw-facebook/attestations/47567067).
+  This replacement contains the high-level reply-observation correction.
+- [ ] Merge the reviewed release manifest and matching exact contract-test
+  expectations after CI. The release candidate pins the replacement above;
+  it is not deployed yet. Current production remains metadata-verified
+  `deploy-34628911410-1` / image digest `b1f3996faff2406eba3383465974895dc2dcbacd6432f5ab1591cb1e76be4bdf`.
+  Its exact reviewed restore config and separate emergency rollback with
+  checkout and paid admission disabled are retained.
 - [ ] Run protected `Deploy production` for image-gen only. Record its final
   release identity, immutable digest, provenance, settled-live verification,
   readiness and Meta callback results before marking runtime checks live.
