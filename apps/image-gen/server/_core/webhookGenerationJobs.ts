@@ -37,7 +37,6 @@ import { summarizeSensitiveUrl } from "./utils/urlSummarizer";
 import type { MessengerGenerationJob } from "./messengerGenerationJob";
 import type { GenerationKind } from "./image-generation/generationTypes";
 import {
-  hasQuotaBypass,
   MessengerQuotaReservationCommitError,
 } from "./messengerQuota";
 import {
@@ -46,7 +45,7 @@ import {
   type MessengerImageQuotaReservation,
   type MessengerImageQuotaStatus,
 } from "./messengerImageQuotaStore";
-import { isMessengerAdmin } from "./messengerAdmin";
+import { readMessengerExecutionAccess } from "./messengerCustomerTestMode";
 import {
   buildGenerationFailureDiagnosticPayload,
   buildGenerationSuccessDiagnosticPayload,
@@ -353,9 +352,8 @@ export function createMessengerGenerationJobRunner(
     try {
       didRun = await runGuardedGeneration(psid, async () => {
         const workspacePolicy = await resolveWorkspaceRuntimePolicy(pageId);
-        const ownerQuotaBypass = isMessengerAdmin(psid, userId);
-        const quotaBypassApplied =
-          ownerQuotaBypass || hasQuotaBypass(psid, userId);
+        const { budgetBypass: ownerQuotaBypass, quotaBypass: quotaBypassApplied } =
+          await readMessengerExecutionAccess(psid, userId);
         const successQuotaIdentity =
           workspacePolicy.kind === "free" && !quotaBypassApplied
             ? imageQuotaIdentityForJob(job)

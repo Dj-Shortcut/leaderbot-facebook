@@ -70,6 +70,8 @@ export type MessengerUserState = {
   preferredLang?: Lang;
   preferredLangSource?: "account_default" | "sender_locale";
   consentGiven: boolean;
+  /** Owner opt-in to ordinary admission; scoped and erased with this state. */
+  customerTestMode?: boolean;
   consentTimestamp?: number;
   /** Distinguishes an explicit refusal from legacy/unanswered false state. */
   consentDeclinedAt?: number;

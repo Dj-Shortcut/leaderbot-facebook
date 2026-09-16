@@ -1,5 +1,13 @@
 import { createHash } from "node:crypto";
-import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 
 const {
   executeGenerationFlowMock,
@@ -176,10 +184,13 @@ import {
 import { CreditCheckoutReservationError } from "./_core/billing/creditCheckoutReservationService";
 import * as messengerGenerationQueue from "./_core/messengerGenerationQueue";
 import {
+  getOrCreateState,
   getState,
   resetStateStore,
+  setConsentState,
   setFlowState,
 } from "./_core/messengerState";
+import { setMessengerCustomerTestMode } from "./_core/messengerCustomerTestMode";
 import { runWithMessengerRequestContext } from "./_core/messengerRequestContext";
 import {
   deleteEphemeralKey,
@@ -217,6 +228,10 @@ const originalFreeMonthlyLimit = process.env.MESSENGER_FREE_MONTHLY_LIMIT;
 const originalQuotaTimeZone = process.env.MESSENGER_IMAGE_QUOTA_TIME_ZONE;
 const originalQuotaBypassIds = process.env.MESSENGER_QUOTA_BYPASS_IDS;
 const originalMessengerAdminIds = process.env.MESSENGER_ADMIN_IDS;
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 
 afterAll(() => {
   if (originalPrivacyPepper === undefined) {
@@ -2564,34 +2579,114 @@ describe("messenger generation job safety", () => {
     expect(executeGenerationFlowMock).toHaveBeenCalledOnce();
   });
 
-  it("keeps the free generation path unchanged while free quota remains", async () => {
-    executeGenerationFlowMock.mockImplementationOnce(async input => {
-      expect(input.imageQuality).toBeUndefined();
-      const admission = await input.onProviderAttempt();
-      expect(admission?.providerSpendBudget).toBeUndefined();
-      await admission?.markTransportStarted();
-      return successGenerationResult(
-        "https://img.example/free-path-unchanged.png"
-      );
-    });
-    const runner = createTestRunner();
+  it.each([false, true])(
+    "keeps the free generation path unchanged while free quota remains (owner customer test: %s)",
+    async ownerCustomerTest => {
+      const job = ownerCustomerTest
+        ? await enableOwnerCustomerTestJob("free-path")
+        : paidCreditGenerationJob("free-path");
+      executeGenerationFlowMock.mockImplementationOnce(async input => {
+        expect(input.bypassBudgetLimits).toBe(false);
+        expect(input.imageQuality).toBeUndefined();
+        const admission = await input.onProviderAttempt();
+        expect(admission?.providerSpendBudget).toBeUndefined();
+        await admission?.markTransportStarted();
+        return successGenerationResult(
+          "https://img.example/free-path-unchanged.png"
+        );
+      });
+      const runner = createTestRunner();
 
-    await runner.processMessengerGenerationJob({
-      psid: "free-path-user",
-      userId: "free-path-user-key",
-      reqId: "req-free-path-unchanged",
-      lang: "nl",
-    });
+      await runner.processMessengerGenerationJob(job);
+
+      expect(reservePaidCreditGenerationMock).not.toHaveBeenCalled();
+      expect(reserveMessengerCreditCheckoutMock).not.toHaveBeenCalled();
+      expect(sendImageMock).toHaveBeenCalledOnce();
+      await expect(
+        getMessengerImageQuotaStatus(quotaIdentityForScopedJob(job))
+      ).resolves.toMatchObject({
+        daily: { used: 1, remaining: 4 },
+        monthly: { used: 1, remaining: 19 },
+      });
+    }
+  );
+
+  it("blocks a stored owner customer test before credits, checkout or provider when Mollie changes to live", async () => {
+    const job = await enableOwnerCustomerTestJob("live-mode-blocked");
+    process.env.MESSENGER_FREE_DAILY_LIMIT = "0";
+    vi.stubEnv("MOLLIE_MODE", "live");
+
+    await createTestRunner().processMessengerGenerationJob(job);
 
     expect(reservePaidCreditGenerationMock).not.toHaveBeenCalled();
     expect(reserveMessengerCreditCheckoutMock).not.toHaveBeenCalled();
-    expect(sendImageMock).toHaveBeenCalledOnce();
+    expect(executeGenerationFlowMock).not.toHaveBeenCalled();
+    expect(reserveMessengerProviderAttemptFenceMock).not.toHaveBeenCalled();
+    expect(markMessengerProviderAttemptStartedMock).not.toHaveBeenCalled();
+    expect(sendButtonTemplateMock).not.toHaveBeenCalled();
+    expect(sendImageMock).not.toHaveBeenCalled();
     await expect(
-      getMessengerImageQuotaStatus(quotaIdentityForUser("free-path-user-key"))
-    ).resolves.toMatchObject({
-      daily: { used: 1, remaining: 4 },
-      monthly: { used: 1, remaining: 19 },
-    });
+      getMessengerImageQuotaStatus(quotaIdentityForScopedJob(job))
+    ).resolves.toMatchObject({ daily: { used: 0 }, monthly: { used: 0 } });
+  });
+
+  it("recovers the original free quota after the owner switches customer testing off without a second provider call", async () => {
+    const job = await enableOwnerCustomerTestJob("quota-marker-switch-off");
+    const queueEnabled = vi
+      .spyOn(messengerGenerationQueue, "isMessengerGenerationQueueEnabled")
+      .mockReturnValue(false);
+    const runner = createTestRunner();
+    executeGenerationFlowMock.mockResolvedValueOnce(successGenerationResult());
+    faultInjection.quotaMarkerError = new Error(
+      "completion quota marker unavailable"
+    );
+
+    try {
+      await runner.processMessengerGenerationJob(job);
+      const pendingCompletion = await getMessengerGenerationCompletion(
+        job.reqId,
+        paidCreditCompletionFence(job)
+      );
+      expect(pendingCompletion).toMatchObject({
+        deliveryStatus: "pending",
+        quotaIdentity: quotaIdentityForScopedJob(job),
+      });
+      expect(pendingCompletion?.quotaStatus).toBeUndefined();
+      expect(sendImageMock).not.toHaveBeenCalled();
+
+      await withOwnerCustomerTestScope(job, async () => {
+        await setMessengerCustomerTestMode(job.psid, job.userId, false);
+        expect((await getState(job.psid))?.customerTestMode).toBe(false);
+      });
+      await runner.processMessengerGenerationJob(job);
+      await runner.processMessengerGenerationJob(job);
+
+      expect(executeGenerationFlowMock).toHaveBeenCalledOnce();
+      expect(sendImageMock).toHaveBeenCalledOnce();
+      expect(reservePaidCreditGenerationMock).not.toHaveBeenCalled();
+      expect(reserveMessengerCreditCheckoutMock).not.toHaveBeenCalled();
+      await expect(
+        getMessengerImageQuotaStatus(quotaIdentityForScopedJob(job))
+      ).resolves.toMatchObject({
+        daily: { used: 1, remaining: 4 },
+        monthly: { used: 1, remaining: 19 },
+      });
+      await expect(
+        getMessengerGenerationCompletion(
+          job.reqId,
+          paidCreditCompletionFence(job)
+        )
+      ).resolves.toMatchObject({
+        deliveryStatus: "delivered",
+        quotaIdentity: quotaIdentityForScopedJob(job),
+        quotaStatus: {
+          daily: { used: 1, remaining: 4 },
+          monthly: { used: 1, remaining: 19 },
+        },
+      });
+    } finally {
+      queueEnabled.mockRestore();
+    }
   });
 
   it("blocks a second provider transport after a paid credit transport starts", async () => {
@@ -2704,63 +2799,71 @@ describe("messenger generation job safety", () => {
     }
   );
 
-  it("debits a paid credit exactly once only after durable image delivery", async () => {
-    process.env.MESSENGER_FREE_DAILY_LIMIT = "0";
-    const job = paidCreditGenerationJob("paid-delivered-once");
-    const markProviderAccepted = vi.fn(async () => undefined);
-    const commitDeliveredOutput = vi.fn(async () => {
+  it.each([false, true])(
+    "debits a paid credit exactly once only after durable image delivery (owner customer test: %s)",
+    async ownerCustomerTest => {
+      process.env.MESSENGER_FREE_DAILY_LIMIT = "0";
+      const job = ownerCustomerTest
+        ? await enableOwnerCustomerTestJob("paid-delivered-once")
+        : paidCreditGenerationJob("paid-delivered-once");
+      const markProviderAccepted = vi.fn(async () => undefined);
+      const commitDeliveredOutput = vi.fn(async () => {
+        await expect(
+          getMessengerGenerationCompletion(
+            job.reqId,
+            paidCreditCompletionFence(job)
+          )
+        ).resolves.toMatchObject({ deliveryStatus: "delivered" });
+      });
+      reservePaidCreditGenerationMock.mockResolvedValueOnce({
+        available: true,
+        reservation: paidCreditReservationFixture({
+          markProviderAccepted,
+          commitDeliveredOutput,
+        }),
+      });
+      executeGenerationFlowMock.mockImplementationOnce(async input => {
+        expect(input.bypassBudgetLimits).toBe(false);
+        await (await input.onProviderAttempt())?.markTransportStarted();
+        await input.onProviderSuccess?.();
+        await input.onProviderSuccess?.();
+        expect(commitDeliveredOutput).not.toHaveBeenCalled();
+        return successGenerationResult();
+      });
+      sendImageMock.mockResolvedValueOnce({
+        sent: true,
+        messageId: "mid-paid-delivered-once",
+      });
+
+      await createTestRunner().processMessengerGenerationJob(job);
+
+      expect(sendImageMock).toHaveBeenCalledOnce();
+      expect(markProviderAccepted).toHaveBeenCalledOnce();
+      expect(commitDeliveredOutput).not.toHaveBeenCalled();
       await expect(
         getMessengerGenerationCompletion(
           job.reqId,
           paidCreditCompletionFence(job)
         )
-      ).resolves.toMatchObject({ deliveryStatus: "delivered" });
-    });
-    reservePaidCreditGenerationMock.mockResolvedValueOnce({
-      available: true,
-      reservation: paidCreditReservationFixture({
-        markProviderAccepted,
-        commitDeliveredOutput,
-      }),
-    });
-    executeGenerationFlowMock.mockImplementationOnce(async input => {
-      await (await input.onProviderAttempt())?.markTransportStarted();
-      await input.onProviderSuccess?.();
-      await input.onProviderSuccess?.();
-      expect(commitDeliveredOutput).not.toHaveBeenCalled();
-      return successGenerationResult();
-    });
-    sendImageMock.mockResolvedValueOnce({
-      sent: true,
-      messageId: "mid-paid-delivered-once",
-    });
+      ).resolves.toMatchObject({ deliveryStatus: "receipt_pending" });
 
-    await createTestRunner().processMessengerGenerationJob(job);
-
-    expect(sendImageMock).toHaveBeenCalledOnce();
-    expect(markProviderAccepted).toHaveBeenCalledOnce();
-    expect(commitDeliveredOutput).not.toHaveBeenCalled();
-    await expect(
-      getMessengerGenerationCompletion(
-        job.reqId,
+      await confirmMessengerGenerationDeliveryReceipts(
+        ["mid-paid-delivered-once"],
         paidCreditCompletionFence(job)
-      )
-    ).resolves.toMatchObject({ deliveryStatus: "receipt_pending" });
+      );
+      await commitPaidCreditFromDeliveredCompletion({
+        reqId: job.reqId,
+        userId: job.userId,
+        imageUrl: "https://img.example/generated.png",
+        completionFence: paidCreditCompletionFence(job),
+        paidCreditMode: "test",
+      });
 
-    await confirmMessengerGenerationDeliveryReceipts(
-      ["mid-paid-delivered-once"],
-      paidCreditCompletionFence(job)
-    );
-    await commitPaidCreditFromDeliveredCompletion({
-      reqId: job.reqId,
-      userId: job.userId,
-      imageUrl: "https://img.example/generated.png",
-      completionFence: paidCreditCompletionFence(job),
-      paidCreditMode: "test",
-    });
-
-    expect(commitDeliveredPaidCreditGenerationMock).toHaveBeenCalledOnce();
-  });
+      expect(commitDeliveredPaidCreditGenerationMock).toHaveBeenCalledOnce();
+      expect(reservePaidCreditGenerationMock).toHaveBeenCalledOnce();
+      expect(executeGenerationFlowMock).toHaveBeenCalledOnce();
+    }
+  );
 
   it("shows daily and remaining premium credits after a paid image", async () => {
     process.env.MESSENGER_FREE_DAILY_LIMIT = "0";
@@ -3137,84 +3240,89 @@ describe("messenger generation job safety", () => {
     expect(sendImageMock).not.toHaveBeenCalled();
   });
 
-  it("offers a provider-silent one-time checkout when free and paid credits are empty", async () => {
-    const originalAppBaseUrl = process.env.APP_BASE_URL;
-    process.env.MESSENGER_FREE_DAILY_LIMIT = "0";
-    process.env.APP_BASE_URL = "https://app.leaderbot.live";
-    reservePaidCreditGenerationMock.mockResolvedValueOnce({
-      available: false,
-      reason: "empty",
-    });
-    reserveMessengerCreditCheckoutMock.mockResolvedValueOnce({
-      intentId: "22222222-2222-8222-8222-222222222222",
-      actionUrl:
-        "https://app.leaderbot.live/credits/checkout/22222222-2222-8222-8222-222222222222#capability",
-      label: "8 premiumcredits - € 4,99",
-      toJSON: () => ({
+  it.each([false, true])(
+    "offers a provider-silent one-time checkout when free and paid credits are empty (owner customer test: %s)",
+    async ownerCustomerTest => {
+      const originalAppBaseUrl = process.env.APP_BASE_URL;
+      process.env.MESSENGER_FREE_DAILY_LIMIT = "0";
+      process.env.APP_BASE_URL = "https://app.leaderbot.live";
+      reservePaidCreditGenerationMock.mockResolvedValueOnce({
+        available: false,
+        reason: "empty",
+      });
+      reserveMessengerCreditCheckoutMock.mockResolvedValueOnce({
         intentId: "22222222-2222-8222-8222-222222222222",
-        capability: "redacted" as const,
-      }),
-    });
-    const { runner } = createContextBackedRunner();
-    const job = paidCreditGenerationJob("paid-checkout-cta");
+        actionUrl:
+          "https://app.leaderbot.live/credits/checkout/22222222-2222-8222-8222-222222222222#capability",
+        label: "8 premiumcredits - € 4,99",
+        toJSON: () => ({
+          intentId: "22222222-2222-8222-8222-222222222222",
+          capability: "redacted" as const,
+        }),
+      });
+      const { runner } = createContextBackedRunner();
+      const job = ownerCustomerTest
+        ? await enableOwnerCustomerTestJob("paid-checkout-cta")
+        : paidCreditGenerationJob("paid-checkout-cta");
 
-    try {
-      await runner.processMessengerGenerationJob(job);
-    } finally {
-      if (originalAppBaseUrl === undefined) {
-        delete process.env.APP_BASE_URL;
-      } else {
-        process.env.APP_BASE_URL = originalAppBaseUrl;
-      }
-    }
-
-    expect(reserveMessengerCreditCheckoutMock).toHaveBeenCalledWith({
-      workspaceId: 42,
-      channelConnectionId: 8,
-      bindingEpoch: 3,
-      privacyEpoch: 5,
-      userKey: job.userId,
-      requestId: job.reqId,
-    });
-    expect(executeGenerationFlowMock).not.toHaveBeenCalled();
-    expect(reserveMessengerProviderAttemptFenceMock).not.toHaveBeenCalled();
-    expect(sendButtonTemplateMock).toHaveBeenCalledWith(
-      job.psid,
-      expect.stringContaining("Koop eenmalig 8 premiumcredits voor € 4,99"),
-      [
-        {
-          type: "web_url",
-          title: "Koop 8 credits",
-          url: expect.stringMatching(
-            /^https:\/\/app[.]leaderbot[.]live\/credits\/checkout\//
-          ),
-          webview_height_ratio: "full",
-          messenger_extensions: false,
-        },
-      ],
-      { providerAttemptKey: "premium-credit-checkout-offer-v1" }
-    );
-    expect(sendButtonTemplateMock.mock.calls[0]?.[1]).toContain(
-      "Geen abonnement of automatische verlenging"
-    );
-    expect(sendButtonTemplateMock.mock.calls[0]?.[1]).toContain(
-      "vervalt nooit"
-    );
-    await expect(
-      runWithMessengerRequestContext(
-        job.pageId,
-        async () => Promise.resolve(getState(job.psid)?.stage),
-        {
-          channel: "facebook_messenger",
-          workspaceId: job.workspaceId,
-          channelConnectionId: job.channelConnectionId,
-          bindingEpoch: job.bindingEpoch,
-          privacyEpoch: job.privacyEpoch,
-          userKey: job.userId,
+      try {
+        await runner.processMessengerGenerationJob(job);
+      } finally {
+        if (originalAppBaseUrl === undefined) {
+          delete process.env.APP_BASE_URL;
+        } else {
+          process.env.APP_BASE_URL = originalAppBaseUrl;
         }
-      )
-    ).resolves.toBe("AWAITING_EDIT_PROMPT");
-  });
+      }
+
+      expect(reserveMessengerCreditCheckoutMock).toHaveBeenCalledWith({
+        workspaceId: 42,
+        channelConnectionId: 8,
+        bindingEpoch: 3,
+        privacyEpoch: 5,
+        userKey: job.userId,
+        requestId: job.reqId,
+      });
+      expect(executeGenerationFlowMock).not.toHaveBeenCalled();
+      expect(reserveMessengerProviderAttemptFenceMock).not.toHaveBeenCalled();
+      expect(sendButtonTemplateMock).toHaveBeenCalledWith(
+        job.psid,
+        expect.stringContaining("Koop eenmalig 8 premiumcredits voor € 4,99"),
+        [
+          {
+            type: "web_url",
+            title: "Koop 8 credits",
+            url: expect.stringMatching(
+              /^https:\/\/app[.]leaderbot[.]live\/credits\/checkout\//
+            ),
+            webview_height_ratio: "full",
+            messenger_extensions: false,
+          },
+        ],
+        { providerAttemptKey: "premium-credit-checkout-offer-v1" }
+      );
+      expect(sendButtonTemplateMock.mock.calls[0]?.[1]).toContain(
+        "Geen abonnement of automatische verlenging"
+      );
+      expect(sendButtonTemplateMock.mock.calls[0]?.[1]).toContain(
+        "vervalt nooit"
+      );
+      await expect(
+        runWithMessengerRequestContext(
+          job.pageId,
+          async () => Promise.resolve(getState(job.psid)?.stage),
+          {
+            channel: "facebook_messenger",
+            workspaceId: job.workspaceId,
+            channelConnectionId: job.channelConnectionId,
+            bindingEpoch: job.bindingEpoch,
+            privacyEpoch: job.privacyEpoch,
+            userKey: job.userId,
+          }
+        )
+      ).resolves.toBe("AWAITING_EDIT_PROMPT");
+    }
+  );
 
   it("falls back to the free-quota notice when a pending refund blocks checkout", async () => {
     process.env.MESSENGER_FREE_DAILY_LIMIT = "0";
@@ -3886,6 +3994,49 @@ function paidCreditGenerationJob(suffix: string) {
     privacyEpoch: 5,
     reqId: `req-${suffix}`,
     lang: "nl" as const,
+  };
+}
+
+function withOwnerCustomerTestScope<T>(
+  job: ReturnType<typeof paidCreditGenerationJob>,
+  task: () => Promise<T>
+): Promise<T> {
+  return runWithMessengerRequestContext(job.pageId, task, {
+    channel: "facebook_messenger",
+    workspaceId: job.workspaceId,
+    channelConnectionId: job.channelConnectionId,
+    bindingEpoch: job.bindingEpoch,
+    privacyEpoch: job.privacyEpoch,
+    userKey: job.userId,
+  });
+}
+
+async function enableOwnerCustomerTestJob(suffix: string) {
+  const base = paidCreditGenerationJob(`owner-customer-${suffix}`);
+  const job = { ...base, userId: getUserKey(base.psid) };
+  vi.stubEnv("MOLLIE_MODE", "test");
+  vi.stubEnv("MOLLIE_BILLING_ENABLED", "false");
+  vi.stubEnv("MOLLIE_LIVE_BILLING_ENABLED", "false");
+  vi.stubEnv("MESSENGER_ADMIN_IDS", job.psid);
+  vi.stubEnv("MESSENGER_QUOTA_BYPASS_IDS", job.userId);
+  await withOwnerCustomerTestScope(job, async () => {
+    await getOrCreateState(job.psid);
+    await setConsentState(job.psid, true);
+    await setMessengerCustomerTestMode(job.psid, job.userId, true);
+    expect((await getState(job.psid))?.customerTestMode).toBe(true);
+  });
+  return job;
+}
+
+function quotaIdentityForScopedJob(
+  job: ReturnType<typeof paidCreditGenerationJob>
+): MessengerImageQuotaIdentity {
+  return {
+    workspaceId: job.workspaceId,
+    channelConnectionId: job.channelConnectionId,
+    bindingEpoch: job.bindingEpoch,
+    privacyEpoch: job.privacyEpoch,
+    userKey: job.userId,
   };
 }
 
