@@ -274,6 +274,49 @@ describe("credit checkout public routes", () => {
   });
 
   it.each([
+    ["malformed JSON", '{"customer":"private-customer-body"'],
+    [
+      "oversized JSON",
+      JSON.stringify({ customer: "private-customer-body".repeat(200) }),
+    ],
+  ])(
+    "normalizes %s confirmation parser failures before session or provider work",
+    async (_scenario, body) => {
+      const target = await start();
+      const response = await fetch(
+        `${target.baseUrl}/api/credits/checkout/${INTENT_ID}/confirm`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Origin: target.baseUrl,
+            "Sec-Fetch-Site": "same-origin",
+            Cookie: `${CREDIT_CHECKOUT_SESSION_COOKIE}=${COOKIE_VALUE}`,
+          },
+          body,
+        }
+      );
+
+      expect(response.status).toBe(404);
+      expect(await response.json()).toEqual({ error: "checkout unavailable" });
+      expect(response.headers.get("cache-control")).toContain("no-store");
+      expect(response.headers.get("referrer-policy")).toBe("no-referrer");
+      expect(claim).not.toHaveBeenCalled();
+      expect(readSession).not.toHaveBeenCalled();
+      expect(confirm).not.toHaveBeenCalled();
+      expect(warningLog).toHaveBeenCalledExactlyOnceWith(
+        JSON.stringify({
+          level: "warn",
+          event: "credit_checkout_request_failed",
+          operation: "confirm",
+          stage: "body_validation",
+          category: "request_rejected",
+        })
+      );
+    }
+  );
+
+  it.each([
     ["cross-site origin", "origin_validation"],
     ["missing origin", "origin_validation"],
     ["cross-site fetch metadata", "origin_validation"],

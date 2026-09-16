@@ -109,7 +109,16 @@ export function registerCreditCheckoutRoutes(
 
   app.post(
     "/api/credits/checkout/:intentId/confirm",
-    json,
+    (req, res, next) => {
+      json(req, res, (error: unknown) => {
+        if (error) {
+          logCheckoutFailure("confirm", "body_validation");
+          unavailable(res);
+          return;
+        }
+        next();
+      });
+    },
     asyncRoute(async (req, res) => {
       if (!isSameOriginMutation(req)) {
         logCheckoutFailure("confirm", "origin_validation");
