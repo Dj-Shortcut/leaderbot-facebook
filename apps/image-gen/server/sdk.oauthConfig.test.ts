@@ -5,7 +5,7 @@ function parseConsoleLogCalls(logSpy: ReturnType<typeof vi.spyOn>) {
   return logSpy.mock.calls.map(call => JSON.parse(String(call[0])));
 }
 
-describe.sequential("OAuth SDK configuration guard", () => {
+describe("OAuth SDK configuration guard", () => {
   const originalOAuthUrl = process.env.OAUTH_SERVER_URL;
   const originalJwtSecret = process.env.JWT_SECRET;
   const originalFacebookConnectStorageMode =
