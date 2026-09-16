@@ -1,7 +1,9 @@
 # Testen als gewone Messenger-klant
 
-Status: geïmplementeerd; deployment en de echte eigenaarstest moeten afzonderlijk
-worden bevestigd. Deze bediening voegt geen Meta-permissie toe.
+Status: [PR #563](https://github.com/Dj-Shortcut/leaderbot-facebook/pull/563)
+is gemerged als `199a04e3def04a54b0f3cf6c0397da1184fa9694`. Deployment en de echte
+eigenaarstest moeten afzonderlijk worden bevestigd. Deze bediening voegt geen
+Meta-permissie toe.
 
 De eigenaar kan in het eigen Messenger-gesprek met de Page sturen:
 
@@ -60,3 +62,23 @@ rijen. Een rollback naar een oudere runtime begrijpt deze instelling niet en
 herneemt de oude eigenaarsvrijstellingen; die runtime is daarom ongeschikt om
 een klanttestronde voort te zetten. Gebruik de beschermde immutable deployment
 en het vastgelegde rollback-artifact zoals bij iedere image-gen-release.
+
+## Releasekandidaat 2026-09-16
+
+- Runtimebron: `199a04e3def04a54b0f3cf6c0397da1184fa9694` (PR #563).
+- [Trusted build 35071095029](https://github.com/Dj-Shortcut/leaderbot-facebook/actions/runs/35071095029)
+  is geslaagd na alle vereiste main-CI-controles. PR-CI bevestigde 2.825 app-tests,
+  de aparte Redis/MySQL-suites, typecheck, build en schema-repetitie.
+- Image: `registry.fly.io/leaderbot-fb-image-gen@sha256:532e974166413faf86917800bbd83831d031ee23c71542bb24d411c5f9e9ea93`.
+- [Provenance 47850881](https://github.com/Dj-Shortcut/leaderbot-facebook/attestations/47850881)
+  is ondertekend onder de huidige repositorynaam `Dj-Shortcut/leaderbot-facebook`.
+- De onafhankelijke settled-readback bevestigde de voorganger
+  `deploy-35065616049-1` met image `e0b82c21ceca12130a892afd01b90cf83fcb3b7a42a2721a9c424a76f1d6f1cf`.
+  Het manifest behoudt die exacte herstelconfiguratie plus de checkout-off
+  noodconfiguratie. De historische ondertekening blijft op de oude repositorynaam.
+- `MOLLIE_MODE=test`, legacy/live uit, lege gepensioneerde testerpins, het
+  oorspronkelijke auditverzoek en schema `0018_credit_checkout_reservation`
+  blijven de releasegrenzen. Het manifest voert geen operatoractivatie uit.
+
+Dit is de gereviewde releasekandidaat; het bewijst nog geen deployment of
+daadwerkelijke Messenger-testbetaling.
