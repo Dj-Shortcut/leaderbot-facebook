@@ -52,11 +52,18 @@ Only diagnostic metadata is retained; no transcript or photo collection.
 - [ ] Activate the contextual photo assistant through a reviewed protected release
   and independently verify its feature flag, health/readiness and rollback. Its
   code is included in deployment `35103111862/1`, but
-  `MESSENGER_PHOTO_CONVERSATION_ENABLED` remains off; activation is still pending.
+  the owner separately authorized activation on 2026-09-16. The reviewed config
+  now requests `MESSENGER_PHOTO_CONVERSATION_ENABLED=true`; protected deployment
+  and live readback are pending. Rollback retains the same checkout-fixed runtime
+  with photo conversation disabled.
 - [ ] Complete a consented Messenger smoke for generated image + new upload,
   natural combination, criticism, corrective follow-up and ordinary conversation.
   Verify the rendered image, exact source selection, delivery and credit boundaries;
   synthetic model decisions alone do not prove that user journey.
+- [ ] Give an explicit length response for photo-conversation requests over
+  4,000 characters. The current interpreter rejects them before a model call,
+  but the generic retry reply does not explain that limit; this remains relevant
+  to the reported ignored long prompts.
 
 Behavior, costs, rollback and tests: [Photo conversation](photo-conversation.md).
 

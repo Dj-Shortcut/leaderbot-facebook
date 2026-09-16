@@ -45,7 +45,7 @@ function readEnvAssignments(file) {
 describe.each([
   { stage: "desired bounded Test", config: app.config, exposure: "true" },
   {
-    stage: "settled owner customer-test predecessor",
+    stage: "settled checkout repair predecessor",
     config: predecessorConfig,
     exposure: "true",
   },
@@ -127,7 +127,7 @@ describe.each([
   });
 });
 
-it("binds the original Test request and retains the exact settled owner customer-test predecessor", () => {
+it("binds the original Test request and retains the exact settled checkout repair predecessor", () => {
   expect(app.creditTestActivation).toEqual({
     state: "bounded_test",
     obsoletePrincipalSha256:
@@ -146,13 +146,56 @@ it("binds the original Test request and retains the exact settled owner customer
   });
   expect(predecessor).toEqual({
     image:
-      "registry.fly.io/leaderbot-fb-image-gen@sha256:532e974166413faf86917800bbd83831d031ee23c71542bb24d411c5f9e9ea93",
-    identity: "deploy-35073398659-1",
-    path: "deploy/production/rollback-configs/image-gen-532e97416641-deploy-35073398659-1.toml",
+      "registry.fly.io/leaderbot-fb-image-gen@sha256:7165f3bac38c168f3b5d85e3153f7371388eeef7b5477c06f8eff63d9602cb8d",
+    identity: "deploy-35103111862-1",
+    path: "deploy/production/rollback-configs/image-gen-7165f3bac38c-deploy-35103111862-1.toml",
     sha256: "4311fd1f4a6075a16ee16f08d83aadf63447bbc439044eb256f2206a37c44d99",
   });
   expect(app.reviewedRollbackConfigs[predecessor.image]).toEqual({
-    path: "deploy/production/rollback-configs/image-gen-532e97416641-emergency-dark.toml",
+    path: "deploy/production/rollback-configs/image-gen-7165f3bac38c-emergency-dark.toml",
     sha256: "f0253b74e85b1cefc4e99d537eafa6dfd687167010834066353c2595c94a02db",
   });
+});
+
+it("activates only the photo flag on the same runtime and keeps exact feature-off recovery", () => {
+  const desiredPath = path.join(rootDir, app.config);
+  const settledPath = path.join(rootDir, predecessorConfig);
+  const darkPath = path.join(
+    rootDir,
+    app.reviewedRollbackConfigs[predecessor.image].path,
+  );
+  const desired = readEnvAssignments(desiredPath);
+  const settled = readEnvAssignments(settledPath);
+  const dark = readEnvAssignments(darkPath);
+
+  expect(app.reviewedImage).toBe(predecessor.image);
+  expect(app.reviewedSourceCommit).toBe(
+    app.reviewedRollbackSourceCommits[predecessor.image],
+  );
+  expect(settled.MESSENGER_PHOTO_CONVERSATION_ENABLED).toBeUndefined();
+  expect(dark.MESSENGER_PHOTO_CONVERSATION_ENABLED).toBeUndefined();
+  expect(desired).toEqual({
+    ...settled,
+    MESSENGER_PHOTO_CONVERSATION_ENABLED: "true",
+  });
+  expect(dark).toEqual({
+    ...settled,
+    MESSENGER_PAID_CREDITS_ENABLED: "false",
+    MOLLIE_CREDIT_CHECKOUT_ENABLED: "false",
+  });
+
+  const unchangedConfigLines = (file) =>
+    fs
+      .readFileSync(file, "utf8")
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(
+        (line) =>
+          line &&
+          !line.startsWith("#") &&
+          !/^MESSENGER_PHOTO_CONVERSATION_ENABLED\s*=/.test(line),
+      );
+  expect(unchangedConfigLines(desiredPath)).toEqual(
+    unchangedConfigLines(settledPath),
+  );
 });
