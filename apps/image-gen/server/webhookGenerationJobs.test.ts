@@ -17,6 +17,7 @@ const {
   reserveMessengerProviderAttemptFenceMock,
   admitStartpilotImageProviderAttemptMock,
   recoverStartpilotImageProviderAdmissionMock,
+  assertPaidCreditGenerationRecoveryMock,
   commitDeliveredPaidCreditGenerationMock,
   readPaidCreditBalanceMock,
   reservePaidCreditGenerationMock,
@@ -37,6 +38,7 @@ const {
   reserveMessengerProviderAttemptFenceMock: vi.fn(),
   admitStartpilotImageProviderAttemptMock: vi.fn(),
   recoverStartpilotImageProviderAdmissionMock: vi.fn(),
+  assertPaidCreditGenerationRecoveryMock: vi.fn(),
   commitDeliveredPaidCreditGenerationMock: vi.fn(),
   readPaidCreditBalanceMock: vi.fn(),
   reservePaidCreditGenerationMock: vi.fn(),
@@ -73,6 +75,7 @@ vi.mock("./_core/billing/creditGenerationAdmission", async importOriginal => {
     >();
   return {
     ...actual,
+    assertPaidCreditGenerationRecovery: assertPaidCreditGenerationRecoveryMock,
     commitDeliveredPaidCreditGeneration:
       commitDeliveredPaidCreditGenerationMock,
     readPaidCreditBalance: readPaidCreditBalanceMock,
@@ -290,6 +293,8 @@ beforeEach(() => {
   });
   recoverStartpilotImageProviderAdmissionMock.mockReset();
   recoverStartpilotImageProviderAdmissionMock.mockResolvedValue(undefined);
+  assertPaidCreditGenerationRecoveryMock.mockReset();
+  assertPaidCreditGenerationRecoveryMock.mockResolvedValue(undefined);
   commitDeliveredPaidCreditGenerationMock.mockReset();
   commitDeliveredPaidCreditGenerationMock.mockResolvedValue(undefined);
   readPaidCreditBalanceMock.mockReset();
@@ -2974,6 +2979,137 @@ describe("messenger generation job safety", () => {
       deliveryProof: "meta_delivery_receipt_v1",
       messengerMessageIdHash: expect.stringMatching(/^[a-f0-9]{64}$/),
     });
+  });
+
+  it("recovers a paid completion without a free-quota snapshot after free quota is exhausted", async () => {
+    process.env.MESSENGER_FREE_DAILY_LIMIT = "0";
+    vi.stubEnv("MESSENGER_GENERATION_QUEUE_ENABLED", "1");
+    const job = paidCreditGenerationJob(
+      "paid-completion-missing-quota-snapshot"
+    );
+    const fence = paidCreditCompletionFence(job);
+    const imageUrl = "https://img.example/generated.png";
+    const quotaIdentity = quotaIdentityForScopedJob(job);
+    const quotaBefore = await getMessengerImageQuotaStatus(quotaIdentity);
+    expect(quotaBefore.daily.remaining).toBe(0);
+    await markMessengerGenerationCompleted(
+      job.reqId,
+      imageUrl,
+      job.userId,
+      Date.now(),
+      fence,
+      "paid_credit_delivery_v1",
+      undefined,
+      "test"
+    );
+    await markMessengerGenerationDeliveryStarted(
+      job.reqId,
+      imageUrl,
+      job.userId,
+      Date.now(),
+      fence
+    );
+    sendImageMock.mockResolvedValueOnce({
+      sent: true,
+      messageId: "mid-paid-completion-recovered",
+    });
+
+    const runner = createTestRunner();
+    await runner.processMessengerGenerationJob(job);
+    await runner.processMessengerGenerationJob(job);
+
+    expect(assertPaidCreditGenerationRecoveryMock).toHaveBeenCalledWith({
+      workspaceId: job.workspaceId,
+      channelConnectionId: job.channelConnectionId,
+      bindingEpoch: job.bindingEpoch,
+      privacyEpoch: job.privacyEpoch,
+      userKey: job.userId,
+      requestId: job.reqId,
+      mode: "test",
+      deliveryAlreadyConfirmed: false,
+    });
+    expect(sendImageMock).toHaveBeenCalledOnce();
+    expect(executeGenerationFlowMock).not.toHaveBeenCalled();
+    expect(reservePaidCreditGenerationMock).not.toHaveBeenCalled();
+    expect(reserveMessengerCreditCheckoutMock).not.toHaveBeenCalled();
+    expect(reserveMessengerProviderAttemptFenceMock).not.toHaveBeenCalled();
+    expect(commitDeliveredPaidCreditGenerationMock).not.toHaveBeenCalled();
+    expect(safeLogMock).not.toHaveBeenCalledWith(
+      "quota_decision",
+      expect.objectContaining({ action: "reserve" })
+    );
+    await expect(getMessengerImageQuotaStatus(quotaIdentity)).resolves.toEqual(
+      quotaBefore
+    );
+    await expect(
+      getMessengerGenerationCompletion(job.reqId, fence)
+    ).resolves.toMatchObject({
+      quotaAccountingMode: "paid_credit_delivery_v1",
+      paidCreditMode: "test",
+      deliveryStatus: "receipt_pending",
+    });
+
+    await confirmMessengerGenerationDeliveryReceipts(
+      ["mid-paid-completion-recovered", "mid-paid-completion-recovered"],
+      fence
+    );
+    await runner.processMessengerGenerationJob(job);
+
+    expect(commitDeliveredPaidCreditGenerationMock).toHaveBeenCalledOnce();
+    expect(commitDeliveredPaidCreditGenerationMock).toHaveBeenCalledWith({
+      workspaceId: job.workspaceId,
+      channelConnectionId: job.channelConnectionId,
+      bindingEpoch: job.bindingEpoch,
+      privacyEpoch: job.privacyEpoch,
+      userKey: job.userId,
+      requestId: job.reqId,
+      mode: "test",
+    });
+    expect(sendImageMock).toHaveBeenCalledOnce();
+    expect(executeGenerationFlowMock).not.toHaveBeenCalled();
+    await expect(
+      getMessengerGenerationCompletion(job.reqId, fence)
+    ).resolves.toMatchObject({
+      deliveryStatus: "delivered",
+      deliveryProof: "meta_delivery_receipt_v1",
+    });
+  });
+
+  it("keeps a stored paid image blocked when its original reservation cannot be verified", async () => {
+    process.env.MESSENGER_FREE_DAILY_LIMIT = "0";
+    vi.stubEnv("MESSENGER_GENERATION_QUEUE_ENABLED", "1");
+    const job = paidCreditGenerationJob("paid-completion-unverified-hold");
+    const fence = paidCreditCompletionFence(job);
+    const quotaIdentity = quotaIdentityForScopedJob(job);
+    const quotaBefore = await getMessengerImageQuotaStatus(quotaIdentity);
+    await markMessengerGenerationCompleted(
+      job.reqId,
+      "https://img.example/generated.png",
+      job.userId,
+      Date.now(),
+      fence,
+      "paid_credit_delivery_v1",
+      undefined,
+      "test"
+    );
+    assertPaidCreditGenerationRecoveryMock.mockRejectedValue(
+      new Error("original paid reservation unavailable")
+    );
+
+    await createTestRunner().processMessengerGenerationJob(job);
+
+    expect(assertPaidCreditGenerationRecoveryMock).toHaveBeenCalledOnce();
+    expect(sendImageMock).not.toHaveBeenCalled();
+    expect(executeGenerationFlowMock).not.toHaveBeenCalled();
+    expect(reservePaidCreditGenerationMock).not.toHaveBeenCalled();
+    expect(reserveMessengerCreditCheckoutMock).not.toHaveBeenCalled();
+    expect(commitDeliveredPaidCreditGenerationMock).not.toHaveBeenCalled();
+    await expect(getMessengerImageQuotaStatus(quotaIdentity)).resolves.toEqual(
+      quotaBefore
+    );
+    await expect(
+      getMessengerGenerationCompletion(job.reqId, fence)
+    ).resolves.toMatchObject({ deliveryStatus: "pending" });
   });
 
   it("keeps a paid credit held when image delivery is known to have failed", async () => {

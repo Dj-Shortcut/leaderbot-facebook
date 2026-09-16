@@ -6,6 +6,7 @@ import {
 } from "./creditCheckoutConfig";
 import { deriveCreditWalletIdentity } from "./creditCheckoutIdentity";
 import {
+  assertPaidCreditGenerationRecovery,
   commitDeliveredPaidCreditGeneration,
   deriveCreditReservationCommitRecovery,
   deriveCreditReservationOutputNotDeliveredRecovery,
@@ -98,6 +99,129 @@ function dependencies(
     ...overrides,
   };
 }
+
+describe("paid credit completion recovery", () => {
+  const recoveryInput = {
+    ...INPUT,
+    mode: "test" as const,
+    deliveryAlreadyConfirmed: false,
+  };
+
+  function expectNoFinancialOrProviderWrites(
+    deps: CreditGenerationAdmissionDependencies
+  ) {
+    for (const write of [
+      deps.reserve,
+      deps.markTransportStarted,
+      deps.markProviderAccepted,
+      deps.commit,
+      deps.release,
+      deps.releaseProviderRejected,
+    ]) {
+      expect(write).not.toHaveBeenCalled();
+    }
+  }
+
+  it("verifies the original exact hold even when every remaining credit is reserved", async () => {
+    const deps = dependencies();
+    const original = await reservePaidCreditGeneration(INPUT, deps);
+    if (!original.available) throw new Error("unreachable");
+    const held = vi.mocked(deps.reserve).mock.calls[0][0];
+    vi.mocked(deps.reserve).mockClear();
+    vi.mocked(deps.readWallet).mockResolvedValue({
+      creditBalance: 8,
+      reservedCredits: 8,
+    });
+    vi.mocked(deps.readReservation).mockImplementation(async read => {
+      expect(read).toEqual({
+        scope: {
+          workspaceId: held.workspaceId,
+          mode: held.mode,
+          channelConnectionId: held.channelConnectionId,
+          bindingEpoch: held.bindingEpoch,
+          privacyEpoch: held.privacyEpoch,
+          userKey: held.userKey,
+          walletId: held.walletId,
+          financialSubjectRef: held.financialSubjectRef,
+        },
+        reservationId: held.reservationId,
+        generationRequestKeyHash: held.generationRequestKeyHash,
+        ownerTokenHash: held.ownerTokenHash,
+        reservedCreditCount: 1,
+      });
+      return { status: "reserved", transportState: "known_accepted" };
+    });
+
+    await expect(
+      assertPaidCreditGenerationRecovery(recoveryInput, deps)
+    ).resolves.toBeUndefined();
+    expectNoFinancialOrProviderWrites(deps);
+  });
+
+  it.each([
+    null,
+    { status: "initializing", transportState: "pretransport" },
+    { status: "reserved", transportState: "pretransport" },
+    { status: "reserved", transportState: "transport_started" },
+    { status: "reserved", transportState: "known_rejected" },
+    { status: "released", transportState: "output_not_delivered" },
+    { status: "expired", transportState: "pretransport" },
+    { status: "committed", transportState: "known_accepted" },
+  ] as const)(
+    "does not authorize image replay from reservation %j",
+    async state => {
+      const deps = dependencies({
+        readReservation: vi.fn(async () => state),
+      });
+      await expect(
+        assertPaidCreditGenerationRecovery(recoveryInput, deps)
+      ).rejects.toBeInstanceOf(PaidCreditGenerationAdmissionError);
+      expectNoFinancialOrProviderWrites(deps);
+    }
+  );
+
+  it.each([
+    { enabled: () => false },
+    { config: () => ({ ...CONFIG, mode: "live" as const }) },
+    { config: () => ({ ...CONFIG, workspaceId: 41 }) },
+    { readWalletIdentity: vi.fn(async () => null) },
+    { readWallet: vi.fn(async () => null) },
+  ])(
+    "fails closed when current paid scope or wallet is unavailable",
+    async overrides => {
+      const deps = dependencies({
+        readReservation: vi.fn(async () => ({
+          status: "reserved" as const,
+          transportState: "known_accepted" as const,
+        })),
+        ...overrides,
+      });
+      await expect(
+        assertPaidCreditGenerationRecovery(recoveryInput, deps)
+      ).rejects.toBeInstanceOf(PaidCreditGenerationAdmissionError);
+      expectNoFinancialOrProviderWrites(deps);
+    }
+  );
+
+  it("permits reconciliation of an already delivered committed hold after admission is disabled", async () => {
+    const deps = dependencies({
+      enabled: () => false,
+      readWallet: vi.fn(async () => null),
+      readReservation: vi.fn(async () => ({
+        status: "committed" as const,
+        transportState: "known_accepted" as const,
+      })),
+    });
+    await expect(
+      assertPaidCreditGenerationRecovery(
+        { ...recoveryInput, deliveryAlreadyConfirmed: true },
+        deps
+      )
+    ).resolves.toBeUndefined();
+    expect(deps.readWallet).not.toHaveBeenCalled();
+    expectNoFinancialOrProviderWrites(deps);
+  });
+});
 
 describe("paid credit generation admission", () => {
   it("does nothing while paid credits are disabled", async () => {
@@ -615,7 +739,10 @@ describe("paid credit generation admission", () => {
               creditBalance: 1,
               reservedCredits: 1,
             })),
-            readReservation: vi.fn(async () => ({ status })),
+            readReservation: vi.fn(async () => ({
+              status,
+              transportState: "pretransport" as const,
+            })),
             reserve,
           })
         )
@@ -654,7 +781,10 @@ describe("paid credit generation admission", () => {
               creditBalance: status === "committed" ? 0 : 1,
               reservedCredits: 0,
             })),
-            readReservation: vi.fn(async () => ({ status })),
+            readReservation: vi.fn(async () => ({
+              status,
+              transportState: "known_accepted" as const,
+            })),
             reserve,
           })
         )
