@@ -206,15 +206,27 @@ Live payment enablement remains gated by the relevant P1 through P4 evidence.
         `c251a5e34c46bd327ffa5c015ed038f1fced545e` on
         `2026-08-30T17:44:08Z`. That exact SHA and UTC timestamp start the
         observation clock.
-  - [ ] Collect continuous metadata-only gateway ingress evidence for all 168
-        hours. The originally scheduled end,
-        `2026-09-06T17:44:08Z`, has passed and is not evidence that the window
-        completed. Record the evidence link and mark the window complete, or
-        record the first gap and approve a new reviewed start and scheduled end.
-        A green health check is not user-traffic evidence. Any evidence gap,
-        gateway probe, gateway Machine mutation, or direct Page-callback drift
-        resets the clock. Do not stop, delete, scale, or replace the gateway
-        Machine or its volumes during an active observation window.
+  - [ ] Decide and record the replacement retirement evidence. The 168-hour
+        window is void. The clock started at `2026-08-30T17:44:08Z`, and commit
+        `d080e446`, recorded at `2026-08-30T19:16:02Z`, states that Fly machine
+        `28621d2c559558` was stopped and that all four gateway machines are now
+        stopped. No exact stop time is recorded anywhere in this repository, so
+        that mutation cannot be placed before the start, and a gateway Machine
+        mutation resets the clock. A stopped app also cannot produce ingress
+        evidence: receiving nothing is quiescence, not proof that no caller
+        remains. Do not present the scheduled end `2026-09-06T17:44:08Z` as
+        reached. Choose and record exactly one path:
+        - Quiescence path (recommended): keep the machines stopped and record
+          the protected inspection showing the canonical direct Page callback
+          with an empty `temporarilyAllowedCallbacks`, the uptime workflow that
+          no longer probes the gateway, the stopped-machine read with gateway
+          `/healthz` `502`, and the exact stop time from the Fly Machine event
+          history. State plainly that this proves quiescence and callback
+          ownership, not zero historical ingress.
+        - Observation path: approve a new reviewed start and scheduled end.
+          This requires starting gateway Machines again, which reverses the
+          approved retirement step and needs its own reviewed approval,
+          rollback, and retention evidence.
 
 - [ ] **P2 - User-scoped purchased-credit ledger.** Add an append-only credit
       ledger, wallet projection, and idempotent reservation/commit/release model
@@ -682,10 +694,11 @@ release`, before any deployment or restart. The app-level Fly config
   168-hour observation contract at
   `c251a5e34c46bd327ffa5c015ed038f1fced545e` on
   `2026-08-30T17:44:08Z`, with conditional end
-  `2026-09-06T17:44:08Z`. P1 remains open until uninterrupted metadata-only
-  zero-ingress evidence, direct Messenger smokes, rollback/retention decisions,
-  the later reviewed gateway stop, and standalone channel publication are
-  complete.
+  `2026-09-06T17:44:08Z`. That window is void, because the approved gateway
+  stop recorded the same day is an unplaced Machine mutation inside it; see the
+  P1 item above. P1 remains open until the replacement retirement evidence is
+  decided and recorded, direct Messenger smokes, rollback/retention decisions,
+  and standalone channel publication are complete.
 
 - Storage-proxy startup ordering was fixed and merged in PR #445 at reviewed
   source commit `6a7d0431e1e02076a2db7fcf12c8358d7fbf33cd`.
