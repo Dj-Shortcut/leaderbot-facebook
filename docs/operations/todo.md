@@ -117,12 +117,14 @@ Behavior, costs, rollback and tests: [Photo conversation](photo-conversation.md)
   and rollback-config hash `0e1d34112abbd08362361820ba585e89807ebbcce4a5a6700f1eaaa23f09714a`.
   CodeRabbit approved source PR #571; its rate limit prevented a second review
   of release PR #572, which passed independent review and all required CI.
-- [ ] In the next runtime release, register an emergency-dark config for
+- [ ] Release the prepared emergency-dark registration for
   `a1f5a73069d1e7429d8b9373ec025a0bad9a3ee0d48aa76aebe391e3f4d4a22c`
-  when it enters `reviewedRollbackImages`. The current reviewed dark path uses
-  `7165f3bac38c` and disables paid admission and checkout while retaining
-  financial recovery; it also restores that runtime's completion defect.
-  Keeping the repaired runtime available in dark mode closes that recovery gap.
+  in `reviewedRollbackImages`. The pending manifest binds the exact current
+  `deploy-35113258520-1` predecessor and a dark config for that repaired runtime,
+  disabling paid admission/checkout while retaining financial recovery and
+  photo context. The independently checked predecessor still had the old caps
+  on all four started Machines at 16:27:03 UTC. Deploy through the protected
+  workflow and retain the release receipt before calling the caps removed.
 - [ ] Complete receipt-backed accounting for the two recovered outputs. The
   owner authorized receipt of both saved images and confirmed both arrived.
   The scoped completion-only recovery sent the original objects at 15:43:43 and
@@ -142,14 +144,18 @@ Behavior, costs, rollback and tests: [Photo conversation](photo-conversation.md)
   processing, without changing pending edit state or starting provider work.
   Photo menus add the pill at the Messenger rendering boundary; consent and
   checkout controls retain their original actions. Test the deployed pill.
-- [ ] Resolve the owner's Test-mode per-user daily budget block. Both 15:49 UTC
+- [ ] Deploy the owner's removal of extra daily USD limits. Both 15:49 UTC
   photo-conversation attempts failed at spend admission with `user_daily_cap`.
   Scoped readback at 15:53:45 UTC showed the configured USD 2/day user cap and
   USD 2 in reserved estimates from seven image attempts, with final provider
   costs unavailable; the global daily cap remains USD 5. Available purchased
-  credits do not override this cost guard. The pending release explains the
-  block without a retry loop. Raising the reviewed cap requires an explicit
-  budget decision; do not reset counters or bypass provider admission.
+  credits did not override this cost guard. The owner explicitly rejected the
+  daily spend caps and controls costs through the provider accounts. The desired
+  Fly configuration and exact deployment contract now set both daily USD caps
+  to `0` (disabled), preserving the five-free-image allowance and one-credit-per-
+  delivered-image accounting. No live counters or balances were reset. Release
+  and verify paid-image use; the separate USD 25 monthly cap is awaiting the
+  owner's scope clarification.
 - [ ] Add a scoped, idempotent Messenger payment-success confirmation. The
   current checkout return page confirms payment; the grant handler does not
   enqueue a chat confirmation, so silence in Messenger is not grant failure.

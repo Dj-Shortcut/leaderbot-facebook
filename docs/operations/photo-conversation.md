@@ -67,7 +67,9 @@ and schema's UTF-8 bytes (excluding image data URLs), plus framing and 3,100 tok
 per image, with output reserved separately. GPT-5.4 mini's `auto`/`high` vision
 budget is at most 2,500 patches multiplied by 1.2, or 3,000 tokens; the reservation
 includes additional margin. Actual usage is recorded when returned. Existing
-global daily/monthly and per-user spend caps apply, including to the owner.
+configured spend caps apply, including to the owner. The pending owner-requested
+release sets global and per-user daily USD caps to explicit zero; it does not
+alter the scoped ledger, model pricing, transport fence or image-credit accounting.
 Rollback does not remove ledger entries.
 
 The earlier `gpt-4.1-mini-2025-04-14` and `gpt-4.1-2025-04-14` variants failed

@@ -112,14 +112,17 @@ The only source of truth for open work is `docs/operations/todo.md`.
 - A Mollie payment ID may fund exactly one immutable credit grant.
 - A generation reserves before provider work and commits only on the documented
   success boundary. Provider retries must not double-charge the wallet.
-- Preserve global and per-user spend caps even for paid users.
+- Respect the owner's configured spend policy. Additional global and per-user
+  daily USD caps are disabled at the owner's request; do not reinstate them as
+  an extra customer quota. One purchased credit entitles its user to one
+  successfully delivered image, with the existing atomic accounting boundary.
 - Live billing stays disabled until legal copy, accounting, webhook handling,
   reconciliation, refund behavior, quota enforcement, and rollback are proven.
 
 ### Cost protection
 
 - Image generation is billable. Every path must pass free-quota or paid-credit
-  admission plus global provider budget controls.
+  admission plus any configured provider budget controls.
 - Never bypass cost checks in fallbacks, workers, retries, admin actions, or
   inline development modes.
 - Keep provider retry counts bounded; a transport retry must not silently start
