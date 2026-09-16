@@ -1,3 +1,4 @@
+import { isPhotoConversationEnabled } from "./photoConversationMemory";
 import { safeLog } from "./messengerApi";
 import {
   isFaceMemoryEnabled,
@@ -243,6 +244,7 @@ function shouldHandleImageCaptionAsConversation(
   }
 
   return (
+    isPhotoConversationEnabled() ||
     isImageGenerationRequest(caption) ||
     isExplicitSourceImageEditRequest(caption) ||
     isSourceImageTransformRequest(caption) ||

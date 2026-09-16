@@ -54,10 +54,12 @@ function decorateFeatureContext<TContext extends FeatureContext>(
   userPsid: string,
   featureUserId: string,
   requestId: string,
-  userLang: Lang
+  userLang: Lang,
+  suppressFallback: () => void
 ): TContext {
   return {
     ...featureCtx,
+    suppressFallback,
     sendText: async text => {
       const inferredActions = inferConversationActions(text);
       if (inferredActions.length) {
@@ -88,7 +90,12 @@ function decorateFeatureContext<TContext extends FeatureContext>(
           await featureCtx.clearImageContext?.();
         }
       : undefined,
-    runImageGeneration: async (sourceImageUrl, promptHint, generationKind) => {
+    runImageGeneration: async (
+      sourceImageUrl,
+      promptHint,
+      generationKind,
+      selectedSourceImageUrls
+    ) => {
       await trackedCtx.runImageGeneration(
         userPsid,
         featureUserId,
@@ -96,7 +103,10 @@ function decorateFeatureContext<TContext extends FeatureContext>(
         userLang,
         sourceImageUrl,
         promptHint,
-        generationKind
+        generationKind,
+        ...(selectedSourceImageUrls
+          ? ([selectedSourceImageUrls] as const)
+          : ([] as const))
       );
     },
     runVideoGeneration: featureCtx.runVideoGeneration
@@ -147,7 +157,8 @@ export function createTrackedHandlerContext(
         userPsid,
         featureUserId,
         requestId,
-        userLang
+        userLang,
+        () => markResponseSentFromOutcome({ sent: true })
       );
     },
     createFeaturePayloadContext: (
@@ -172,7 +183,8 @@ export function createTrackedHandlerContext(
         userPsid,
         featureUserId,
         requestId,
-        userLang
+        userLang,
+        () => markResponseSentFromOutcome({ sent: true })
       );
     },
     createFeatureTextContext: (
@@ -201,7 +213,8 @@ export function createTrackedHandlerContext(
         userPsid,
         featureUserId,
         requestId,
-        userLang
+        userLang,
+        () => markResponseSentFromOutcome({ sent: true })
       );
     },
     maybeSendInFlightMessage: async (userPsid, requestId, userLang) => {
@@ -222,7 +235,8 @@ export function createTrackedHandlerContext(
       userLang,
       sourceImageUrl,
       promptHint,
-      generationKind
+      generationKind,
+      selectedSourceImageUrls
     ) => {
       const outcome = await ctx.runImageGeneration(
         userPsid,
@@ -231,7 +245,10 @@ export function createTrackedHandlerContext(
         userLang,
         sourceImageUrl,
         promptHint,
-        generationKind
+        generationKind,
+        ...(selectedSourceImageUrls
+          ? ([selectedSourceImageUrls] as const)
+          : ([] as const))
       );
       markResponseSentFromOutcome(outcome);
       return outcome;

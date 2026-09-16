@@ -351,7 +351,8 @@ export function createHandlerContext({
       runImageGeneration: async (
         sourceImageUrl,
         promptHint,
-        generationKind
+        generationKind,
+        selectedSourceImageUrls
       ) => {
         await runImageGeneration(
           psid,
@@ -360,7 +361,10 @@ export function createHandlerContext({
           lang,
           sourceImageUrl,
           promptHint,
-          generationKind
+          generationKind,
+          ...(selectedSourceImageUrls
+            ? ([selectedSourceImageUrls] as const)
+            : ([] as const))
         );
       },
       runVideoGeneration: runVideoGeneration

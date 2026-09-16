@@ -1,3 +1,4 @@
+import { normalizePhotoConversation } from "./photoConversationMemory";
 import { toUserKey } from "./privacy";
 import { MAX_SOURCE_IMAGES } from "./image-generation/generationTypes";
 import type { MessengerFlowState, MessengerUserState } from "./messengerState";
@@ -419,6 +420,9 @@ function applyNormalizedStateShape(
     ...fallback,
     ...value,
     customerTestMode: value?.customerTestMode === true,
+    photoConversation: value?.photoConversation
+      ? normalizePhotoConversation(value.photoConversation)
+      : undefined,
     psid: resolvedPsid,
     userKey: getUserKey(value?.userKey ?? fallback.userKey),
     pageId: value?.pageId ?? fallback.pageId,

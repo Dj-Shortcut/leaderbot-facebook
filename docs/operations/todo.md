@@ -40,6 +40,17 @@ and sampled-monitor coverage remain open.
 Executable procedure: [Conversation evaluation](conversation-evaluation.md).
 Only diagnostic metadata is retained; no transcript or photo collection.
 
+## Contextual photo assistant
+
+- [x] Implement bounded private conversation and visual source selection behind
+  `MESSENGER_PHOTO_CONVERSATION_ENABLED`, retaining the generated image when a new
+  source arrives. Ordinary chat/criticism does not invoke image generation.
+- [ ] Complete real-model synthetic conversation evaluation and protected release
+  activation/readback. Stubbed regression tests do not prove model understanding.
+  Keep the flag off until this gate is completed.
+
+Behavior, costs, rollback and tests: [Photo conversation](photo-conversation.md).
+
 ## Product decision
 
 ```text

@@ -1,3 +1,4 @@
+import { photoConversationFeature } from "./features/photoConversationFeature";
 import { hasBotFeature, registerBotFeature } from "./features";
 import { rateLimitFeature } from "./features/rateLimitFeature";
 import { conversationalEditingFeature } from "./features/conversationalEditingFeature";
@@ -11,6 +12,7 @@ export function ensureDefaultBotFeaturesRegistered(): void {
   const defaults = [
     rateLimitFeature,
     customerTestModeFeature,
+    photoConversationFeature,
     freeformTransformFeature,
     imageRequestFeature,
     conversationalEditingFeature,

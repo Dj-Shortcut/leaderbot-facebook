@@ -1,3 +1,5 @@
+import { getPhotoConversationImages } from "./photoConversationMemory";
+import { MAX_SOURCE_IMAGES } from "./image-generation/generationTypes";
 import { createHash } from "node:crypto";
 import type { MessengerSendOutcome } from "./messengerApi";
 import type { ImageQuotaBalance } from "./botResponse";
@@ -36,9 +38,7 @@ import { emitGenerationDiagnostic } from "./generationDiagnostics";
 import { summarizeSensitiveUrl } from "./utils/urlSummarizer";
 import type { MessengerGenerationJob } from "./messengerGenerationJob";
 import type { GenerationKind } from "./image-generation/generationTypes";
-import {
-  MessengerQuotaReservationCommitError,
-} from "./messengerQuota";
+import { MessengerQuotaReservationCommitError } from "./messengerQuota";
 import {
   getMessengerImageQuotaStatus,
   type MessengerImageQuotaIdentity,
@@ -352,8 +352,10 @@ export function createMessengerGenerationJobRunner(
     try {
       didRun = await runGuardedGeneration(psid, async () => {
         const workspacePolicy = await resolveWorkspaceRuntimePolicy(pageId);
-        const { budgetBypass: ownerQuotaBypass, quotaBypass: quotaBypassApplied } =
-          await readMessengerExecutionAccess(psid, userId);
+        const {
+          budgetBypass: ownerQuotaBypass,
+          quotaBypass: quotaBypassApplied,
+        } = await readMessengerExecutionAccess(psid, userId);
         const successQuotaIdentity =
           workspacePolicy.kind === "free" && !quotaBypassApplied
             ? imageQuotaIdentityForJob(job)
@@ -994,7 +996,8 @@ export function createMessengerGenerationJobRunner(
     lang: MessengerGenerationJob["lang"],
     sourceImageUrl?: string,
     promptHint?: string,
-    generationKind?: GenerationKind
+    generationKind?: GenerationKind,
+    selectedSourceImageUrls?: string[]
   ): Promise<MessengerSendOutcome> {
     const resolvedGenerationKind = resolveGenerationKind({
       generationKind,
@@ -1018,10 +1021,29 @@ export function createMessengerGenerationJobRunner(
     }
     const privacyEpoch = requestPrivacy?.privacyEpoch;
     const currentState = await getOrCreateState(psid);
-    const sourceImageUrls =
-      resolvedGenerationKind === "source_image_edit" &&
-      sourceImageUrl &&
-      currentState.pendingImageUrls?.includes(sourceImageUrl)
+    if (
+      selectedSourceImageUrls &&
+      (resolvedGenerationKind !== "source_image_edit" ||
+        selectedSourceImageUrls.length < 1 ||
+        selectedSourceImageUrls.length > MAX_SOURCE_IMAGES ||
+        new Set(selectedSourceImageUrls).size !==
+          selectedSourceImageUrls.length ||
+        selectedSourceImageUrls[0] !== sourceImageUrl ||
+        selectedSourceImageUrls.some(
+          url =>
+            !getPhotoConversationImages(currentState).some(
+              image => image.url === url
+            )
+        ))
+    )
+      throw new Error(
+        "Photo conversation source selection is stale or invalid"
+      );
+    const sourceImageUrls = selectedSourceImageUrls
+      ? [...selectedSourceImageUrls]
+      : resolvedGenerationKind === "source_image_edit" &&
+          sourceImageUrl &&
+          currentState.pendingImageUrls?.includes(sourceImageUrl)
         ? currentState.pendingImageUrls
         : sourceImageUrl
           ? [sourceImageUrl]
