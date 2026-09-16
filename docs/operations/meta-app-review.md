@@ -202,3 +202,23 @@ retain conversation text or media and does not initiate messages or generation.
 Technical collection and coverage limits are documented in
 [Conversation evaluation](conversation-evaluation.md). Runtime activation still
 requires the protected production release and consented smoke verification.
+
+
+## Contextual photo assistant (not yet enabled)
+
+The optional contextual layer allows ordinary replies, creative discussion and
+clarification using recent messages and up to four images within the same
+consented Page/user conversation. It keeps a prior generated image available
+when the user uploads another image. No additional Meta permissions or profile
+access are requested. Credits and commercial messages remain server-controlled.
+
+Demonstrate: generated animal + uploaded person + “voeg samen”; criticism without
+a new generation; descriptive captions and later references; a creative question;
+missing-source clarification; new-image reset; and delete-my-data including
+retained image cleanup. Use synthetic photos or explicitly consented test media.
+The bounded history/retention, provider-cost and rollout contract is documented
+in [Photo conversation](photo-conversation.md). Do not claim this experience is
+live based on mocked tests alone. The [2026-09-16 synthetic model evaluation](photo-conversation-evaluation-2026-09-16.md)
+passed 20 authored text/vision scenarios with separate semantic review. This
+closes that bounded interpretation check; it does not replace the protected
+activation/readback or Messenger delivery and rendered-image demonstrations above.

@@ -152,6 +152,26 @@ describe("webhook tracked context", () => {
     );
   });
 
+  it("marks an intentionally suppressed duplicate as handled without a send", () => {
+    const marked = vi.fn();
+    const tracked = createTrackedHandlerContext(
+      makeHandlerContext(vi.fn()),
+      marked
+    );
+    const ctx = tracked.createFeatureTextContext(
+      "user",
+      "user-key",
+      "duplicate",
+      "nl",
+      makeState(),
+      "hello",
+      "hello",
+      false
+    );
+    ctx.suppressFallback?.();
+    expect(marked).toHaveBeenCalledWith({ sent: true });
+  });
+
   it("renders numbered feature text as Messenger quick replies", async () => {
     process.env.PRIVACY_PEPPER = "test-pepper";
     const sendLoggedActions = vi.fn(async () => ({

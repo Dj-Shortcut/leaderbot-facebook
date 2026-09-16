@@ -1,3 +1,4 @@
+import { isPhotoConversationEnabled } from "./photoConversationMemory";
 import { t, type Lang } from "./i18n";
 import type { ConversationState, MessengerUserState } from "./messengerState";
 import { safeLog } from "./messengerApi";
@@ -221,20 +222,24 @@ export async function handleSharedTextMessage(
   const { trimmedText, normalizedText } = preparedMessage;
   logSharedTextExecution(input);
 
-  const socialReply = getSocialReply(trimmedText, input.lang);
-  if (socialReply) return { response: { text: socialReply } };
+  if (!(
+    isPhotoConversationEnabled() && input.message.channel === "messenger"
+  )) {
+    const socialReply = getSocialReply(trimmedText, input.lang);
+    if (socialReply) return { response: { text: socialReply } };
 
-  const ackResult = tryHandleAck(input, trimmedText);
-  if (ackResult) {
-    return ackResult;
-  }
+    const ackResult = tryHandleAck(input, trimmedText);
+    if (ackResult) {
+      return ackResult;
+    }
 
-  const greetingResult = await tryHandleGreetingOrSmalltalk(
-    input,
-    normalizedText
-  );
-  if (greetingResult) {
-    return greetingResult;
+    const greetingResult = await tryHandleGreetingOrSmalltalk(
+      input,
+      normalizedText
+    );
+    if (greetingResult) {
+      return greetingResult;
+    }
   }
 
   const state = await input.getState();

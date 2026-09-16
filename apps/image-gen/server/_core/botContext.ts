@@ -28,6 +28,8 @@ type BotContextBase = {
   reqId: string;
   lang: Lang;
   state: MessengerUserState;
+  /** An intentionally suppressed duplicate or erased turn has no fallback reply. */
+  suppressFallback?(): void;
   sendText(text: string): Promise<void>;
   sendImage(url: string): Promise<void>;
   sendActions(text: string, actions: ConversationAction[]): Promise<void>;
@@ -37,7 +39,8 @@ type BotContextBase = {
   runImageGeneration(
     sourceImageUrl?: string,
     promptHint?: string,
-    generationKind?: GenerationKind
+    generationKind?: GenerationKind,
+    selectedSourceImageUrls?: string[]
   ): Promise<void>;
   runVideoGeneration?(
     sourceImageUrl: string,

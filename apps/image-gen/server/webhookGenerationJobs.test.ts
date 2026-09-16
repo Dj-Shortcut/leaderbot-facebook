@@ -1,3 +1,4 @@
+import { patchState } from "./_core/messengerStatePersistence";
 import { createHash } from "node:crypto";
 import {
   afterAll,
@@ -159,6 +160,7 @@ vi.mock("./_core/messengerState", async importOriginal => {
 });
 
 vi.mock("./_core/workspaceEntitlementRuntime", () => ({
+  resolveMessengerGenerationOwnership: vi.fn(async () => undefined),
   assertMessengerGenerationOwnership: assertMessengerGenerationOwnershipMock,
   resolveWorkspaceRuntimePolicy: resolveWorkspaceRuntimePolicyMock,
 }));
@@ -4120,3 +4122,75 @@ function paidImageIdempotencyKey(
     .update(reqId)
     .digest("hex")}`;
 }
+
+describe("explicit photo conversation source selection", () => {
+  it("freezes exactly selected sources instead of expanding the pending upload set", async () => {
+    const psid = "selected-composition-user";
+    const dog = "https://assets.example/generated/dog.png",
+      friend = "https://assets.example/inbound/friend.png",
+      extra = "https://assets.example/inbound/extra.png";
+    await patchState(psid, {
+      pendingImageUrls: [friend, extra],
+      photoConversation: {
+        images: [
+          { id: "ignored", url: dog, kind: "generated" },
+          { id: "ignored", url: friend, kind: "uploaded" },
+          { id: "ignored", url: extra, kind: "uploaded" },
+        ],
+        turns: [],
+      },
+    });
+    const enqueue = vi
+      .spyOn(messengerGenerationQueue, "enqueueOrRunMessengerGenerationJob")
+      .mockResolvedValue({ mode: "queued" });
+    try {
+      const selected = [friend, dog];
+      await createTestRunner().runImageGeneration(
+        psid,
+        getUserKey(psid),
+        "selected-composition",
+        "nl",
+        friend,
+        "Combine the friend with the dog",
+        "source_image_edit",
+        selected
+      );
+      const job = enqueue.mock.calls[0][0];
+      expect(job).toMatchObject({
+        sourceImageUrl: friend,
+        sourceImageUrls: [friend, dog],
+        generationKind: "source_image_edit",
+      });
+      selected.push(extra);
+      expect(job.sourceImageUrls).toEqual([friend, dog]);
+      expect(executeGenerationFlowMock).not.toHaveBeenCalled();
+    } finally {
+      enqueue.mockRestore();
+    }
+  });
+  it("rejects an evicted source before enqueuing", async () => {
+    const psid = "stale-composition-user";
+    await getOrCreateState(psid);
+    const enqueue = vi
+      .spyOn(messengerGenerationQueue, "enqueueOrRunMessengerGenerationJob")
+      .mockResolvedValue({ mode: "queued" });
+    try {
+      await expect(
+        createTestRunner().runImageGeneration(
+          psid,
+          getUserKey(psid),
+          "stale-composition",
+          "nl",
+          "https://assets.example/stale.png",
+          "Combine",
+          "source_image_edit",
+          ["https://assets.example/stale.png"]
+        )
+      ).rejects.toThrow("stale or invalid");
+      expect(enqueue).not.toHaveBeenCalled();
+      expect(executeGenerationFlowMock).not.toHaveBeenCalled();
+    } finally {
+      enqueue.mockRestore();
+    }
+  });
+});

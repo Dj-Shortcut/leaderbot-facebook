@@ -104,7 +104,8 @@ export type HandlerContext = {
     lang: Lang,
     sourceImageUrl?: string,
     promptHint?: string,
-    generationKind?: GenerationKind
+    generationKind?: GenerationKind,
+    selectedSourceImageUrls?: string[]
   ) => Promise<MessengerSendOutcome>;
   runVideoGeneration?: (
     psid: string,
