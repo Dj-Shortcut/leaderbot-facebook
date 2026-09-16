@@ -351,15 +351,23 @@ export async function interpretPhotoConversation(
     if (!response.ok)
       throw new Error("Photo conversation provider rejected request");
     accepted = true;
-    const raw = await response.json();
-    const usage = raw?.usage;
+    const raw: unknown = await response.json();
+    const usage = (
+      raw as {
+        usage?: { input_tokens?: unknown; output_tokens?: unknown };
+      } | null
+    )?.usage;
+    const inputTokens = usage?.input_tokens;
+    const outputTokens = usage?.output_tokens;
     const finalCostUsd =
-      Number.isSafeInteger(usage?.input_tokens) &&
-      usage.input_tokens >= 0 &&
-      Number.isSafeInteger(usage?.output_tokens) &&
-      usage.output_tokens >= 0
-        ? usage.input_tokens * INPUT_USD_PER_TOKEN +
-          usage.output_tokens * OUTPUT_USD_PER_TOKEN
+      typeof inputTokens === "number" &&
+      Number.isSafeInteger(inputTokens) &&
+      inputTokens >= 0 &&
+      typeof outputTokens === "number" &&
+      Number.isSafeInteger(outputTokens) &&
+      outputTokens >= 0
+        ? inputTokens * INPUT_USD_PER_TOKEN +
+          outputTokens * OUTPUT_USD_PER_TOKEN
         : null;
     await safelyUpdateCostLedgerEntry(
       id,
