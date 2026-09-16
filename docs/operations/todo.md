@@ -139,29 +139,15 @@ Behavior, costs, rollback and tests: [Photo conversation](photo-conversation.md)
   independently read back at 15:59:39 UTC, preserving its three existing fields.
   Future receipt ingress still needs a live delivery check; this does not prove
   that Meta will replay receipts for the two earlier images.
-- [ ] Release and verify the Messenger **Credits** quick reply. Source PR #575 merged at
-  `0d406cdc1df478776da6606fb475c112ed10d8b1`. Trusted build
-  [35126862746](https://github.com/Dj-Shortcut/leaderbot-facebook/actions/runs/35126862746)
-  produced runtime `bec463108c3c...` with schema `0018`; its exact image, source
-  and signing repository were pinned for the protected rollout. Deployment
-  [35128951165](https://github.com/Dj-Shortcut/leaderbot-facebook/actions/runs/35128951165)
-  was cancelled after the app process repeatedly exited at startup: billing's
-  launch validation still rejected the explicitly disabled USD caps. Exact
-  protected recovery is tracked in run
-  [35130050735](https://github.com/Dj-Shortcut/leaderbot-facebook/actions/runs/35130050735).
-  The startup validator now accepts explicit zero, retaining rejection of
-  missing, negative and non-finite values; a regression loads the actual desired
-  Fly spend settings into both billing startup paths. Rebuild and deploy this
-  repair before verifying the Credits action. Source fix PR #577 merged at
-  `3512e522aacdc5643b1c2824aaa91181bb386fe9`; trusted build
-  [35131224373](https://github.com/Dj-Shortcut/leaderbot-facebook/actions/runs/35131224373)
-  produced repaired runtime `10a7607a671d...`, now pinned for deployment. Recovery
-  attempt 2 passed; all four predecessor Machines and both health endpoints were
-  verified healthy at 17:49 UTC. The implementation
-  reads scoped free and available premium balances, including while an image is
-  processing, without changing pending edit state or starting provider work.
-  Photo menus add the pill at the Messenger rendering boundary; consent and
-  checkout controls retain their original actions. Test the deployed pill.
+- [ ] Release and verify the **Credits** balance reply without a replacement
+  quick reply. Protected deployment
+  [35133964382](https://github.com/Dj-Shortcut/leaderbot-facebook/actions/runs/35133964382)
+  passed with corrected runtime `10a7607a671d...`; independent readback confirmed
+  four started Machines and healthy endpoints. The owner confirmed the button
+  returns a balance but immediately reappears. The prepared fix sends the balance
+  (or unavailable notice) as plain text, preserving the ordinary photo-menu entry
+  and pending image context. After rollout, tap **Credits** and confirm the
+  balance arrives without another **Credits** pill beneath it.
 - [ ] Deploy the owner's removal of extra bot-level USD limits. Both 15:49 UTC
   photo-conversation attempts failed at spend admission with `user_daily_cap`.
   Scoped readback at 15:53:45 UTC showed the configured USD 2/day user cap and

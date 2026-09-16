@@ -22,7 +22,6 @@ import { runWithMessengerRequestContext } from "./_core/messengerRequestContext"
 import { createDefaultState } from "./_core/messengerStateNormalization";
 import { toUserKey } from "./_core/privacy";
 import type { BotTextContext } from "./_core/botContext";
-import { CREDIT_BALANCE_ACTION } from "./_core/creditBalanceAction";
 
 const senderId = "synthetic-credit-user";
 const scope = () => ({
@@ -87,10 +86,10 @@ describe("Messenger Credits action", () => {
         requestId: ctx.reqId,
       });
       expect(m.free).toHaveBeenCalledWith(scope());
-      expect(ctx.sendActions).toHaveBeenCalledWith(
-        "Gratis afbeeldingen: vandaag nog 2 van 5. Deze maand nog 12 van 20.\nPremiumcredits: 6 beschikbaar.",
-        [CREDIT_BALANCE_ACTION]
+      expect(ctx.sendText).toHaveBeenCalledExactlyOnceWith(
+        "Gratis afbeeldingen: vandaag nog 2 van 5. Deze maand nog 12 van 20.\nPremiumcredits: 6 beschikbaar."
       );
+      expect(ctx.sendActions).not.toHaveBeenCalled();
       expect(ctx.state).toEqual(before);
       expect(ctx.setFlowState).not.toHaveBeenCalled();
       expect(ctx.setPendingEditIntent).not.toHaveBeenCalled();
@@ -101,9 +100,8 @@ describe("Messenger Credits action", () => {
     m.premium.mockResolvedValue(0);
     const ctx = context();
     await run(ctx);
-    expect(ctx.sendActions).toHaveBeenCalledWith(
-      expect.stringContaining("Premiumcredits: 0 beschikbaar."),
-      expect.any(Array)
+    expect(ctx.sendText).toHaveBeenCalledWith(
+      expect.stringContaining("Premiumcredits: 0 beschikbaar.")
     );
   });
   it.each([null, new Error("synthetic database failure")])(
@@ -113,21 +111,20 @@ describe("Messenger Credits action", () => {
       else m.premium.mockResolvedValue(result);
       const ctx = context();
       await run(ctx);
-      expect(ctx.sendActions).toHaveBeenCalledWith(
+      expect(ctx.sendText).toHaveBeenCalledWith(
         expect.stringContaining(
           "Premiumcredits: saldo momenteel niet beschikbaar."
-        ),
-        expect.any(Array)
+        )
       );
+      expect(ctx.sendActions).not.toHaveBeenCalled();
     }
   );
   it("still reports premium credits when the free-quota read fails", async () => {
     m.free.mockRejectedValue(new Error("synthetic quota failure"));
     const ctx = context();
     await run(ctx);
-    expect(ctx.sendActions).toHaveBeenCalledWith(
-      "Gratis afbeeldingen: saldo momenteel niet beschikbaar.\nPremiumcredits: 6 beschikbaar.",
-      expect.any(Array)
+    expect(ctx.sendText).toHaveBeenCalledWith(
+      "Gratis afbeeldingen: saldo momenteel niet beschikbaar.\nPremiumcredits: 6 beschikbaar."
     );
   });
   it.each([
@@ -144,10 +141,10 @@ describe("Messenger Credits action", () => {
       await run(ctx);
       expect(m.free).not.toHaveBeenCalled();
       expect(m.premium).not.toHaveBeenCalled();
-      expect(ctx.sendActions).toHaveBeenCalledWith(
-        expect.stringContaining("momenteel niet beschikbaar"),
-        expect.any(Array)
+      expect(ctx.sendText).toHaveBeenCalledWith(
+        expect.stringContaining("momenteel niet beschikbaar")
       );
+      expect(ctx.sendActions).not.toHaveBeenCalled();
     }
   );
   it.each(["privacy", "teken credits op de muur", "maak een hond"])(
@@ -173,9 +170,9 @@ describe("Messenger Credits action", () => {
     const ctx = context();
     ctx.lang = "en";
     await run(ctx);
-    expect(ctx.sendActions).toHaveBeenCalledWith(
-      expect.stringContaining("Premium credits: 6 available."),
-      [CREDIT_BALANCE_ACTION]
+    expect(ctx.sendText).toHaveBeenCalledWith(
+      expect.stringContaining("Premium credits: 6 available.")
     );
+    expect(ctx.sendActions).not.toHaveBeenCalled();
   });
 });

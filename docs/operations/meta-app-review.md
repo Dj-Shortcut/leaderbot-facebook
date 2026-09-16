@@ -29,7 +29,7 @@ mix it into the owner-bot review or subscription behavior.
 
 ## Current Messenger capabilities
 
-### Credits quick reply (implemented; release pending)
+### Credits quick reply (deployed; reply adjustment pending)
 
 Messenger photo menus include a **Credits** quick reply. Its encoded `credits`
 input, or typed `credits` / `/credits` / `saldo`, reads the current consented
@@ -40,12 +40,22 @@ unavailable, never as zero. This starts no provider work, reserves no credits,
 and changes no payment, consent or entitlement. Existing Meta messaging
 permissions suffice; consent/deletion controls and checkout buttons are unchanged.
 
+Pending follow-up: balance replies, including unavailable-balance replies, send
+plain text without another **Credits** quick reply. This stops the button from
+reappearing after each balance request. The entry in ordinary photo menus and
+typed balance commands remain available. Verify this behavior in Messenger after
+deployment; it does not introduce prompt suggestions or new permissions.
+
 Photo-conversation budget admission failures now explain the unavailable bot
 budget and retained credits, without suggesting that an immediate retry fixes it.
 The owner-requested configuration disables the extra global daily/monthly and
 per-user daily USD limits; the owner manages dollar budgets at the API provider.
-Free allowances and paid-credit admission remain enforced. Verify the balance pill
-and paid-image admission after deployment before marking this capability live.
+Free allowances and paid-credit admission remain enforced. Protected deployment
+[35133964382](https://github.com/Dj-Shortcut/leaderbot-facebook/actions/runs/35133964382)
+passed; independent readback confirmed the corrected runtime on all four started
+Machines and healthy endpoints. The owner confirmed the Credits button returns
+the balance. Paid-image admission and the pending reply adjustment still need
+their respective live checks.
 
 ### Owner customer-test control (deployed; user journey pending)
 
