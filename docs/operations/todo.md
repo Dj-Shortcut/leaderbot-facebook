@@ -56,7 +56,19 @@ Only diagnostic metadata is retained; no transcript or photo collection.
   probes confirmed unchanged persisted state and made no provider call. This
   proves the claim repair under current grants, not deployment or paid delivery.
 - Safe route/payment-stage diagnostics and distinct link/confirmation/status
-  error screens accompany the fix. The changes on this branch are not deployed.
+  error screens accompany the fix. [PR #567](https://github.com/Dj-Shortcut/leaderbot-facebook/pull/567)
+  merged as `f2b168a53f6aa08b32949c3f298efcd3d9548204`; its main CI passed,
+  including the real restricted-principal MySQL regression and production
+  schema/container checks. The owner authorized deployment on 2026-09-16.
+- The pending release pins image
+  `sha256:e8db5df627daf9b1619de05ea0c6067f2c734526e6d0ac38c1e2a52c0e85f234`,
+  built from that exact source by [35098126177](https://github.com/Dj-Shortcut/leaderbot-facebook/actions/runs/35098126177)
+  with [provenance 47910631](https://github.com/Dj-Shortcut/leaderbot-facebook/attestations/47910631).
+  The verified settled predecessor is `deploy-35073398659-1` / `532e97416641`.
+  Restoring its active config also restores the known checkout failure; the
+  separate emergency rollback config disables checkout/paid admission while
+  retaining financial recovery. Protected deployment and runtime readback are
+  still required; this build is not a completed payment test.
 - Local Chromium verification of the real React page, routes and headers with
   synthetic dependencies proved automatic cookie storage, session reload and
   the confirmation request. It does not prove Messenger WebView behavior or

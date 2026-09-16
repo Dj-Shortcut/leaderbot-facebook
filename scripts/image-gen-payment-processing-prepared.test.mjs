@@ -45,7 +45,7 @@ function readEnvAssignments(file) {
 describe.each([
   { stage: "desired bounded Test", config: app.config, exposure: "true" },
   {
-    stage: "settled scheduler guard predecessor",
+    stage: "settled owner customer-test predecessor",
     config: predecessorConfig,
     exposure: "true",
   },
@@ -127,7 +127,7 @@ describe.each([
   });
 });
 
-it("binds the original Test request and retains the exact settled scheduler guard predecessor", () => {
+it("binds the original Test request and retains the exact settled owner customer-test predecessor", () => {
   expect(app.creditTestActivation).toEqual({
     state: "bounded_test",
     obsoletePrincipalSha256:
@@ -144,12 +144,15 @@ it("binds the original Test request and retains the exact settled scheduler guar
       deploymentIdentity: "deploy-34496956631-1",
     },
   });
-  expect(predecessor.image).toBe(
-    "registry.fly.io/leaderbot-fb-image-gen@sha256:e0b82c21ceca12130a892afd01b90cf83fcb3b7a42a2721a9c424a76f1d6f1cf",
-  );
-  expect(predecessor.identity).toBe("deploy-35065616049-1");
+  expect(predecessor).toEqual({
+    image:
+      "registry.fly.io/leaderbot-fb-image-gen@sha256:532e974166413faf86917800bbd83831d031ee23c71542bb24d411c5f9e9ea93",
+    identity: "deploy-35073398659-1",
+    path: "deploy/production/rollback-configs/image-gen-532e97416641-deploy-35073398659-1.toml",
+    sha256: "4311fd1f4a6075a16ee16f08d83aadf63447bbc439044eb256f2206a37c44d99",
+  });
   expect(app.reviewedRollbackConfigs[predecessor.image]).toEqual({
-    path: "deploy/production/rollback-configs/image-gen-e0b82c21ceca-emergency-dark.toml",
+    path: "deploy/production/rollback-configs/image-gen-532e97416641-emergency-dark.toml",
     sha256: "f0253b74e85b1cefc4e99d537eafa6dfd687167010834066353c2595c94a02db",
   });
 });

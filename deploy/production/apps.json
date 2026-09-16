@@ -94,10 +94,11 @@
       "sourceDeployEnabled": false,
       "sourceDeployBlockReason": "Production deploys require an immutable image built from reviewed source and recorded in this manifest before rollout.",
       "trustedBuilderWorkflow": ".github/workflows/build-production-artifacts.yml",
-      "reviewedImage": "registry.fly.io/leaderbot-fb-image-gen@sha256:532e974166413faf86917800bbd83831d031ee23c71542bb24d411c5f9e9ea93",
+      "reviewedImage": "registry.fly.io/leaderbot-fb-image-gen@sha256:e8db5df627daf9b1619de05ea0c6067f2c734526e6d0ac38c1e2a52c0e85f234",
       "reviewedArtifactKind": "runtime",
-      "reviewedSourceCommit": "199a04e3def04a54b0f3cf6c0397da1184fa9694",
+      "reviewedSourceCommit": "f2b168a53f6aa08b32949c3f298efcd3d9548204",
       "reviewedArtifactRepositories": {
+        "registry.fly.io/leaderbot-fb-image-gen@sha256:e8db5df627daf9b1619de05ea0c6067f2c734526e6d0ac38c1e2a52c0e85f234": "Dj-Shortcut/leaderbot-facebook",
         "registry.fly.io/leaderbot-fb-image-gen@sha256:532e974166413faf86917800bbd83831d031ee23c71542bb24d411c5f9e9ea93": "Dj-Shortcut/leaderbot-facebook",
         "registry.fly.io/leaderbot-fb-image-gen@sha256:e0b82c21ceca12130a892afd01b90cf83fcb3b7a42a2721a9c424a76f1d6f1cf": "Dj-Shortcut/openclaw-facebook",
         "registry.fly.io/leaderbot-fb-image-gen@sha256:4b211aa3d68a7599bd3f18f4d166b9223f442332ff02528a99daa180b7d9afbd": "Dj-Shortcut/openclaw-facebook",
@@ -106,12 +107,13 @@
         "registry.fly.io/leaderbot-fb-image-gen@sha256:f2fa9d60e1fca02c09cb2764981a7134e908f2e33f127eb0e54e77030b4a7a4b": "Dj-Shortcut/openclaw-facebook"
       },
       "reviewedSettledPredecessor": {
-        "identity": "deploy-35065616049-1",
-        "image": "registry.fly.io/leaderbot-fb-image-gen@sha256:e0b82c21ceca12130a892afd01b90cf83fcb3b7a42a2721a9c424a76f1d6f1cf",
-        "path": "deploy/production/rollback-configs/image-gen-e0b82c21ceca-deploy-35065616049-1.toml",
+        "identity": "deploy-35073398659-1",
+        "image": "registry.fly.io/leaderbot-fb-image-gen@sha256:532e974166413faf86917800bbd83831d031ee23c71542bb24d411c5f9e9ea93",
+        "path": "deploy/production/rollback-configs/image-gen-532e97416641-deploy-35073398659-1.toml",
         "sha256": "4311fd1f4a6075a16ee16f08d83aadf63447bbc439044eb256f2206a37c44d99"
       },
       "reviewedRollbackImages": [
+        "registry.fly.io/leaderbot-fb-image-gen@sha256:532e974166413faf86917800bbd83831d031ee23c71542bb24d411c5f9e9ea93",
         "registry.fly.io/leaderbot-fb-image-gen@sha256:e0b82c21ceca12130a892afd01b90cf83fcb3b7a42a2721a9c424a76f1d6f1cf",
         "registry.fly.io/leaderbot-fb-image-gen@sha256:4b211aa3d68a7599bd3f18f4d166b9223f442332ff02528a99daa180b7d9afbd",
         "registry.fly.io/leaderbot-fb-image-gen@sha256:b1f3996faff2406eba3383465974895dc2dcbacd6432f5ab1591cb1e76be4bdf",
@@ -119,6 +121,10 @@
         "registry.fly.io/leaderbot-fb-image-gen@sha256:f2fa9d60e1fca02c09cb2764981a7134e908f2e33f127eb0e54e77030b4a7a4b"
       ],
       "reviewedRollbackConfigs": {
+        "registry.fly.io/leaderbot-fb-image-gen@sha256:532e974166413faf86917800bbd83831d031ee23c71542bb24d411c5f9e9ea93": {
+          "path": "deploy/production/rollback-configs/image-gen-532e97416641-emergency-dark.toml",
+          "sha256": "f0253b74e85b1cefc4e99d537eafa6dfd687167010834066353c2595c94a02db"
+        },
         "registry.fly.io/leaderbot-fb-image-gen@sha256:c04c742f56de06cddb72907ca0bdc989200babd0ea7dcb73b318bf96a327b548": {
           "path": "deploy/production/rollback-configs/image-gen-c04c742f56de-emergency-dark.toml",
           "sha256": "96954feccc90b1885c4b6b6684b56b83b5fbd64f07fbfa15057b0a0a52400649"
@@ -141,6 +147,7 @@
         }
       },
       "reviewedRollbackArtifactKinds": {
+        "registry.fly.io/leaderbot-fb-image-gen@sha256:532e974166413faf86917800bbd83831d031ee23c71542bb24d411c5f9e9ea93": "runtime",
         "registry.fly.io/leaderbot-fb-image-gen@sha256:c04c742f56de06cddb72907ca0bdc989200babd0ea7dcb73b318bf96a327b548": "runtime",
         "registry.fly.io/leaderbot-fb-image-gen@sha256:f2fa9d60e1fca02c09cb2764981a7134e908f2e33f127eb0e54e77030b4a7a4b": "runtime",
         "registry.fly.io/leaderbot-fb-image-gen@sha256:b1f3996faff2406eba3383465974895dc2dcbacd6432f5ab1591cb1e76be4bdf": "runtime",
@@ -148,6 +155,7 @@
         "registry.fly.io/leaderbot-fb-image-gen@sha256:e0b82c21ceca12130a892afd01b90cf83fcb3b7a42a2721a9c424a76f1d6f1cf": "runtime"
       },
       "reviewedRollbackSourceCommits": {
+        "registry.fly.io/leaderbot-fb-image-gen@sha256:532e974166413faf86917800bbd83831d031ee23c71542bb24d411c5f9e9ea93": "199a04e3def04a54b0f3cf6c0397da1184fa9694",
         "registry.fly.io/leaderbot-fb-image-gen@sha256:c04c742f56de06cddb72907ca0bdc989200babd0ea7dcb73b318bf96a327b548": "ba1720e6a48a3784b800f610fb7f8dad9859945a",
         "registry.fly.io/leaderbot-fb-image-gen@sha256:f2fa9d60e1fca02c09cb2764981a7134e908f2e33f127eb0e54e77030b4a7a4b": "b9caea7951b44d1f97bbd1bc742c25aca68264e9",
         "registry.fly.io/leaderbot-fb-image-gen@sha256:b1f3996faff2406eba3383465974895dc2dcbacd6432f5ab1591cb1e76be4bdf": "df8d5d840272e05934916797cf84e802b0fdae42",
@@ -189,6 +197,9 @@
       },
       "reviewedImageSchemaPhases": ["0018_credit_checkout_reservation"],
       "reviewedRollbackImageSchemaPhases": {
+        "registry.fly.io/leaderbot-fb-image-gen@sha256:532e974166413faf86917800bbd83831d031ee23c71542bb24d411c5f9e9ea93": [
+          "0018_credit_checkout_reservation"
+        ],
         "registry.fly.io/leaderbot-fb-image-gen@sha256:c04c742f56de06cddb72907ca0bdc989200babd0ea7dcb73b318bf96a327b548": [
           "0018_credit_checkout_reservation"
         ],
