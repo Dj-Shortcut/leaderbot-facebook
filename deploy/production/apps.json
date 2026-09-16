@@ -94,10 +94,11 @@
       "sourceDeployEnabled": false,
       "sourceDeployBlockReason": "Production deploys require an immutable image built from reviewed source and recorded in this manifest before rollout.",
       "trustedBuilderWorkflow": ".github/workflows/build-production-artifacts.yml",
-      "reviewedImage": "registry.fly.io/leaderbot-fb-image-gen@sha256:7165f3bac38c168f3b5d85e3153f7371388eeef7b5477c06f8eff63d9602cb8d",
+      "reviewedImage": "registry.fly.io/leaderbot-fb-image-gen@sha256:a1f5a73069d1e7429d8b9373ec025a0bad9a3ee0d48aa76aebe391e3f4d4a22c",
       "reviewedArtifactKind": "runtime",
-      "reviewedSourceCommit": "2bebfabd7e005e7dcb87c9a46cf3611c2b2a3dee",
+      "reviewedSourceCommit": "bd67c6f502cda26a16f2282fbe479afeb2a4fcbc",
       "reviewedArtifactRepositories": {
+        "registry.fly.io/leaderbot-fb-image-gen@sha256:a1f5a73069d1e7429d8b9373ec025a0bad9a3ee0d48aa76aebe391e3f4d4a22c": "Dj-Shortcut/leaderbot-facebook",
         "registry.fly.io/leaderbot-fb-image-gen@sha256:7165f3bac38c168f3b5d85e3153f7371388eeef7b5477c06f8eff63d9602cb8d": "Dj-Shortcut/leaderbot-facebook",
         "registry.fly.io/leaderbot-fb-image-gen@sha256:532e974166413faf86917800bbd83831d031ee23c71542bb24d411c5f9e9ea93": "Dj-Shortcut/leaderbot-facebook",
         "registry.fly.io/leaderbot-fb-image-gen@sha256:e0b82c21ceca12130a892afd01b90cf83fcb3b7a42a2721a9c424a76f1d6f1cf": "Dj-Shortcut/openclaw-facebook",
@@ -107,10 +108,10 @@
         "registry.fly.io/leaderbot-fb-image-gen@sha256:f2fa9d60e1fca02c09cb2764981a7134e908f2e33f127eb0e54e77030b4a7a4b": "Dj-Shortcut/openclaw-facebook"
       },
       "reviewedSettledPredecessor": {
-        "identity": "deploy-35103111862-1",
+        "identity": "deploy-35108204745-1",
         "image": "registry.fly.io/leaderbot-fb-image-gen@sha256:7165f3bac38c168f3b5d85e3153f7371388eeef7b5477c06f8eff63d9602cb8d",
-        "path": "deploy/production/rollback-configs/image-gen-7165f3bac38c-deploy-35103111862-1.toml",
-        "sha256": "4311fd1f4a6075a16ee16f08d83aadf63447bbc439044eb256f2206a37c44d99"
+        "path": "deploy/production/rollback-configs/image-gen-7165f3bac38c-deploy-35108204745-1.toml",
+        "sha256": "0e1d34112abbd08362361820ba585e89807ebbcce4a5a6700f1eaaa23f09714a"
       },
       "reviewedRollbackImages": [
         "registry.fly.io/leaderbot-fb-image-gen@sha256:7165f3bac38c168f3b5d85e3153f7371388eeef7b5477c06f8eff63d9602cb8d",
