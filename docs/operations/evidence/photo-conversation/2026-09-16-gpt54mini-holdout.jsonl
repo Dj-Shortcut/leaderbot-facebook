@@ -1,0 +1,45 @@
+{"kind":"bundle","bundleSha256":"341640855717fa91563866d4ea4141fffe40f90d8446a8a376704323e010cb85","suite":"holdout","inputs":["server/_core/openai/responseText.ts","server/_core/image-generation/generationTypes.ts","server/_core/photoConversationMemory.ts","server/_core/photoConversationContract.ts","scripts/lib/photo-conversation-evaluation.mjs","photo-evaluation-entry.mjs"]}
+{"kind":"runtime","app":"leaderbot-fb-image-gen","machineId":"d895355a1e6178","image":"registry.fly.io/leaderbot-fb-image-gen@sha256:532e974166413faf86917800bbd83831d031ee23c71542bb24d411c5f9e9ea93"}
+{"kind":"plan","model":"gpt-5.4-mini-2026-03-17","calls":10,"maxUsd":0.5,"reservedUsd":0.21476699999999999,"suiteSha256":"426fd71474d9bce10c0c4d9becac75c2747bef463b0968b4975b1afacc48a0bb","cases":[{"id":"elliptical_correction","tokenBound":19278,"reservedUsd":0.0236745,"expectedAction":"edit"},{"id":"complaint_alternate","tokenBound":19310,"reservedUsd":0.0236985,"expectedAction":"reply"},{"id":"different_pair","tokenBound":19446,"reservedUsd":0.023800500000000002,"expectedAction":"edit"},{"id":"unneeded_missing_source","tokenBound":12777,"reservedUsd":0.018798750000000003,"expectedAction":"edit"},{"id":"after_failed_result","tokenBound":19461,"reservedUsd":0.02381175,"expectedAction":"edit"},{"id":"ambiguous_alternate","tokenBound":19148,"reservedUsd":0.023577,"expectedAction":"reply"},{"id":"confirmed_different_pair","tokenBound":19291,"reservedUsd":0.02368425,"expectedAction":"edit"},{"id":"missing_person","tokenBound":12685,"reservedUsd":0.01872975,"expectedAction":"reply"},{"id":"new_image_alternate","tokenBound":9294,"reservedUsd":0.0161865,"expectedAction":"generate"},{"id":"authorized_new_subject","tokenBound":12786,"reservedUsd":0.018805500000000003,"expectedAction":"edit"}]}
+{"kind":"attempt","caseId":"elliptical_correction"}
+{"kind":"response","caseId":"elliptical_correction","httpStatus":200}
+{"kind":"usage","caseId":"elliptical_correction","inputTokens":2593,"outputTokens":120}
+{"kind":"case","caseId":"elliptical_correction","passed":true,"decision":{"action":"edit","reply":"","prompt":"Zet de man en de hond samen in één compositie. Behoud hun oorspronkelijke uiterlijk, houding, kleding en alle details, en verander alleen de opstelling zodat ze samen in beeld staan.","imageIds":["image_291ea05f83dc764b","image_b6d749ac8fe02315"]},"inputTokens":2593,"outputTokens":120,"elapsedMs":1561}
+{"kind":"attempt","caseId":"complaint_alternate"}
+{"kind":"response","caseId":"complaint_alternate","httpStatus":200}
+{"kind":"usage","caseId":"complaint_alternate","inputTokens":2591,"outputTokens":188}
+{"kind":"case","caseId":"complaint_alternate","passed":true,"decision":{"action":"reply","reply":"Ik had het opgevat als: de hond en de persoon samen in één afbeelding. Wat moet er precies anders aan de samenvoeging?","prompt":"","imageIds":[]},"inputTokens":2591,"outputTokens":188,"elapsedMs":2847}
+{"kind":"attempt","caseId":"different_pair"}
+{"kind":"response","caseId":"different_pair","httpStatus":200}
+{"kind":"usage","caseId":"different_pair","inputTokens":2627,"outputTokens":144}
+{"kind":"case","caseId":"different_pair","passed":true,"decision":{"action":"edit","reply":"","prompt":"Voeg de man en de kat samen in één afbeelding. Laat de hond weg. Behoud van beide hun oorspronkelijke houding, uiterlijk, kleding en alle details.","imageIds":["image_291ea05f83dc764b","image_7c19a24d06bf358e"]},"inputTokens":2627,"outputTokens":144,"elapsedMs":1857}
+{"kind":"attempt","caseId":"unneeded_missing_source"}
+{"kind":"response","caseId":"unneeded_missing_source","httpStatus":200}
+{"kind":"usage","caseId":"unneeded_missing_source","inputTokens":1934,"outputTokens":202}
+{"kind":"case","caseId":"unneeded_missing_source","passed":true,"decision":{"action":"edit","reply":"","prompt":"Verander alleen de trui van mijn maat naar rood. Behoud verder zijn oorspronkelijke uiterlijk, houding, kledingdetails en de rest van de afbeelding ongewijzigd.","imageIds":["image_291ea05f83dc764b"]},"inputTokens":1934,"outputTokens":202,"elapsedMs":1807}
+{"kind":"attempt","caseId":"after_failed_result"}
+{"kind":"response","caseId":"after_failed_result","httpStatus":200}
+{"kind":"usage","caseId":"after_failed_result","inputTokens":2622,"outputTokens":103}
+{"kind":"case","caseId":"after_failed_result","passed":true,"decision":{"action":"edit","reply":"","prompt":"Voeg de hond en mijn maat samen in één afbeelding. Behoud van beide hun oorspronkelijke uiterlijk, kleding, pose en details, en zet ze samen in hetzelfde beeld.","imageIds":["image_b6d749ac8fe02315","image_291ea05f83dc764b"]},"inputTokens":2622,"outputTokens":103,"elapsedMs":2516}
+{"kind":"attempt","caseId":"ambiguous_alternate"}
+{"kind":"response","caseId":"ambiguous_alternate","httpStatus":200}
+{"kind":"usage","caseId":"ambiguous_alternate","inputTokens":2566,"outputTokens":83}
+{"kind":"case","caseId":"ambiguous_alternate","passed":true,"decision":{"action":"reply","reply":"Welke twee wil je naast elkaar zetten: de man, de hond of de kat?","prompt":"","imageIds":[]},"inputTokens":2566,"outputTokens":83,"elapsedMs":1843}
+{"kind":"attempt","caseId":"confirmed_different_pair"}
+{"kind":"response","caseId":"confirmed_different_pair","httpStatus":200}
+{"kind":"usage","caseId":"confirmed_different_pair","inputTokens":2598,"outputTokens":96}
+{"kind":"case","caseId":"confirmed_different_pair","passed":true,"decision":{"action":"edit","reply":"","prompt":"Zet de kat en de persoon met de blauwe trui samen in één compositie. Behoud hun oorspronkelijke uiterlijk, kleding, houding en alle details precies zoals ze zijn.","imageIds":["image_7c19a24d06bf358e","image_291ea05f83dc764b"]},"inputTokens":2598,"outputTokens":96,"elapsedMs":1352}
+{"kind":"attempt","caseId":"missing_person"}
+{"kind":"response","caseId":"missing_person","httpStatus":200}
+{"kind":"usage","caseId":"missing_person","inputTokens":1920,"outputTokens":122}
+{"kind":"case","caseId":"missing_person","passed":true,"decision":{"action":"reply","reply":"Ik kan de kat wel zien, maar je maat staat in een niet-beschikbare afbeelding. Upload die persoon even opnieuw, dan zet ik ze samen op één foto.","prompt":"","imageIds":[]},"inputTokens":1920,"outputTokens":122,"elapsedMs":1512}
+{"kind":"attempt","caseId":"new_image_alternate"}
+{"kind":"response","caseId":"new_image_alternate","httpStatus":200}
+{"kind":"usage","caseId":"new_image_alternate","inputTokens":1543,"outputTokens":79}
+{"kind":"case","caseId":"new_image_alternate","passed":true,"decision":{"action":"generate","reply":"","prompt":"Een rode luchtballon zweeft boven een berglandschap, met heldere lucht en zachte, natuurlijke belichting. Realistische stijl, rustige compositie, de ballon duidelijk zichtbaar boven de bergtoppen.","imageIds":[]},"inputTokens":1543,"outputTokens":79,"elapsedMs":1285}
+{"kind":"attempt","caseId":"authorized_new_subject"}
+{"kind":"response","caseId":"authorized_new_subject","httpStatus":200}
+{"kind":"usage","caseId":"authorized_new_subject","inputTokens":1933,"outputTokens":186}
+{"kind":"case","caseId":"authorized_new_subject","passed":true,"decision":{"action":"edit","reply":"","prompt":"Voeg een nieuwe hond toe naast de man. Behoud de man precies zoals hij is, met zijn oorspronkelijke houding, uiterlijk, kleding en details. Plaats de hond in het gras als een natuurlijke toevoeging.","imageIds":["image_291ea05f83dc764b"]},"inputTokens":1933,"outputTokens":186,"elapsedMs":1744}
+{"kind":"summary","passed":true,"calls":10,"actualUsd":0.023148750000000003,"reservedUsd":0.21476699999999999,"suiteSha256":"426fd71474d9bce10c0c4d9becac75c2747bef463b0968b4975b1afacc48a0bb"}
+{"kind":"execution","completed":true,"passed":true,"bundleSha256":"341640855717fa91563866d4ea4141fffe40f90d8446a8a376704323e010cb85","automaticRetry":false}

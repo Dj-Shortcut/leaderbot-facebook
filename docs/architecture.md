@@ -89,6 +89,12 @@ The Messenger adapter parses inbound events and renders text, images, and
 actions. A checkout action becomes a Messenger URL button pointing to a
 short-lived signed web handoff.
 
+The opt-in [contextual photo assistant](operations/photo-conversation.md) uses
+bounded private history and scoped image references to choose a reply, a new
+image request, or an edit of exact sources. The model supplies no financial or
+provider-policy parameters; execution remains in the existing admission and
+worker stores. It is not a general-purpose tool agent.
+
 ## Free quota
 
 Free quota is an abuse- and cost-control allowance, not a monetary wallet.

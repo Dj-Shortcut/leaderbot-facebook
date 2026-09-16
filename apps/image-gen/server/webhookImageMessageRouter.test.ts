@@ -100,12 +100,33 @@ describe("webhook image message router", () => {
   });
 
   afterEach(() => {
+    vi.unstubAllEnvs();
     resetStateStore();
     if (originalPrivacyPepper === undefined) {
       delete process.env.PRIVACY_PEPPER;
     } else {
       process.env.PRIVACY_PEPPER = originalPrivacyPepper;
     }
+  });
+
+  it("routes a descriptive photo caption into conversation when enabled", async () => {
+    vi.stubEnv("MESSENGER_PHOTO_CONVERSATION_ENABLED", "true");
+    const ctx = makeHandlerContext();
+    await tryHandleImageMessage(ctx, {
+      psid: "caption-user",
+      userId: "caption-key",
+      reqId: "caption-turn",
+      lang: "nl",
+      attachments: [
+        { type: "image", payload: { url: "https://example.com/portrait.jpg" } },
+      ],
+      text: "Dit is mijn vriend Jan",
+    });
+    expect(handleTextMessageMock).toHaveBeenCalledWith(
+      ctx,
+      expect.objectContaining({ text: "Dit is mijn vriend Jan" })
+    );
+    expect(ctx.runImageGeneration).not.toHaveBeenCalled();
   });
 
   it("routes prompt-first captioned image messages into text handling", async () => {

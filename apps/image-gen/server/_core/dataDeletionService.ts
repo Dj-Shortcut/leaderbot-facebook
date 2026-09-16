@@ -68,6 +68,7 @@ function getGeneralStateImageUrls(state: MessengerUserState): string[] {
     state.lastPhotoUrl,
     state.pendingImageUrl,
     ...(state.pendingImageUrls ?? []),
+    ...(state.photoConversation?.images.map(image => image.url) ?? []),
     state.lastGeneratedUrl,
     state.lastImageUrl,
     state.lastGeneratedVideoUrl,

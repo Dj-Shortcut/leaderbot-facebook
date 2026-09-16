@@ -21,6 +21,12 @@ import {
   type MessengerStateFence,
 } from "./messengerStatePersistence";
 
+import {
+  isPhotoConversationEnabled,
+  rememberPhotoConversationImages,
+  type PhotoConversationMemory,
+} from "./photoConversationMemory";
+
 export type ConversationState =
   | "IDLE"
   | "AWAITING_PHOTO"
@@ -72,6 +78,8 @@ export type MessengerUserState = {
   consentGiven: boolean;
   /** Owner opt-in to ordinary admission; scoped and erased with this state. */
   customerTestMode?: boolean;
+  /** Bounded private conversation; erased with this exact Page/user state. */
+  photoConversation?: PhotoConversationMemory;
   consentTimestamp?: number;
   /** Distinguishes an explicit refusal from legacy/unanswered false state. */
   consentDeclinedAt?: number;
@@ -391,7 +399,16 @@ export function setPendingImage(
 ): MaybePromise<void> {
   const result = patchState(
     psid,
-    {
+    current => ({
+      ...(isPhotoConversationEnabled()
+        ? {
+            photoConversation: rememberPhotoConversationImages(
+              current,
+              [imageUrl],
+              "uploaded"
+            ),
+          }
+        : { photoConversation: undefined }),
       lastPhotoUrl: imageUrl,
       lastPhoto: imageUrl,
       lastPhotoSource: source,
@@ -402,7 +419,7 @@ export function setPendingImage(
       pendingEditIntent: null,
       stage: "AWAITING_EDIT_PROMPT",
       state: "AWAITING_EDIT_PROMPT",
-    },
+    }),
     now
   );
 
@@ -461,7 +478,16 @@ export async function setPendingStoredImages(
       await Promise.resolve(
         patchState(
           psid,
-          {
+          current => ({
+            ...(isPhotoConversationEnabled()
+              ? {
+                  photoConversation: rememberPhotoConversationImages(
+                    current,
+                    retainedIncomingImageUrls,
+                    "uploaded"
+                  ),
+                }
+              : { photoConversation: undefined }),
             lastPhotoUrl: lastImageUrl,
             lastPhoto: lastImageUrl,
             lastPhotoSource: "stored",
@@ -473,7 +499,7 @@ export async function setPendingStoredImages(
             pendingEditIntent: null,
             stage: "AWAITING_EDIT_PROMPT",
             state: "AWAITING_EDIT_PROMPT",
-          },
+          }),
           now
         )
       );
@@ -589,6 +615,8 @@ export function clearFaceMemoryState(
       pendingSourceImageDeleteUrls: uniquePendingDeleteUrls.length
         ? uniquePendingDeleteUrls
         : null,
+      photoConversation: undefined,
+      lastPrompt: undefined,
       lastPhotoUrl: null,
       lastPhoto: null,
       lastPhotoSource: null,
@@ -659,6 +687,8 @@ export function clearPendingImageState(
   return patchState(
     psid,
     {
+      photoConversation: undefined,
+      lastPrompt: undefined,
       lastPhotoUrl: null,
       lastPhoto: null,
       lastPhotoSource: null,
@@ -787,14 +817,23 @@ export function setLastGenerated(
 ): MaybePromise<void> {
   const result = patchState(
     psid,
-    {
+    current => ({
+      ...(isPhotoConversationEnabled()
+        ? {
+            photoConversation: rememberPhotoConversationImages(
+              current,
+              [resultImageUrl],
+              "generated"
+            ),
+          }
+        : { photoConversation: undefined }),
       lastImageUrl: resultImageUrl,
       lastGeneratedUrl: resultImageUrl,
       lastGeneratedAt: now,
       pendingEditIntent: null,
       stage: "RESULT_READY",
       state: "RESULT_READY",
-    },
+    }),
     now
   );
 

@@ -22,6 +22,7 @@
     "db:rehearse-0017": "node scripts/rehearse-0017-credit-wallet-migration.mjs",
     "db:rehearse-0018": "node scripts/rehearse-0018-credit-checkout-reservation.mjs",
     "dev": "cross-env NODE_ENV=development tsx watch server/_core/index.ts",
+    "evaluate:photo-conversation": "node scripts/evaluate-photo-conversation.mjs",
     "deploy:check-docker": "node scripts/check-docker-host.mjs",
     "fallow": "pnpm dlx fallow@2.27.0 --root .",
     "fallow:list": "pnpm dlx fallow@2.27.0 --root . list",
