@@ -1238,7 +1238,7 @@ describe("production deployment contract", () => {
     });
   });
 
-  it("pins the checkout permission fix while retaining the settled owner customer-test predecessor and dark emergency rollback", () => {
+  it("pins the same runtime for photo activation with its exact feature-off predecessor and dark emergency rollback", () => {
     const manifest = JSON.parse(
       fs.readFileSync(
         path.join(repoRoot, "deploy/production/apps.json"),
@@ -1254,8 +1254,10 @@ describe("production deployment contract", () => {
       "registry.fly.io/leaderbot-fb-image-gen@sha256:4b211aa3d68a7599bd3f18f4d166b9223f442332ff02528a99daa180b7d9afbd";
     const previousSchedulerPredecessorImage =
       "registry.fly.io/leaderbot-fb-image-gen@sha256:e0b82c21ceca12130a892afd01b90cf83fcb3b7a42a2721a9c424a76f1d6f1cf";
-    const predecessorImage =
+    const previousOwnerTestPredecessorImage =
       "registry.fly.io/leaderbot-fb-image-gen@sha256:532e974166413faf86917800bbd83831d031ee23c71542bb24d411c5f9e9ea93";
+    const predecessorImage =
+      "registry.fly.io/leaderbot-fb-image-gen@sha256:7165f3bac38c168f3b5d85e3153f7371388eeef7b5477c06f8eff63d9602cb8d";
     const emergencyRollbackImage =
       "registry.fly.io/leaderbot-fb-image-gen@sha256:f2fa9d60e1fca02c09cb2764981a7134e908f2e33f127eb0e54e77030b4a7a4b";
 
@@ -1276,7 +1278,7 @@ describe("production deployment contract", () => {
     expect(app.reviewedSourceCommit).toBe(
       "2bebfabd7e005e7dcb87c9a46cf3611c2b2a3dee",
     );
-    expect(app.reviewedImage).not.toBe(predecessorImage);
+    expect(app.reviewedImage).toBe(predecessorImage);
     expect(app.reviewedImageSchemaPhases).toEqual([
       "0018_credit_checkout_reservation",
     ]);
@@ -1285,6 +1287,7 @@ describe("production deployment contract", () => {
     );
     expect(app.reviewedRollbackImages).toEqual([
       predecessorImage,
+      previousOwnerTestPredecessorImage,
       previousSchedulerPredecessorImage,
       previousPaymentPredecessorImage,
       earlierPredecessorImage,
@@ -1293,6 +1296,7 @@ describe("production deployment contract", () => {
     ]);
     expect(app.reviewedRollbackArtifactKinds).toEqual({
       [predecessorImage]: "runtime",
+      [previousOwnerTestPredecessorImage]: "runtime",
       [previousSchedulerPredecessorImage]: "runtime",
       [previousPaymentPredecessorImage]: "runtime",
       [earlierPredecessorImage]: "runtime",
@@ -1300,7 +1304,9 @@ describe("production deployment contract", () => {
       [emergencyRollbackImage]: "runtime",
     });
     expect(app.reviewedRollbackSourceCommits).toEqual({
-      [predecessorImage]: "199a04e3def04a54b0f3cf6c0397da1184fa9694",
+      [predecessorImage]: "2bebfabd7e005e7dcb87c9a46cf3611c2b2a3dee",
+      [previousOwnerTestPredecessorImage]:
+        "199a04e3def04a54b0f3cf6c0397da1184fa9694",
       [previousSchedulerPredecessorImage]:
         "f139c0c688369b605528975481eb2f0fa4626417",
       [previousPaymentPredecessorImage]:
@@ -1311,6 +1317,7 @@ describe("production deployment contract", () => {
     });
     expect(app.reviewedRollbackImageSchemaPhases).toEqual({
       [predecessorImage]: ["0018_credit_checkout_reservation"],
+      [previousOwnerTestPredecessorImage]: ["0018_credit_checkout_reservation"],
       [previousSchedulerPredecessorImage]: ["0018_credit_checkout_reservation"],
       [previousPaymentPredecessorImage]: ["0018_credit_checkout_reservation"],
       [earlierPredecessorImage]: ["0018_credit_checkout_reservation"],
@@ -1318,13 +1325,20 @@ describe("production deployment contract", () => {
       [emergencyRollbackImage]: ["0018_credit_checkout_reservation"],
     });
     expect(app.reviewedSettledPredecessor).toEqual({
-      identity: "deploy-35073398659-1",
+      identity: "deploy-35103111862-1",
       image: predecessorImage,
-      path: "deploy/production/rollback-configs/image-gen-532e97416641-deploy-35073398659-1.toml",
+      path: "deploy/production/rollback-configs/image-gen-7165f3bac38c-deploy-35103111862-1.toml",
       sha256:
         "4311fd1f4a6075a16ee16f08d83aadf63447bbc439044eb256f2206a37c44d99",
     });
     expect(app.reviewedRollbackConfigs[predecessorImage]).toEqual({
+      path: "deploy/production/rollback-configs/image-gen-7165f3bac38c-emergency-dark.toml",
+      sha256:
+        "f0253b74e85b1cefc4e99d537eafa6dfd687167010834066353c2595c94a02db",
+    });
+    expect(
+      app.reviewedRollbackConfigs[previousOwnerTestPredecessorImage],
+    ).toEqual({
       path: "deploy/production/rollback-configs/image-gen-532e97416641-emergency-dark.toml",
       sha256:
         "f0253b74e85b1cefc4e99d537eafa6dfd687167010834066353c2595c94a02db",
@@ -1345,7 +1359,7 @@ describe("production deployment contract", () => {
     });
     expect(app.reviewedArtifactRepositories).toEqual({
       [app.reviewedImage]: "Dj-Shortcut/leaderbot-facebook",
-      [predecessorImage]: "Dj-Shortcut/leaderbot-facebook",
+      [previousOwnerTestPredecessorImage]: "Dj-Shortcut/leaderbot-facebook",
       [previousSchedulerPredecessorImage]: "Dj-Shortcut/openclaw-facebook",
       [previousPaymentPredecessorImage]: "Dj-Shortcut/openclaw-facebook",
       [earlierPredecessorImage]: "Dj-Shortcut/openclaw-facebook",
@@ -3734,11 +3748,45 @@ describe("production deployment contract", () => {
     );
   });
 
+  it("accepts one signing binding when the exact runtime is both desired and rollback", () => {
+    const root = createRepositoryFixture();
+    const manifest = JSON.parse(
+      fs.readFileSync(path.join(root, "deploy/production/apps.json"), "utf8"),
+    );
+    const app = manifest.apps["image-gen"];
+    expect(app.reviewedRollbackImages).toContain(app.reviewedImage);
+    expect(app.reviewedSettledPredecessor.image).toBe(app.reviewedImage);
+    expect(Object.keys(app.reviewedArtifactRepositories)).toEqual(
+      expect.arrayContaining([app.reviewedImage]),
+    );
+    expect(Object.keys(app.reviewedArtifactRepositories)).toHaveLength(
+      new Set([app.reviewedImage, ...app.reviewedRollbackImages]).size,
+    );
+    expect(validateProductionRepository(root)).toEqual({
+      apps: 3,
+      callbacks: 2,
+    });
+  });
+
+  it("still rejects duplicate rollback entries for a same-image config transition", () => {
+    const root = createRepositoryFixture();
+    const manifestPath = path.join(root, "deploy/production/apps.json");
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+    const app = manifest.apps["image-gen"];
+    expect(app.reviewedRollbackImages).toContain(app.reviewedImage);
+    app.reviewedRollbackImages.push(app.reviewedImage);
+    fs.writeFileSync(manifestPath, JSON.stringify(manifest));
+    expect(() => validateProductionRepository(root)).toThrow(
+      "reviewedRollbackImages must not contain duplicates",
+    );
+  });
+
   it.each(["missing", "unrelated", "extra"])("rejects %s artifact repository binding", (mutation) => {
     const root = createRepositoryFixture();
     const manifestPath = path.join(root, "deploy/production/apps.json");
     const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
     const app = manifest.apps["image-gen"];
+    expect(app.reviewedRollbackImages).toContain(app.reviewedImage);
     if (mutation === "missing") delete app.reviewedArtifactRepositories[app.reviewedImage];
     if (mutation === "unrelated") app.reviewedArtifactRepositories[app.reviewedImage] = "attacker/leaderbot-facebook";
     if (mutation === "extra") app.reviewedArtifactRepositories["unreviewed-image"] = "Dj-Shortcut/leaderbot-facebook";

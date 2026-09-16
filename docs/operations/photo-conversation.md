@@ -1,7 +1,9 @@
 # Contextual photo conversation
 
-Status: code included in [deployment 35103111862/1](https://github.com/Dj-Shortcut/leaderbot-facebook/actions/runs/35103111862),
-with `MESSENGER_PHOTO_CONVERSATION_ENABLED` still off. The pinned model passed the
+Status: code included in [deployment 35103111862/1](https://github.com/Dj-Shortcut/leaderbot-facebook/actions/runs/35103111862).
+The owner authorized activation on 2026-09-16; the reviewed configuration requests
+`MESSENGER_PHOTO_CONVERSATION_ENABLED=true`, with protected deployment/readback
+still pending. The pinned model passed the
 bounded real-model evaluation and independent semantic review on 2026-09-16.
 Protected activation/readback and a consented Messenger smoke remain open.
 The normal rollback value is `false`.

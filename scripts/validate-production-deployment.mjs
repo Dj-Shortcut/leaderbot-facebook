@@ -9826,7 +9826,7 @@ export function validateProductionRepository(rootDir = process.cwd()) {
   for (const [target, app] of Object.entries(manifest.apps)) {
     if (target === "gateway") continue;
     const artifactRepositories = app.reviewedArtifactRepositories;
-    const trustedImages = [app.reviewedImage, ...app.reviewedRollbackImages]
+    const trustedImages = [...new Set([app.reviewedImage, ...app.reviewedRollbackImages])]
       .filter((image) => reviewedArtifactKindForImage(app, image) !== "legacy-bootstrap");
     if (
       !artifactRepositories || typeof artifactRepositories !== "object" ||
