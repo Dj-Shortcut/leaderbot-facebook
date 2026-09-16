@@ -75,6 +75,10 @@ import {
   parsePhotoConversationDecision,
   PHOTO_CONVERSATION_MODEL,
 } from "./_core/photoConversation";
+import {
+  photoConversationInputTokenBound,
+  PHOTO_CONVERSATION_INPUT_USD_PER_TOKEN,
+} from "./_core/photoConversationContract";
 import { buildMessengerStorageObjectKey } from "./_core/messengerStorageObject";
 const psid = "synthetic-photo-user";
 const scope = () => ({
@@ -213,7 +217,9 @@ describe("contextual photo service through Messenger routing", () => {
           expect.objectContaining({
             tenantScope: expect.objectContaining(scope()),
             costEstimateComplete: true,
-            estimatedCostUsd: expect.any(Number),
+            estimatedCostUsd:
+              photoConversationInputTokenBound(body) *
+              PHOTO_CONVERSATION_INPUT_USD_PER_TOKEN,
           })
         );
       })
@@ -239,13 +245,15 @@ describe("contextual photo service through Messenger routing", () => {
         "source_image_edit",
         [dog, friend]
       );
-      const data = JSON.parse(
-        JSON.parse(m.fetch.mock.calls[1][1].body).input[1].content[0].text
-      );
-      expect(data.recentConversation).toEqual([
-        { role: "user", text: "Niet wat ik vroeg" },
-        { role: "assistant", text: reply().reply },
+      const data = JSON.parse(m.fetch.mock.calls[1][1].body);
+      expect(data.input.slice(2, -1)).toEqual([
+        { role: "user", content: "Niet wat ik vroeg" },
+        { role: "assistant", content: reply().reply },
       ]);
+      expect(data.input.at(-1)).toEqual({
+        role: "user",
+        content: "Voeg de hond samen met mijn maat",
+      });
     }));
   it.each([
     "Dankjewel",
@@ -467,6 +475,13 @@ describe("contextual photo service through Messenger routing", () => {
           (c: { type: string }) => c.type === "input_image"
         )
       ).toHaveLength(1);
+      expect(m.spend).toHaveBeenCalledWith(
+        expect.objectContaining({
+          estimatedCostUsd:
+            photoConversationInputTokenBound(body) *
+            PHOTO_CONVERSATION_INPUT_USD_PER_TOKEN,
+        })
+      );
     }));
   it("serializes overlapping messages and includes the first exchange in the second", async () =>
     within(async () => {
@@ -492,10 +507,8 @@ describe("contextual photo service through Messenger routing", () => {
       expect(m.fetch).toHaveBeenCalledTimes(2);
       expect(m.send).toHaveBeenCalledTimes(2);
       expect(
-        JSON.parse(
-          JSON.parse(m.fetch.mock.calls[1][1].body).input[1].content[0].text
-        ).recentConversation
-      ).toContainEqual({ role: "user", text: "Ik zoek een idee" });
+        JSON.parse(m.fetch.mock.calls[1][1].body).input.slice(2, -1)
+      ).toContainEqual({ role: "user", content: "Ik zoek een idee" });
     }));
   it("invalidates old memory when uploads occur while the flag is disabled", async () =>
     within(async () => {

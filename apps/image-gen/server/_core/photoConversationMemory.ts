@@ -42,6 +42,27 @@ function imageReference(
   };
 }
 
+function normalizeImages(
+  images: Array<Pick<PhotoConversationImage, "url" | "kind">>
+): PhotoConversationImage[] {
+  const byUrl = new Map<string, PhotoConversationImage>();
+  for (const image of images) {
+    if (
+      !image ||
+      typeof image.url !== "string" ||
+      image.url.length > 4096 ||
+      !/^https?:\/\//.test(image.url) ||
+      (image.kind !== "uploaded" && image.kind !== "generated")
+    )
+      continue;
+    // Refresh both kind and recency without spending a retained-source slot
+    // on another reference to the same object.
+    byUrl.delete(image.url);
+    byUrl.set(image.url, imageReference(image.url, image.kind));
+  }
+  return [...byUrl.values()].slice(-MAX_SOURCE_IMAGES);
+}
+
 export function normalizePhotoConversation(
   value: unknown
 ): PhotoConversationMemory {
@@ -79,17 +100,7 @@ export function normalizePhotoConversation(
           imageIds: [...entry.decision.imageIds],
         },
       })),
-    images: images
-      .filter(
-        image =>
-          image &&
-          typeof image.url === "string" &&
-          image.url.length <= 4096 &&
-          /^https?:\/\//.test(image.url) &&
-          (image.kind === "uploaded" || image.kind === "generated")
-      )
-      .slice(-MAX_SOURCE_IMAGES)
-      .map(image => imageReference(image.url, image.kind)),
+    images: normalizeImages(images),
     turns: turns
       .filter(
         turn =>
@@ -118,13 +129,12 @@ export function getPhotoConversationImages(
     url: string | null | undefined,
     kind: PhotoConversationImage["kind"]
   ) => {
-    if (url && !images.some(image => image.url === url))
-      images.push(imageReference(url, kind));
+    if (url) images.push(imageReference(url, kind));
   };
   for (const url of state.pendingImageUrls ?? []) add(url, "uploaded");
   add(state.lastPhotoUrl ?? state.lastPhoto, "uploaded");
   add(state.lastGeneratedUrl ?? state.lastImageUrl, "generated");
-  return images.slice(-MAX_SOURCE_IMAGES);
+  return normalizeImages(images);
 }
 
 export function rememberPhotoConversationImages(
@@ -132,14 +142,12 @@ export function rememberPhotoConversationImages(
   urls: string[],
   kind: PhotoConversationImage["kind"]
 ): PhotoConversationMemory {
-  const images = getPhotoConversationImages(state).filter(
-    image => !urls.includes(image.url)
-  );
   return {
     ...normalizePhotoConversation(state.photoConversation),
-    images: [...images, ...urls.map(url => imageReference(url, kind))].slice(
-      -MAX_SOURCE_IMAGES
-    ),
+    images: normalizeImages([
+      ...getPhotoConversationImages(state),
+      ...urls.map(url => ({ url, kind })),
+    ]),
   };
 }
 

@@ -1,7 +1,10 @@
 # Contextual photo conversation
 
-Status: implemented behind `MESSENGER_PHOTO_CONVERSATION_ENABLED=true`; not yet
-verified with the real model or deployed. The normal rollback value is `false`.
+Status: implemented behind `MESSENGER_PHOTO_CONVERSATION_ENABLED=true`. The
+pinned model passed the bounded real-model evaluation and independent semantic
+review on 2026-09-16. Protected activation/readback and a consented Messenger smoke
+remain open; this feature has not been deployed. The normal rollback value is
+`false`. See [evaluation evidence](photo-conversation-evaluation-2026-09-16.md).
 This adds a photo assistant to the direct Messenger runtime. It does not restore
 OpenClaw or change Mollie, wallet, image quality, or owner test mode.
 
@@ -45,19 +48,35 @@ OpenClaw or change Mollie, wallet, image quality, or owner test mode.
 
 ## Provider and economics
 
-The pinned model is `gpt-4.1-mini-2025-04-14`. The Responses request uses
-`store: false`, strict JSON schema output, no tools and an 800-token output cap.
-Images are supplied as data URLs after scoped storage validation, with an 8 MiB
-per-image bound and at most four images. There is one 12-second model transport;
-there are no automatic model retries.
+The pinned model is `gpt-5.4-mini-2026-03-17`. The Responses request explicitly
+sets `reasoning: { effort: "low" }`, `store: false`, strict JSON schema output,
+no tools and a 2,048-token output cap, including reasoning tokens. Images are
+supplied as data URLs after scoped storage validation, with an 8 MiB per-image
+bound and at most four images. There is one 20-second model transport; there are
+no automatic model retries.
 
-Pricing is fixed alongside the model: $0.40 per million input tokens and $1.60
-per million output tokens. Admission conservatively reserves UTF-8 text bytes
-plus framing and 2,500 tokens per image, with output reserved separately. Actual
-usage is recorded when returned. Existing global daily/monthly and per-user
-spend caps apply, including to the owner. Rollback does not remove ledger entries.
+Pricing is fixed alongside the model: $0.75 per million input tokens and $4.50
+per million output tokens. Admission conservatively reserves the complete request
+and schema's UTF-8 bytes (excluding image data URLs), plus framing and 3,100 tokens
+per image, with output reserved separately. GPT-5.4 mini's `auto`/`high` vision
+budget is at most 2,500 patches multiplied by 1.2, or 3,000 tokens; the reservation
+includes additional margin. Actual usage is recorded when returned. Existing
+global daily/monthly and per-user spend caps apply, including to the owner.
+Rollback does not remove ledger entries.
 
-References: [model and pricing](https://developers.openai.com/api/docs/models/gpt-4.1-mini),
+The earlier `gpt-4.1-mini-2025-04-14` and `gpt-4.1-2025-04-14` variants failed
+semantic review. Failures included guessing unspecified source pairs, reverting
+to an older goal after criticism, and executing an ambiguous reference instead of
+asking which subjects were intended. Correct action/source fields alone did not
+prove a useful conversation. The current pinned model subsequently passed both
+suites (20/20 automatic checks) and separate semantic review;
+[the evidence record](photo-conversation-evaluation-2026-09-16.md) retains the
+earlier failures and the limits of that result. Provider caps apply before every
+conversation call; exceeding them fails closed rather than selecting a fallback
+model.
+
+References: [model](https://developers.openai.com/api/docs/models/gpt-5.4-mini),
+[pricing](https://developers.openai.com/api/docs/pricing),
 [structured output](https://developers.openai.com/api/docs/guides/structured-outputs),
 [vision token accounting](https://developers.openai.com/api/docs/guides/images-vision).
 
@@ -79,10 +98,87 @@ failures and erasure. Adjacent router/job/deletion tests cover captions, exact
 queued source selection, intentional fallback suppression and cleanup retry.
 These tests prove wiring and fences, not the real model's language quality.
 
-Before enabling, run a consented synthetic-image conversation through the actual
-model, including a vague complaint (no generation), a creative question (no
-generation), and an explicit two-image composition (both correct sources).
-Use the protected immutable build/manifest/deployment workflow. Verify the flag,
+### Real-model synthetic evaluation
+
+The runtime and evaluator use the same pure request builder, instructions and
+strict decision parser in `photoConversationContract.ts`. Reference image blocks
+keep their preceding ID labels in a separate context message. Validated recent
+turns become real chronological `user`/`assistant` messages, followed by the current
+user message; history is not duplicated inside the reference metadata. Prior image
+context is explicitly separate from the user's current request.
+Instructions resolve the latest clarification before selecting
+sources, preserve unspecified subject details, and ask for missing original
+sources instead of inventing replacements. Ordinary reactions can end naturally.
+
+From `apps/image-gen`, a default dry run builds and checks the isolated bundle and
+prints the complete cost admission plan. It makes no network request and needs no
+key:
+
+```sh
+pnpm evaluate:photo-conversation
+pnpm evaluate:photo-conversation --suite holdout
+```
+
+For an owner-authorized paid evaluation, review the runner and select one existing,
+started Machine and its exact current reviewed runtime digest. Then run:
+
+```sh
+pnpm evaluate:photo-conversation --fly-machine MACHINE_ID --expected-image IMMUTABLE_IMAGE
+pnpm evaluate:photo-conversation --suite holdout --fly-machine MACHINE_ID --expected-image IMMUTABLE_IMAGE
+```
+
+`MACHINE_ID` and `IMMUTABLE_IMAGE` are placeholders, not shell variables. The CLI
+validates the app, ID, started state and full digest before SSH. It streams the
+reviewed synthetic bundle to a one-shot Node process on that existing Machine.
+It reads `OPENAI_API_KEY` inside Fly, never copies it locally, writes no remote
+files, and does not create Machines, replace the app, deploy, or enable the feature.
+Fly CLI authentication is required locally, but an OpenAI key is not.
+
+The bundle has an explicit dependency allowlist and no database, storage, Redis,
+Messenger or application entrypoint imports. It only sends the fixed synthetic
+text and authored PNG illustrations to the fixed OpenAI Responses endpoint.
+It never dispatches an image generation or writes provider, payment or wallet
+rows. It is a separately budgeted operator text/vision evaluation, not a user
+generation path or a bypass of that path's quota and spend fences.
+
+Each suite pre-admits all ten calls within a $0.50 ceiling using conservative
+text/schema/image/output token bounds; these requests enable no tools or image
+generation. Each call has the runtime's 20-second timeout, explicit low reasoning,
+and 2,048-token output limit including reasoning, a 64 KiB response bound,
+`store: false`, and no redirects or retries.
+Missing/invalid usage, a truncated response, or a transport failure stops the run.
+SSH has a 240-second outer timeout. An uncertain run is **not automatically rerun**;
+first inspect its available attempt/summary evidence. A failed semantic case is
+recorded as a failure, not hidden by repeated sampling.
+
+The regression suite covers the reported combination, complaint, subsequent
+repair with a distractor, creative discussion, thanks, ambiguous references,
+clarification answers, unavailable sources, new images and jokes. The holdout
+suite varies wording, image order, and target subjects; it also checks a correction
+like “Nee, de hond”, an edit that does not need the unavailable image, and an
+explicit request to invent a new subject. That last pair guards against over-refusal.
+It also includes the result context from the reported failure: a generated result
+showing only the person remains in the catalog beside the original dog and person.
+For this synthetic case, the failed-result fixture is pixel-identical to the person
+fixture. Either person source may be selected together with the dog, but the
+accepted edit contains exactly one dog source and one person source; selecting
+both person copies or the entire catalog fails. This tests retained result context
+without invoking the image provider.
+
+Evidence contains bundle/suite hashes, the existing runtime identity, parsed
+synthetic decisions, usage and outcomes. Never run this collector on customer
+content. Automatic passes check action and exact source set. Separately review
+the Dutch reply, subject preservation, source-role ordering and prompt consistency.
+Authored illustrations test visual reference selection, not realistic-photo
+fidelity or the rendered image. Model sampling and a finite suite do not prove
+universal conversational correctness.
+
+### Production activation
+
+Both bounded synthetic suites and their independent semantic review passed on
+2026-09-16; see [the evidence record](photo-conversation-evaluation-2026-09-16.md).
+Protected activation and a consented Messenger smoke are still required. Use the
+protected immutable build/manifest/deployment workflow. Verify the flag,
 health, readiness and exact release identity independently. Leave Mollie Test
 Mode and the existing commercial authorization epoch unchanged. Roll back through
 the reviewed deployment path with the flag disabled; do not change financial rows.

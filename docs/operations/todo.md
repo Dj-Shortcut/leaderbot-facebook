@@ -45,9 +45,17 @@ Only diagnostic metadata is retained; no transcript or photo collection.
 - [x] Implement bounded private conversation and visual source selection behind
   `MESSENGER_PHOTO_CONVERSATION_ENABLED`, retaining the generated image when a new
   source arrives. Ordinary chat/criticism does not invoke image generation.
-- [ ] Complete real-model synthetic conversation evaluation and protected release
-  activation/readback. Stubbed regression tests do not prove model understanding.
-  Keep the flag off until this gate is completed.
+- [x] Complete bounded real-model synthetic evaluation with
+  `gpt-5.4-mini-2026-03-17`, low reasoning: 20/20 action/source checks and independent
+  semantic review passed on 2026-09-16. Earlier failures and the synthetic-only
+  proof boundary are retained in [the evidence record](photo-conversation-evaluation-2026-09-16.md).
+- [ ] Complete protected release activation and independent readback of the exact
+  artifact, feature flag, health/readiness and rollback. Keep the flag off until
+  that reviewed release; the operator evaluation did not deploy the feature.
+- [ ] Complete a consented Messenger smoke for generated image + new upload,
+  natural combination, criticism, corrective follow-up and ordinary conversation.
+  Verify the rendered image, exact source selection, delivery and credit boundaries;
+  synthetic model decisions alone do not prove that user journey.
 
 Behavior, costs, rollback and tests: [Photo conversation](photo-conversation.md).
 

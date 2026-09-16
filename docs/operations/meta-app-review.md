@@ -218,4 +218,7 @@ missing-source clarification; new-image reset; and delete-my-data including
 retained image cleanup. Use synthetic photos or explicitly consented test media.
 The bounded history/retention, provider-cost and rollout contract is documented
 in [Photo conversation](photo-conversation.md). Do not claim this experience is
-live based on mocked tests alone.
+live based on mocked tests alone. The [2026-09-16 synthetic model evaluation](photo-conversation-evaluation-2026-09-16.md)
+passed 20 authored text/vision scenarios with separate semantic review. This
+closes that bounded interpretation check; it does not replace the protected
+activation/readback or Messenger delivery and rendered-image demonstrations above.
