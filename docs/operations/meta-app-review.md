@@ -42,8 +42,9 @@ permissions suffice; consent/deletion controls and checkout buttons are unchange
 
 Photo-conversation budget admission failures now explain the unavailable bot
 budget and retained credits, without suggesting that an immediate retry fixes it.
-The owner-requested configuration disables the extra global and per-user daily
-USD limits; configured remaining limits stay enforced. Verify the balance pill
+The owner-requested configuration disables the extra global daily/monthly and
+per-user daily USD limits; the owner manages dollar budgets at the API provider.
+Free allowances and paid-credit admission remain enforced. Verify the balance pill
 and paid-image admission after deployment before marking this capability live.
 
 ### Owner customer-test control (deployed; user journey pending)

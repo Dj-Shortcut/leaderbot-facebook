@@ -86,20 +86,23 @@ describe("atomic Messenger spend admission", () => {
     expect(stored.filter(entry => entry.userKey === "user-b")).toHaveLength(2);
   });
 
-  it("allows all eight priced attempts when the owner disables the daily dollar caps", async () => {
+  it("allows all eight priced attempts past the former daily and monthly dollar caps", async () => {
     process.env.MESSENGER_GLOBAL_DAILY_SPEND_CAP_USD = "0";
     process.env.MESSENGER_USER_DAILY_SPEND_CAP_USD = "0";
-    process.env.MESSENGER_GLOBAL_MONTHLY_SPEND_CAP_USD = "25";
+    process.env.MESSENGER_GLOBAL_MONTHLY_SPEND_CAP_USD = "0";
+
+    await recordAttempt("earlier-provider-spend", "user-b", 25);
 
     for (let index = 0; index < 8; index += 1) {
       await recordAttempt(`credit-image-${index}`, "user-a", 1);
     }
 
     const stored = await readCostLedgerPeriod(PERIOD);
-    expect(stored).toHaveLength(8);
+    expect(stored.filter(entry => entry.userKey === "user-a")).toHaveLength(8);
+    expect(stored).toHaveLength(9);
     expect(
       stored.reduce((total, entry) => total + (entry.estimatedCostUsd ?? 0), 0)
-    ).toBe(8);
+    ).toBe(33);
   });
 
   it("fails before provider admission when the durable ledger write fails", async () => {

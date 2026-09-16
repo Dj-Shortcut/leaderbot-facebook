@@ -44,7 +44,7 @@ function readEnvAssignments(file) {
 }
 
 describe.each([
-  { stage: "desired bounded Test", config: app.config, exposure: "true", dailyCapsDisabled: true },
+  { stage: "desired bounded Test", config: app.config, exposure: "true", spendCapsDisabled: true },
   {
     stage: "settled photo-enabled predecessor",
     config: predecessorConfig,
@@ -55,7 +55,7 @@ describe.each([
     config: app.reviewedRollbackConfigs[predecessor.image].path,
     exposure: "false",
   },
-])("image-gen $stage payment processing", ({ config, exposure, dailyCapsDisabled }) => {
+])("image-gen $stage payment processing", ({ config, exposure, spendCapsDisabled }) => {
   const env = readEnvAssignments(path.join(rootDir, config));
   it("keeps the drain, notification plane and reconciliation prepared", () => {
     expect(env.MOLLIE_BILLING_DRAIN_ENABLED).toBe("true");
@@ -85,9 +85,9 @@ describe.each([
   it("preserves the offer and pins each stage's reviewed spend policy", () => {
     expect(env.MOLLIE_CREDIT_WORKSPACE_ID).toBe("1");
     expect(env.MESSENGER_PAID_IMAGE_PROVIDER_MAX_COST_USD).toBe("1.00");
-    expect(env.MESSENGER_GLOBAL_DAILY_SPEND_CAP_USD).toBe(dailyCapsDisabled ? "0" : "5.00");
-    expect(env.MESSENGER_GLOBAL_MONTHLY_SPEND_CAP_USD).toBe("25.00");
-    expect(env.MESSENGER_USER_DAILY_SPEND_CAP_USD).toBe(dailyCapsDisabled ? "0" : "2.00");
+    expect(env.MESSENGER_GLOBAL_DAILY_SPEND_CAP_USD).toBe(spendCapsDisabled ? "0" : "5.00");
+    expect(env.MESSENGER_GLOBAL_MONTHLY_SPEND_CAP_USD).toBe(spendCapsDisabled ? "0" : "25.00");
+    expect(env.MESSENGER_USER_DAILY_SPEND_CAP_USD).toBe(spendCapsDisabled ? "0" : "2.00");
   });
 
   /**
@@ -169,6 +169,7 @@ it("keeps photo conversations enabled for the release and exact settled recovery
   expect(desired).toEqual({
     ...settled,
     MESSENGER_GLOBAL_DAILY_SPEND_CAP_USD: "0",
+    MESSENGER_GLOBAL_MONTHLY_SPEND_CAP_USD: "0",
     MESSENGER_USER_DAILY_SPEND_CAP_USD: "0",
   });
   const darkExpected = {

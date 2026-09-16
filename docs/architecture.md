@@ -149,12 +149,11 @@ to a higher-quality provider mode than the free path, but the mapping is
 versioned so existing purchases retain their promised value.
 
 Provider cost varies by model, size, quality, edits, and input images. The owner
-rejected additional application-level daily USD caps: the desired configuration
-explicitly disables both the per-user and global daily caps. Free quotas and
-atomic paid-credit admission still govern image entitlement, and provider cost
-estimates remain recorded. Deployment of this policy change is tracked in the
-operations backlog; the separate monthly cap remains configured until the owner
-decides its scope.
+manages dollar budgets at the API provider and rejected additional bot-level
+USD caps: the desired configuration explicitly disables global daily/monthly and
+per-user daily caps. Free quotas and atomic paid-credit admission still govern
+image entitlement, and provider cost estimates remain recorded. Deployment of
+this policy change is tracked in the operations backlog.
 Changing quality or model requires updated unit economics and failure-path
 tests.
 

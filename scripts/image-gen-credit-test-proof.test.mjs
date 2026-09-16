@@ -545,6 +545,7 @@ describe("bounded credit Test activation", () => {
     ["daily cap", "MESSENGER_GLOBAL_DAILY_SPEND_CAP_USD", "100.00"],
     ["old global daily cap", "MESSENGER_GLOBAL_DAILY_SPEND_CAP_USD", "5.00"],
     ["old user daily cap", "MESSENGER_USER_DAILY_SPEND_CAP_USD", "2.00"],
+    ["old global monthly cap", "MESSENGER_GLOBAL_MONTHLY_SPEND_CAP_USD", "25.00"],
   ])("rejects invalid %s", (_, key, value) => {
     const f = fixture();
     expect(() =>

@@ -144,18 +144,18 @@ Behavior, costs, rollback and tests: [Photo conversation](photo-conversation.md)
   processing, without changing pending edit state or starting provider work.
   Photo menus add the pill at the Messenger rendering boundary; consent and
   checkout controls retain their original actions. Test the deployed pill.
-- [ ] Deploy the owner's removal of extra daily USD limits. Both 15:49 UTC
+- [ ] Deploy the owner's removal of extra bot-level USD limits. Both 15:49 UTC
   photo-conversation attempts failed at spend admission with `user_daily_cap`.
   Scoped readback at 15:53:45 UTC showed the configured USD 2/day user cap and
   USD 2 in reserved estimates from seven image attempts, with final provider
   costs unavailable; the global daily cap remains USD 5. Available purchased
   credits did not override this cost guard. The owner explicitly rejected the
-  daily spend caps and controls costs through the provider accounts. The desired
-  Fly configuration and exact deployment contract now set both daily USD caps
-  to `0` (disabled), preserving the five-free-image allowance and one-credit-per-
+  daily spend caps and clarified that they manage the monthly dollar ceiling at
+  the API provider too. The desired Fly configuration and exact deployment
+  contract now set global daily/monthly and per-user daily USD caps to `0`
+  (disabled), preserving the five-free-image allowance and one-credit-per-
   delivered-image accounting. No live counters or balances were reset. Release
-  and verify paid-image use; the separate USD 25 monthly cap is awaiting the
-  owner's scope clarification.
+  and verify paid-image use.
 - [ ] Add a scoped, idempotent Messenger payment-success confirmation. The
   current checkout return page confirms payment; the grant handler does not
   enqueue a chat confirmation, so silence in Messenger is not grant failure.

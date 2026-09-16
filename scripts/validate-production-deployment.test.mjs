@@ -203,6 +203,7 @@ function createPhotoActivationFixture() {
     desiredPath,
     fs.readFileSync(desiredPath, "utf8")
       .replace('MESSENGER_GLOBAL_DAILY_SPEND_CAP_USD = "5.00"', 'MESSENGER_GLOBAL_DAILY_SPEND_CAP_USD = "0"')
+      .replace('MESSENGER_GLOBAL_MONTHLY_SPEND_CAP_USD = "25.00"', 'MESSENGER_GLOBAL_MONTHLY_SPEND_CAP_USD = "0"')
       .replace('MESSENGER_USER_DAILY_SPEND_CAP_USD = "2.00"', 'MESSENGER_USER_DAILY_SPEND_CAP_USD = "0"'),
   );
   app.reviewedImage = image;

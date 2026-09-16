@@ -112,10 +112,11 @@ The only source of truth for open work is `docs/operations/todo.md`.
 - A Mollie payment ID may fund exactly one immutable credit grant.
 - A generation reserves before provider work and commits only on the documented
   success boundary. Provider retries must not double-charge the wallet.
-- Respect the owner's configured spend policy. Additional global and per-user
-  daily USD caps are disabled at the owner's request; do not reinstate them as
-  an extra customer quota. One purchased credit entitles its user to one
-  successfully delivered image, with the existing atomic accounting boundary.
+- The owner manages dollar budgets at the API provider. Additional bot-level
+  global daily/monthly and per-user daily USD caps are disabled at the owner's
+  request; do not reinstate them as an extra customer quota. One purchased credit
+  entitles its user to one successfully delivered image, with the existing atomic
+  accounting boundary.
 - Live billing stays disabled until legal copy, accounting, webhook handling,
   reconciliation, refund behavior, quota enforcement, and rollback are proven.
 
