@@ -1368,7 +1368,9 @@ async function lockExactRecoveryBinding(
       )
     )
     .limit(1)
-    .for("update");
+    // Recovery reads the wallet under SELECT-only runtime privileges. Keep
+    // wallet changes fenced without requesting an exclusive mutation lock.
+    .for("share");
   const intents = await tx
     .select()
     .from(billingIntents)

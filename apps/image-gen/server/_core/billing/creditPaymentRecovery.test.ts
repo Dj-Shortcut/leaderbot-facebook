@@ -156,6 +156,7 @@ function harness(
 ) {
   const inserts: Array<{ table: object; value: Record<string, unknown> }> = [];
   const updates: Array<{ table: object; value: Record<string, unknown> }> = [];
+  const locks: Array<{ table: object; mode: string }> = [];
   const rowsFor = (table: object): unknown[] => {
     if (table === billingExecutionControls) {
       return [
@@ -199,7 +200,15 @@ function harness(
       from: vi.fn((table: object) => ({
         where: vi.fn(() => ({
           limit: vi.fn(() => ({
-            for: vi.fn(async () => rowsFor(table)),
+            for: vi.fn(async (mode: string) => {
+              locks.push({ table, mode });
+              if (table === creditWallets && mode !== "share") {
+                throw new Error(
+                  "Runtime wallet privileges permit shared reads only"
+                );
+              }
+              return rowsFor(table);
+            }),
           })),
         })),
       })),
@@ -223,6 +232,7 @@ function harness(
     database: { transaction: vi.fn(async callback => callback(tx)) },
     inserts,
     updates,
+    locks,
   };
 }
 
@@ -251,6 +261,13 @@ describe("customerless premium-credit payment recovery", () => {
 
     expect(cancelPayment).toHaveBeenCalledOnce();
     expect(cancelPayment).toHaveBeenCalledWith(PAYMENT_ID);
+    expect(state.locks).toEqual([
+      { table: billingExecutionControls, mode: "update" },
+      { table: creditWallets, mode: "share" },
+      { table: billingIntents, mode: "update" },
+      { table: billingProviderOperations, mode: "update" },
+      { table: billingWebhookRoutes, mode: "update" },
+    ]);
   });
 
   it.each([

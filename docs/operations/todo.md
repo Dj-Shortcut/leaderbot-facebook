@@ -6,7 +6,7 @@ or a dedicated incident record and should be summarized here only when they
 change an open gate.
 
 Last reviewed: **2026-09-16** (owner customer-test switch deployed; actual
-Messenger payment/grant/delivery journey remains open).
+Messenger payment/grant/delivery journey blocked at checkout confirmation).
 Last state reset: **2026-08-27**.
 
 ## Messenger bot and evaluator release gate
@@ -33,9 +33,9 @@ and sampled-monitor coverage remain open.
   typed-consent photo. Confirm accepted-response signals, no false missing reply,
   no extra provider work/credits and metadata-only logs. Health checks alone do
   not prove these user journeys.
-- [ ] Confirm the hourly monitor observes new runtime signals when traffic is
-  available. Preserve the sampled-log coverage limitation; empty snapshots
-  never prove complete conversation health.
+- The owner stopped the hourly conversation monitor on 2026-09-16 after it
+  missed an ignored image request. The app automation is paused; do not restart
+  it without a new request.
 
 Executable procedure: [Conversation evaluation](conversation-evaluation.md).
 Only diagnostic metadata is retained; no transcript or photo collection.
@@ -58,6 +58,44 @@ Only diagnostic metadata is retained; no transcript or photo collection.
   synthetic model decisions alone do not prove that user journey.
 
 Behavior, costs, rollback and tests: [Photo conversation](photo-conversation.md).
+## Current Test Mode checkout blocker
+
+- [ ] Deploy and verify the repair for the reported confirmation failure: a freshly opened
+  link displayed the offer, but clicking **Testbetaling starten** showed a
+  generic unusable-link error. A bounded production metadata read observed one
+  claimed `created` Test intent and no payment/provider operation. A fresh
+  owner-approved attempt reproduced `ER_TABLEACCESS_DENIED_ERROR` (1142) at
+  the wallet's `SELECT ... FOR UPDATE` under the real runtime principal.
+  Wallet tables intentionally permit runtime reads and guarded-routine writes.
+  The fix uses `FOR SHARE` for payment-path wallet/ledger reads: concurrent
+  mutations still wait, and direct credit-table writes remain denied.
+- On both production app machines, the corrected claim completed all boundary
+  reads, operation insertion and intent update in a rollback-only probe. Both
+  probes confirmed unchanged persisted state and made no provider call. This
+  proves the claim repair under current grants, not deployment or paid delivery.
+- Safe route/payment-stage diagnostics and distinct link/confirmation/status
+  error screens accompany the fix. The changes on this branch are not deployed.
+- Local Chromium verification of the real React page, routes and headers with
+  synthetic dependencies proved automatic cookie storage, session reload and
+  the confirmation request. It does not prove Messenger WebView behavior or
+  the production database/provider flow.
+- Local MySQL regression uses a temporary SELECT-only wallet account and the
+  real checkout claim. It proves that the old update lock and direct wallet
+  writes are denied, while the shared lock permits checkout and blocks a
+  concurrent wallet mutation until commit. The disposable fixture matches the
+  current 0018 schema contract; local case-insensitive table naming prevents
+  production engine-preflight equivalence. CI retains the unmodified engine
+  contract and runs this regression in its existing MySQL suite.
+- [ ] After deployment, use a fresh consented Test checkout to prove Mollie
+  opens, authoritative paid status, exactly one grant of 8 credits,
+  and usable premium image delivery. Green code checks alone do not close this.
+- [ ] Before live billing, repair and verify remaining restricted-runtime
+  authority gaps outside the ordinary paid checkout: reconnect and reservation
+  operator reads in `server/db.ts` and `creditReservationOperatorResolution.ts`
+  still request update locks on protected credit tables; refund/chargeback
+  fencing in `creditPaymentWebhookStore.ts` attempts direct wallet writes.
+  Preserve guarded-routine authority and test these paths with the restricted
+  runtime principal instead of an administrator database connection.
 
 ## Product decision
 

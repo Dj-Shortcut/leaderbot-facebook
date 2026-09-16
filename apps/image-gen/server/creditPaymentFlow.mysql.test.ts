@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { createServer } from "node:http";
 
 import express from "express";
+import { drizzle } from "drizzle-orm/mysql2";
 
 import mysql, {
   type Connection,
@@ -62,6 +63,7 @@ import { handleMollieWebhook } from "./_core/billing/webhookRoutes";
 import { registerCreditCheckoutRoutes } from "./_core/billing/creditCheckoutRoutes";
 import { getCreditCheckoutPilotConfig } from "./_core/billing/creditCheckoutConfig";
 import { beginMessengerPrivacyErasure } from "./_core/messengerPrivacySubject";
+import * as databaseModule from "./db";
 
 const suite = describe.runIf(
   process.env.RUN_MYSQL_INTEGRATION === "1" && Boolean(process.env.DATABASE_URL)
@@ -112,6 +114,20 @@ function sha256(value: string): string {
 
 function paymentId(): string {
   return `tr_${randomUUID().replaceAll("-", "")}`;
+}
+
+function isDisposableRuntimeGrantDatabase(): boolean {
+  try {
+    const target = new URL(process.env.DATABASE_URL ?? "");
+    return (
+      ["localhost", "127.0.0.1", "[::1]"].includes(target.hostname) &&
+      /^\/(?:codex_checkout_confirm_[a-z0-9_]+|test_image_gen[a-z0-9_]*)$/.test(
+        target.pathname
+      )
+    );
+  } catch {
+    return false;
+  }
 }
 
 suite("credit payment MySQL 8.4.11 end-to-end boundary", () => {
@@ -492,6 +508,150 @@ suite("credit payment MySQL 8.4.11 end-to-end boundary", () => {
     );
     return wallet;
   }
+
+  it.runIf(isDisposableRuntimeGrantDatabase())(
+    "claims checkout with SELECT-only wallet grants while its shared lock blocks a wallet mutation",
+    async () => {
+      // Account DDL is allowed only for an explicitly named disposable database
+      // on loopback. Never create or grant an account for a remote/shared target.
+      expect(isDisposableRuntimeGrantDatabase()).toBe(true);
+      const owner = await createOwnerScope();
+      const fixture = await reserveAndConsumeCheckout(owner, "runtime-grants");
+      const target = new URL(process.env.DATABASE_URL!);
+      const databaseName = target.pathname.slice(1);
+      const username = `checkout_${randomUUID().replaceAll("-", "").slice(0, 20)}`;
+      const password = randomUUID() + randomUUID();
+      // The CI service sees the runner through its container network rather
+      // than as localhost; this random account exists only for this test.
+      const account = `${connection.escape(username)}@'%'`;
+      const schemaName = connection.escapeId(databaseName);
+      let accountCreated = false;
+      let restricted: Connection | undefined;
+      let writer: Connection | undefined;
+      let pendingClaim:
+        ReturnType<typeof claimCreditPaymentCreation> | undefined;
+      let pendingMutation: Promise<unknown> | undefined;
+      let restoreDatabase: (() => void) | undefined;
+      let releaseTransaction: () => void = () => {};
+      try {
+        await connection.query(
+          `CREATE USER ${account} IDENTIFIED BY ${connection.escape(password)}`
+        );
+        accountCreated = true;
+        // The production contract grants SELECT only on credit_wallets.
+        // Checkout's other boundary rows may be locked/updated by runtime.
+        for (const table of [
+          "billing_execution_controls",
+          "channelConnections",
+          "messenger_privacy_subjects",
+          "billing_intents",
+          "billing_scheduler_tenants",
+        ]) {
+          await connection.query(
+            `GRANT SELECT, UPDATE ON ${schemaName}.${connection.escapeId(table)} TO ${account}`
+          );
+        }
+        await connection.query(
+          `GRANT SELECT, INSERT, UPDATE ON ${schemaName}.\`billing_provider_operations\` TO ${account}`
+        );
+        await connection.query(
+          `GRANT SELECT ON ${schemaName}.\`credit_wallets\` TO ${account}`
+        );
+
+        target.username = username;
+        target.password = password;
+        restricted = await mysql.createConnection(target.toString());
+        await restricted.query(
+          "SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED"
+        );
+        await restricted.query("SET SESSION innodb_lock_wait_timeout=5");
+        await expect(
+          restricted.query(
+            "SELECT `wallet_id` FROM `credit_wallets` WHERE `wallet_id`=? FOR UPDATE",
+            [fixture.providerScope.walletId]
+          )
+        ).rejects.toMatchObject({ errno: 1142 });
+        await expect(
+          restricted.query(
+            "UPDATE `credit_wallets` SET `status`='frozen' WHERE `wallet_id`=?",
+            [fixture.providerScope.walletId]
+          )
+        ).rejects.toMatchObject({ errno: 1142 });
+
+        const restrictedDatabase = drizzle(restricted);
+        const originalTransaction =
+          restrictedDatabase.transaction.bind(restrictedDatabase);
+        let transactionReached: () => void = () => {};
+        const transactionHeld = new Promise<void>(resolve => {
+          transactionReached = resolve;
+        });
+        const transactionReleased = new Promise<void>(resolve => {
+          releaseTransaction = resolve;
+        });
+        vi.spyOn(restrictedDatabase, "transaction").mockImplementation(
+          (run, config) =>
+            originalTransaction(async tx => {
+              const result = await run(tx);
+              transactionReached();
+              await transactionReleased;
+              return result;
+            }, config)
+        );
+        const databaseSpy = vi
+          .spyOn(databaseModule, "getDatabaseOrThrow")
+          .mockResolvedValue(
+            // Production uses a pooled client; this bounded test uses a single
+            // connection so the lock holder can be identified independently.
+            restrictedDatabase as unknown as Awaited<
+              ReturnType<typeof databaseModule.getDatabaseOrThrow>
+            >
+          );
+        restoreDatabase = () => databaseSpy.mockRestore();
+        const [[holder]] = await restricted.query<RowDataPacket[]>(
+          "SELECT CONNECTION_ID() AS connectionId"
+        );
+        pendingClaim = claimCreditPaymentCreation(fixture.providerScope);
+        await Promise.race([transactionHeld, pendingClaim]);
+
+        writer = await openPeer();
+        const [[writerIdentity]] = await writer.query<RowDataPacket[]>(
+          "SELECT CONNECTION_ID() AS connectionId"
+        );
+        pendingMutation = writer.query(
+          "UPDATE `credit_wallets` SET `status`='frozen' WHERE `wallet_id`=?",
+          [fixture.providerScope.walletId]
+        );
+        // Attach rejection handling before observing the lock wait, including
+        // failure cleanup when the expected barrier cannot be established.
+        void pendingMutation.catch(() => undefined);
+        await expect(
+          waitForLockWait(
+            connection,
+            Number(holder.connectionId),
+            Number(writerIdentity.connectionId)
+          )
+        ).resolves.toBe(Number(writerIdentity.connectionId));
+        expect((await walletState(fixture.providerScope.walletId)).status).toBe(
+          "active"
+        );
+
+        releaseTransaction();
+        await expect(pendingClaim).resolves.toMatchObject({ claimed: true });
+        await pendingMutation;
+        expect((await walletState(fixture.providerScope.walletId)).status).toBe(
+          "frozen"
+        );
+      } finally {
+        releaseTransaction();
+        await Promise.allSettled(
+          [pendingClaim, pendingMutation].filter(Boolean)
+        );
+        restoreDatabase?.();
+        await Promise.all([restricted?.end(), writer?.end()]);
+        if (accountCreated) await connection.query(`DROP USER ${account}`);
+      }
+    }
+  );
 
   async function proveAdjustmentFreezeWinsBeforeConcurrentHold(
     kind: "refund" | "chargeback"
