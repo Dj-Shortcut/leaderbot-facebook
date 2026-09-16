@@ -6,7 +6,7 @@ or a dedicated incident record and should be summarized here only when they
 change an open gate.
 
 Last reviewed: **2026-09-16** (fresh Test checkout and one eight-credit grant
-verified; paid image delivery repair and photo assistant activation pending).
+verified; photo assistant active; paid image delivery repair pending).
 Last state reset: **2026-08-27**.
 
 ## Messenger bot and evaluator release gate
@@ -49,13 +49,13 @@ Only diagnostic metadata is retained; no transcript or photo collection.
   `gpt-5.4-mini-2026-03-17`, low reasoning: 20/20 action/source checks and independent
   semantic review passed on 2026-09-16. Earlier failures and the synthetic-only
   proof boundary are retained in [the evidence record](photo-conversation-evaluation-2026-09-16.md).
-- [ ] Activate the contextual photo assistant through a reviewed protected release
-  and independently verify its feature flag, health/readiness and rollback. Its
-  code is included in deployment `35103111862/1`, but
-  the owner separately authorized activation on 2026-09-16. The reviewed config
-  now requests `MESSENGER_PHOTO_CONVERSATION_ENABLED=true`; protected deployment
-  and live readback are pending. Rollback retains the same checkout-fixed runtime
-  with photo conversation disabled.
+- [x] Activate the contextual photo assistant through the authorized protected
+  [deployment 35108204745/1](https://github.com/Dj-Shortcut/leaderbot-facebook/actions/runs/35108204745).
+  Independent readback at 14:30:27 UTC verified release 390, identity
+  `deploy-35108204745-1`, exact image `7165f3bac38c`, and the feature flag true
+  on both app and both worker machines with no secret override or drift.
+  Both public hosts passed health/readiness; Test billing stayed on and live
+  billing off. The activation retained an exact rollback with photo context off.
 - [ ] Complete a consented Messenger smoke for generated image + new upload,
   natural combination, criticism, corrective follow-up and ordinary conversation.
   Verify the rendered image, exact source selection, delivery and credit boundaries;
@@ -83,10 +83,11 @@ Behavior, costs, rollback and tests: [Photo conversation](photo-conversation.md)
   proofs, attestations and rollback capture passed.
   The protected build and deployment prove the installed runtime, not a completed
   Mollie payment or credit grant.
-- The retained predecessor is `deploy-35073398659-1` / `532e97416641`.
-  Restoring its active config restores the known checkout failure; its separate
-  emergency rollback config disables checkout/paid admission while retaining
-  financial recovery.
+- The next repair release retains `deploy-35108204745-1` / `7165f3bac38c`
+  as its exact predecessor, including active photo context and the checkout
+  repair. Its separate emergency rollback config disables checkout/paid
+  admission and photo context while retaining financial recovery. The previous
+  runtime still has the paid-image completion defect described below.
 - [x] Verify a fresh consented Test checkout and grant. The owner's checkout
   reached Mollie; the authoritative Test payment became paid at 13:52:57 UTC on
   2026-09-16. The webhook applied exactly one immutable eight-credit grant at
@@ -96,10 +97,17 @@ Behavior, costs, rollback and tests: [Photo conversation](photo-conversation.md)
   but the production Redis-compatible interpreter rejected mutation of Lua
   `ARGV` after persisting delivery intent. Recovery then mistook a paid
   completion with an omitted JSON-null quota field for free-quota work.
-  The source correction keeps expiry in a local variable and validates the
+  The source correction in [PR #571](https://github.com/Dj-Shortcut/leaderbot-facebook/pull/571)
+  keeps expiry in a local variable and validates the
   original paid reservation without requesting free quota or another hold.
   The Redis regression models both read-only arguments and dropped null fields;
   native Redis alone does not reproduce this production behavior.
+  The reviewed source `bd67c6f502cda26a16f2282fbe479afeb2a4fcbc` passed exact
+  main CI and [trusted build 35110414178](https://github.com/Dj-Shortcut/leaderbot-facebook/actions/runs/35110414178).
+  The pending production candidate is
+  `sha256:a1f5a73069d1e7429d8b9373ec025a0bad9a3ee0d48aa76aebe391e3f4d4a22c`,
+  with [provenance 47938967](https://github.com/Dj-Shortcut/leaderbot-facebook/attestations/47938967).
+  Manifest review, protected deployment and independent live readback remain open.
 - [ ] Resolve the two undelivered outputs and prove one receipt-backed debit
   per delivered premium image. Their completions remain stored, but dead-letter
   handling deleted the private job bodies; deployment does not replay them.

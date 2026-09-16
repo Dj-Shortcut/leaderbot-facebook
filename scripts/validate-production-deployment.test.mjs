@@ -166,6 +166,60 @@ function createRepositoryFixture({ boundedTest = false } = {}) {
   return root;
 }
 
+function createPhotoActivationFixture() {
+  const root = createRepositoryFixture({ boundedTest: true });
+  const manifestPath = path.join(root, "deploy/production/apps.json");
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+  const app = manifest.apps["image-gen"];
+  const image =
+    "registry.fly.io/leaderbot-fb-image-gen@sha256:7165f3bac38c168f3b5d85e3153f7371388eeef7b5477c06f8eff63d9602cb8d";
+  const source = "2bebfabd7e005e7dcb87c9a46cf3611c2b2a3dee";
+  const predecessor = {
+    identity: "deploy-35103111862-1",
+    image,
+    path: "deploy/production/rollback-configs/image-gen-7165f3bac38c-deploy-35103111862-1.toml",
+    sha256: "4311fd1f4a6075a16ee16f08d83aadf63447bbc439044eb256f2206a37c44d99",
+  };
+  const desiredConfig = {
+    path: "deploy/production/rollback-configs/image-gen-7165f3bac38c-deploy-35108204745-1.toml",
+    sha256: "0e1d34112abbd08362361820ba585e89807ebbcce4a5a6700f1eaaa23f09714a",
+  };
+  const darkConfig = {
+    path: "deploy/production/rollback-configs/image-gen-7165f3bac38c-emergency-dark.toml",
+    sha256: "f0253b74e85b1cefc4e99d537eafa6dfd687167010834066353c2595c94a02db",
+  };
+  // Copy the immutable activation records explicitly; the current manifest can
+  // point at a newer runtime and no longer references its old OFF predecessor.
+  for (const config of [predecessor, desiredConfig, darkConfig]) {
+    const contents = fs.readFileSync(path.join(repoRoot, config.path));
+    expect(createHash("sha256").update(contents).digest("hex")).toBe(config.sha256);
+    fs.writeFileSync(path.join(root, config.path), contents);
+  }
+  fs.copyFileSync(path.join(root, desiredConfig.path), path.join(root, app.config));
+  app.reviewedImage = image;
+  app.reviewedArtifactKind = "runtime";
+  app.reviewedSourceCommit = source;
+  app.reviewedImageSchemaPhases = ["0018_credit_checkout_reservation"];
+  app.reviewedSettledPredecessor = predecessor;
+  app.reviewedRollbackImages = [
+    image,
+    ...app.reviewedRollbackImages.filter((candidate) => candidate !== image),
+  ];
+  app.reviewedRollbackConfigs[image] = darkConfig;
+  app.reviewedRollbackArtifactKinds[image] = "runtime";
+  app.reviewedRollbackSourceCommits[image] = source;
+  app.reviewedRollbackImageSchemaPhases[image] = ["0018_credit_checkout_reservation"];
+  app.reviewedArtifactRepositories[image] = "Dj-Shortcut/leaderbot-facebook";
+  app.reviewedArtifactRepositories = Object.fromEntries(
+    [...new Set([image, ...app.reviewedRollbackImages])].map((trustedImage) => [
+      trustedImage,
+      app.reviewedArtifactRepositories[trustedImage],
+    ]),
+  );
+  fs.writeFileSync(manifestPath, JSON.stringify(manifest));
+  return root;
+}
+
 function replaceFixtureText(root, relativePath, before, after) {
   const filePath = path.join(root, relativePath);
   const source = fs.readFileSync(filePath, "utf8");
@@ -1238,7 +1292,7 @@ describe("production deployment contract", () => {
     });
   });
 
-  it("pins the same runtime for photo activation with its exact feature-off predecessor and dark emergency rollback", () => {
+  it("pins the reviewed runtime with its exact photo-enabled predecessor and dark emergency rollback", () => {
     const manifest = JSON.parse(
       fs.readFileSync(
         path.join(repoRoot, "deploy/production/apps.json"),
@@ -1273,12 +1327,11 @@ describe("production deployment contract", () => {
     expect(app.deploymentEnabled).toBe(true);
     expect(app.reviewedArtifactKind).toBe("runtime");
     expect(app.reviewedImage).toBe(
-      "registry.fly.io/leaderbot-fb-image-gen@sha256:7165f3bac38c168f3b5d85e3153f7371388eeef7b5477c06f8eff63d9602cb8d",
+      "registry.fly.io/leaderbot-fb-image-gen@sha256:a1f5a73069d1e7429d8b9373ec025a0bad9a3ee0d48aa76aebe391e3f4d4a22c",
     );
     expect(app.reviewedSourceCommit).toBe(
-      "2bebfabd7e005e7dcb87c9a46cf3611c2b2a3dee",
+      "bd67c6f502cda26a16f2282fbe479afeb2a4fcbc",
     );
-    expect(app.reviewedImage).toBe(predecessorImage);
     expect(app.reviewedImageSchemaPhases).toEqual([
       "0018_credit_checkout_reservation",
     ]);
@@ -1325,11 +1378,11 @@ describe("production deployment contract", () => {
       [emergencyRollbackImage]: ["0018_credit_checkout_reservation"],
     });
     expect(app.reviewedSettledPredecessor).toEqual({
-      identity: "deploy-35103111862-1",
+      identity: "deploy-35108204745-1",
       image: predecessorImage,
-      path: "deploy/production/rollback-configs/image-gen-7165f3bac38c-deploy-35103111862-1.toml",
+      path: "deploy/production/rollback-configs/image-gen-7165f3bac38c-deploy-35108204745-1.toml",
       sha256:
-        "4311fd1f4a6075a16ee16f08d83aadf63447bbc439044eb256f2206a37c44d99",
+        "0e1d34112abbd08362361820ba585e89807ebbcce4a5a6700f1eaaa23f09714a",
     });
     expect(app.reviewedRollbackConfigs[predecessorImage]).toEqual({
       path: "deploy/production/rollback-configs/image-gen-7165f3bac38c-emergency-dark.toml",
@@ -1359,6 +1412,7 @@ describe("production deployment contract", () => {
     });
     expect(app.reviewedArtifactRepositories).toEqual({
       [app.reviewedImage]: "Dj-Shortcut/leaderbot-facebook",
+      [predecessorImage]: "Dj-Shortcut/leaderbot-facebook",
       [previousOwnerTestPredecessorImage]: "Dj-Shortcut/leaderbot-facebook",
       [previousSchedulerPredecessorImage]: "Dj-Shortcut/openclaw-facebook",
       [previousPaymentPredecessorImage]: "Dj-Shortcut/openclaw-facebook",
@@ -3749,7 +3803,7 @@ describe("production deployment contract", () => {
   });
 
   it("accepts one signing binding when the exact runtime is both desired and rollback", () => {
-    const root = createRepositoryFixture();
+    const root = createPhotoActivationFixture();
     const manifest = JSON.parse(
       fs.readFileSync(path.join(root, "deploy/production/apps.json"), "utf8"),
     );
@@ -3769,7 +3823,7 @@ describe("production deployment contract", () => {
   });
 
   it("still rejects duplicate rollback entries for a same-image config transition", () => {
-    const root = createRepositoryFixture();
+    const root = createPhotoActivationFixture();
     const manifestPath = path.join(root, "deploy/production/apps.json");
     const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
     const app = manifest.apps["image-gen"];
@@ -3781,12 +3835,17 @@ describe("production deployment contract", () => {
     );
   });
 
-  it.each(["missing", "unrelated", "extra"])("rejects %s artifact repository binding", (mutation) => {
-    const root = createRepositoryFixture();
+  it.each(
+    ["current release", "historical same-image activation"].flatMap((stage) =>
+      ["missing", "unrelated", "extra"].map((mutation) => [stage, mutation]),
+    ),
+  )("rejects %s %s artifact repository binding", (stage, mutation) => {
+    const root = stage === "current release"
+      ? createRepositoryFixture()
+      : createPhotoActivationFixture();
     const manifestPath = path.join(root, "deploy/production/apps.json");
     const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
     const app = manifest.apps["image-gen"];
-    expect(app.reviewedRollbackImages).toContain(app.reviewedImage);
     if (mutation === "missing") delete app.reviewedArtifactRepositories[app.reviewedImage];
     if (mutation === "unrelated") app.reviewedArtifactRepositories[app.reviewedImage] = "attacker/leaderbot-facebook";
     if (mutation === "extra") app.reviewedArtifactRepositories["unreviewed-image"] = "Dj-Shortcut/leaderbot-facebook";
