@@ -211,10 +211,11 @@ function createPhotoActivationFixture() {
   app.reviewedRollbackImageSchemaPhases[image] = ["0018_credit_checkout_reservation"];
   app.reviewedArtifactRepositories[image] = "Dj-Shortcut/leaderbot-facebook";
   app.reviewedArtifactRepositories = Object.fromEntries(
-    [...new Set([image, ...app.reviewedRollbackImages])].map((trustedImage) => [
-      trustedImage,
-      app.reviewedArtifactRepositories[trustedImage],
-    ]),
+    [...new Set([image, ...app.reviewedRollbackImages])].map((trustedImage) => {
+      const repository = app.reviewedArtifactRepositories[trustedImage];
+      expect(repository).toBeDefined();
+      return [trustedImage, repository];
+    }),
   );
   fs.writeFileSync(manifestPath, JSON.stringify(manifest));
   return root;
