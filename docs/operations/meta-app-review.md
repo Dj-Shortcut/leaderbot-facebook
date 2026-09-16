@@ -29,6 +29,24 @@ mix it into the owner-bot review or subscription behavior.
 
 ## Current Messenger capabilities
 
+### Credits quick reply (implemented; release pending)
+
+Messenger photo menus include a **Credits** quick reply. Its encoded `credits`
+input, or typed `credits` / `/credits` / `saldo`, reads the current consented
+Page/user/privacy scope and displays free daily/monthly availability and premium
+credits after existing reservations. It remains available during image work and
+preserves the pending photo/edit context. Unavailable balances are reported as
+unavailable, never as zero. This starts no provider work, reserves no credits,
+and changes no payment, consent or entitlement. Existing Meta messaging
+permissions suffice; consent/deletion controls and checkout buttons are unchanged.
+
+Photo-conversation budget admission failures now explain the unavailable bot
+budget and retained credits, without suggesting that an immediate retry fixes it.
+The owner-requested configuration disables the extra global daily/monthly and
+per-user daily USD limits; the owner manages dollar budgets at the API provider.
+Free allowances and paid-credit admission remain enforced. Verify the balance pill
+and paid-image admission after deployment before marking this capability live.
+
 ### Owner customer-test control (deployed; user journey pending)
 
 An existing Messenger administrator can use `/testklant aan|uit|status` after

@@ -196,6 +196,16 @@ function createPhotoActivationFixture() {
     fs.writeFileSync(path.join(root, config.path), contents);
   }
   fs.copyFileSync(path.join(root, desiredConfig.path), path.join(root, app.config));
+  // Exercise historical artifact identity under the current desired budget
+  // policy. Keep the immutable predecessor and rollback records untouched.
+  const desiredPath = path.join(root, app.config);
+  fs.writeFileSync(
+    desiredPath,
+    fs.readFileSync(desiredPath, "utf8")
+      .replace('MESSENGER_GLOBAL_DAILY_SPEND_CAP_USD = "5.00"', 'MESSENGER_GLOBAL_DAILY_SPEND_CAP_USD = "0"')
+      .replace('MESSENGER_GLOBAL_MONTHLY_SPEND_CAP_USD = "25.00"', 'MESSENGER_GLOBAL_MONTHLY_SPEND_CAP_USD = "0"')
+      .replace('MESSENGER_USER_DAILY_SPEND_CAP_USD = "2.00"', 'MESSENGER_USER_DAILY_SPEND_CAP_USD = "0"'),
+  );
   app.reviewedImage = image;
   app.reviewedArtifactKind = "runtime";
   app.reviewedSourceCommit = source;
@@ -1340,6 +1350,7 @@ describe("production deployment contract", () => {
       "972e89225a2d25540d6abfa7bb4e75303f6a94b2f80b4ec26152a95b9b44eeb9",
     );
     expect(app.reviewedRollbackImages).toEqual([
+      app.reviewedImage,
       predecessorImage,
       previousOwnerTestPredecessorImage,
       previousSchedulerPredecessorImage,
@@ -1349,6 +1360,7 @@ describe("production deployment contract", () => {
       emergencyRollbackImage,
     ]);
     expect(app.reviewedRollbackArtifactKinds).toEqual({
+      [app.reviewedImage]: "runtime",
       [predecessorImage]: "runtime",
       [previousOwnerTestPredecessorImage]: "runtime",
       [previousSchedulerPredecessorImage]: "runtime",
@@ -1358,6 +1370,7 @@ describe("production deployment contract", () => {
       [emergencyRollbackImage]: "runtime",
     });
     expect(app.reviewedRollbackSourceCommits).toEqual({
+      [app.reviewedImage]: "bd67c6f502cda26a16f2282fbe479afeb2a4fcbc",
       [predecessorImage]: "2bebfabd7e005e7dcb87c9a46cf3611c2b2a3dee",
       [previousOwnerTestPredecessorImage]:
         "199a04e3def04a54b0f3cf6c0397da1184fa9694",
@@ -1370,6 +1383,7 @@ describe("production deployment contract", () => {
       [emergencyRollbackImage]: "b9caea7951b44d1f97bbd1bc742c25aca68264e9",
     });
     expect(app.reviewedRollbackImageSchemaPhases).toEqual({
+      [app.reviewedImage]: ["0018_credit_checkout_reservation"],
       [predecessorImage]: ["0018_credit_checkout_reservation"],
       [previousOwnerTestPredecessorImage]: ["0018_credit_checkout_reservation"],
       [previousSchedulerPredecessorImage]: ["0018_credit_checkout_reservation"],
@@ -1379,11 +1393,15 @@ describe("production deployment contract", () => {
       [emergencyRollbackImage]: ["0018_credit_checkout_reservation"],
     });
     expect(app.reviewedSettledPredecessor).toEqual({
-      identity: "deploy-35108204745-1",
-      image: predecessorImage,
-      path: "deploy/production/rollback-configs/image-gen-7165f3bac38c-deploy-35108204745-1.toml",
+      identity: "deploy-35113258520-1",
+      image: app.reviewedImage,
+      path: "deploy/production/rollback-configs/image-gen-a1f5a73069d1-deploy-35113258520-1.toml",
       sha256:
         "0e1d34112abbd08362361820ba585e89807ebbcce4a5a6700f1eaaa23f09714a",
+    });
+    expect(app.reviewedRollbackConfigs[app.reviewedImage]).toEqual({
+      path: "deploy/production/rollback-configs/image-gen-a1f5a73069d1-emergency-dark.toml",
+      sha256: "2b55bf77e2f30084da1c6d7e6a20afead565e7a57ff331cb7098f6b03b913c6b",
     });
     expect(app.reviewedRollbackConfigs[predecessorImage]).toEqual({
       path: "deploy/production/rollback-configs/image-gen-7165f3bac38c-emergency-dark.toml",

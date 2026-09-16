@@ -94,7 +94,10 @@ export class MessengerDailyAudioTranscriptionBudgetExceededError extends Error {
 }
 
 export class MessengerSpendBudgetExceededError extends Error {
-  constructor(message = "Messenger spend budget reached") {
+  constructor(
+    message = "Messenger spend budget reached",
+    readonly limit?: "user_daily" | "daily" | "monthly"
+  ) {
     super(message);
     this.name = "MessengerSpendBudgetExceededError";
   }
@@ -583,7 +586,16 @@ export async function admitMessengerProviderSpend<T>(input: {
                 ? "user_daily_cap"
                 : "store_result_invalid",
     });
-    throw new MessengerSpendBudgetExceededError();
+    throw new MessengerSpendBudgetExceededError(
+      undefined,
+      result === -3
+        ? "user_daily"
+        : result === -1
+          ? "daily"
+          : result === -2
+            ? "monthly"
+            : undefined
+    );
   }
 
   try {

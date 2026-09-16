@@ -195,6 +195,11 @@ describe("photo-first onboarding", () => {
           title: "Privacy",
           payload: "OPENCLAW_ACTION:Privacy",
         },
+        {
+          content_type: "text",
+          title: "Credits",
+          payload: "OPENCLAW_ACTION:credits",
+        },
       ]
     );
   });
@@ -529,6 +534,11 @@ describe("photo-first onboarding", () => {
           title: "Privacy",
           payload: "OPENCLAW_ACTION:Privacy",
         },
+        {
+          content_type: "text",
+          title: "Credits",
+          payload: "OPENCLAW_ACTION:credits",
+        },
       ]
     );
   });
@@ -624,6 +634,11 @@ describe("photo-first onboarding", () => {
           content_type: "text",
           title: "Privacy",
           payload: "OPENCLAW_ACTION:Privacy",
+        },
+        {
+          content_type: "text",
+          title: "Credits",
+          payload: "OPENCLAW_ACTION:credits",
         },
       ]
     );

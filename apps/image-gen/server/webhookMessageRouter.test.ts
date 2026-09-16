@@ -112,6 +112,35 @@ function messageWithTextAndAttachments(
 }
 
 describe("webhook message router", () => {
+  it.each([false, true])(
+    "allows Credits while an image is processing (quick reply: %s)",
+    async quickReply => {
+      const ctx = makeContext({
+        maybeSendInFlightMessage: vi.fn(async () => ({ handled: true })),
+      });
+      decodeMessengerActionInputMock.mockReturnValue("credits");
+      await handleMessageEvent(ctx, {
+        psid: "synthetic-credit-user",
+        userId: "synthetic-credit-key",
+        reqId: "synthetic-credit-request",
+        lang: "nl",
+        event: {
+          message: {
+            text: "Credits",
+            ...(quickReply
+              ? { quick_reply: { payload: "OPENCLAW_ACTION:credits" } }
+              : {}),
+          },
+        },
+      });
+      expect(handleTextMessageMock).toHaveBeenCalledWith(
+        ctx,
+        expect.objectContaining({ text: quickReply ? "credits" : "Credits" })
+      );
+      expect(ctx.maybeSendInFlightMessage).not.toHaveBeenCalled();
+      expect(ctx.runImageGeneration).not.toHaveBeenCalled();
+    }
+  );
   beforeEach(() => {
     process.env.PRIVACY_PEPPER = "test-pepper";
     safeLogMock.mockClear();

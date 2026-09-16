@@ -13,6 +13,7 @@ import {
   withPhotoConversationTurn,
 } from "../../photoConversation";
 import { patchState } from "../../messengerStatePersistence";
+import { MessengerSpendBudgetExceededError } from "../../generationGuard";
 
 export const photoConversationFeature: BotFeature = {
   name: "photoConversation",
@@ -114,7 +115,7 @@ export const photoConversationFeature: BotFeature = {
           return { photoConversation };
         });
       });
-    } catch {
+    } catch (error) {
       if (dispatchAccepted) {
         ctx.logger.warn("photo_conversation_completion_pending", {
           reqId: ctx.reqId,
@@ -129,6 +130,20 @@ export const photoConversationFeature: BotFeature = {
         await readCurrentPhotoConversationState(ctx);
       } catch {
         ctx.suppressFallback?.();
+        return { handled: true };
+      }
+      if (error instanceof MessengerSpendBudgetExceededError) {
+        const dailyLimit =
+          error.limit === "user_daily" || error.limit === "daily";
+        await ctx.sendText(
+          dailyLimit
+            ? ctx.lang === "en"
+              ? "The daily processing limit has been reached. Your credits are kept; this request has not started. You can continue tomorrow."
+              : "De daglimiet voor beeldverwerking is bereikt. Je credits blijven behouden; deze aanvraag is niet gestart. Je kunt morgen weer verder."
+            : ctx.lang === "en"
+              ? "The bot's usage budget is currently unavailable. Your credits are kept; this request has not started."
+              : "Het gebruiksbudget van de bot is momenteel niet beschikbaar. Je credits blijven behouden; deze aanvraag is niet gestart."
+        );
         return { handled: true };
       }
       await ctx.sendText(

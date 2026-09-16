@@ -108,12 +108,13 @@
         "registry.fly.io/leaderbot-fb-image-gen@sha256:f2fa9d60e1fca02c09cb2764981a7134e908f2e33f127eb0e54e77030b4a7a4b": "Dj-Shortcut/openclaw-facebook"
       },
       "reviewedSettledPredecessor": {
-        "identity": "deploy-35108204745-1",
-        "image": "registry.fly.io/leaderbot-fb-image-gen@sha256:7165f3bac38c168f3b5d85e3153f7371388eeef7b5477c06f8eff63d9602cb8d",
-        "path": "deploy/production/rollback-configs/image-gen-7165f3bac38c-deploy-35108204745-1.toml",
+        "identity": "deploy-35113258520-1",
+        "image": "registry.fly.io/leaderbot-fb-image-gen@sha256:a1f5a73069d1e7429d8b9373ec025a0bad9a3ee0d48aa76aebe391e3f4d4a22c",
+        "path": "deploy/production/rollback-configs/image-gen-a1f5a73069d1-deploy-35113258520-1.toml",
         "sha256": "0e1d34112abbd08362361820ba585e89807ebbcce4a5a6700f1eaaa23f09714a"
       },
       "reviewedRollbackImages": [
+        "registry.fly.io/leaderbot-fb-image-gen@sha256:a1f5a73069d1e7429d8b9373ec025a0bad9a3ee0d48aa76aebe391e3f4d4a22c",
         "registry.fly.io/leaderbot-fb-image-gen@sha256:7165f3bac38c168f3b5d85e3153f7371388eeef7b5477c06f8eff63d9602cb8d",
         "registry.fly.io/leaderbot-fb-image-gen@sha256:532e974166413faf86917800bbd83831d031ee23c71542bb24d411c5f9e9ea93",
         "registry.fly.io/leaderbot-fb-image-gen@sha256:e0b82c21ceca12130a892afd01b90cf83fcb3b7a42a2721a9c424a76f1d6f1cf",
@@ -123,6 +124,10 @@
         "registry.fly.io/leaderbot-fb-image-gen@sha256:f2fa9d60e1fca02c09cb2764981a7134e908f2e33f127eb0e54e77030b4a7a4b"
       ],
       "reviewedRollbackConfigs": {
+        "registry.fly.io/leaderbot-fb-image-gen@sha256:a1f5a73069d1e7429d8b9373ec025a0bad9a3ee0d48aa76aebe391e3f4d4a22c": {
+          "path": "deploy/production/rollback-configs/image-gen-a1f5a73069d1-emergency-dark.toml",
+          "sha256": "2b55bf77e2f30084da1c6d7e6a20afead565e7a57ff331cb7098f6b03b913c6b"
+        },
         "registry.fly.io/leaderbot-fb-image-gen@sha256:7165f3bac38c168f3b5d85e3153f7371388eeef7b5477c06f8eff63d9602cb8d": {
           "path": "deploy/production/rollback-configs/image-gen-7165f3bac38c-emergency-dark.toml",
           "sha256": "f0253b74e85b1cefc4e99d537eafa6dfd687167010834066353c2595c94a02db"
@@ -153,6 +158,7 @@
         }
       },
       "reviewedRollbackArtifactKinds": {
+        "registry.fly.io/leaderbot-fb-image-gen@sha256:a1f5a73069d1e7429d8b9373ec025a0bad9a3ee0d48aa76aebe391e3f4d4a22c": "runtime",
         "registry.fly.io/leaderbot-fb-image-gen@sha256:7165f3bac38c168f3b5d85e3153f7371388eeef7b5477c06f8eff63d9602cb8d": "runtime",
         "registry.fly.io/leaderbot-fb-image-gen@sha256:532e974166413faf86917800bbd83831d031ee23c71542bb24d411c5f9e9ea93": "runtime",
         "registry.fly.io/leaderbot-fb-image-gen@sha256:c04c742f56de06cddb72907ca0bdc989200babd0ea7dcb73b318bf96a327b548": "runtime",
@@ -162,6 +168,7 @@
         "registry.fly.io/leaderbot-fb-image-gen@sha256:e0b82c21ceca12130a892afd01b90cf83fcb3b7a42a2721a9c424a76f1d6f1cf": "runtime"
       },
       "reviewedRollbackSourceCommits": {
+        "registry.fly.io/leaderbot-fb-image-gen@sha256:a1f5a73069d1e7429d8b9373ec025a0bad9a3ee0d48aa76aebe391e3f4d4a22c": "bd67c6f502cda26a16f2282fbe479afeb2a4fcbc",
         "registry.fly.io/leaderbot-fb-image-gen@sha256:7165f3bac38c168f3b5d85e3153f7371388eeef7b5477c06f8eff63d9602cb8d": "2bebfabd7e005e7dcb87c9a46cf3611c2b2a3dee",
         "registry.fly.io/leaderbot-fb-image-gen@sha256:532e974166413faf86917800bbd83831d031ee23c71542bb24d411c5f9e9ea93": "199a04e3def04a54b0f3cf6c0397da1184fa9694",
         "registry.fly.io/leaderbot-fb-image-gen@sha256:c04c742f56de06cddb72907ca0bdc989200babd0ea7dcb73b318bf96a327b548": "ba1720e6a48a3784b800f610fb7f8dad9859945a",
@@ -205,6 +212,7 @@
       },
       "reviewedImageSchemaPhases": ["0018_credit_checkout_reservation"],
       "reviewedRollbackImageSchemaPhases": {
+        "registry.fly.io/leaderbot-fb-image-gen@sha256:a1f5a73069d1e7429d8b9373ec025a0bad9a3ee0d48aa76aebe391e3f4d4a22c": ["0018_credit_checkout_reservation"],
         "registry.fly.io/leaderbot-fb-image-gen@sha256:7165f3bac38c168f3b5d85e3153f7371388eeef7b5477c06f8eff63d9602cb8d": [
           "0018_credit_checkout_reservation"
         ],

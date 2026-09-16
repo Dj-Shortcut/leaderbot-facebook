@@ -37,17 +37,15 @@ kill_timeout = 300
   BILLING_OPERATOR_NOTIFICATION_WEBHOOK_URL = "https://app.leaderbot.live/api/internal/billing/notifications/operator"
   BILLING_SUPPORT_EMAIL = "privacy@leaderbot.live"
   FB_PAGE_CONNECT_CONFIG_ID = "2097873054148678"
-  # Owner policy: image entitlement is controlled by free quota and credits.
-  # The owner manages dollar budgets at the API provider; zero disables bot caps.
-  MESSENGER_GLOBAL_DAILY_SPEND_CAP_USD = "0"
-  MESSENGER_GLOBAL_MONTHLY_SPEND_CAP_USD = "0"
+  MESSENGER_GLOBAL_DAILY_SPEND_CAP_USD = "5.00"
+  MESSENGER_GLOBAL_MONTHLY_SPEND_CAP_USD = "25.00"
   MESSENGER_FREE_DAILY_LIMIT = "5"
   MESSENGER_FREE_MONTHLY_LIMIT = "20"
   # Bridge phase: every Machine reads v1+v2 while writes remain on v1. Switch
   # to v2 only in a later config-only release after this image is fully live.
   MESSENGER_GENERATION_QUEUE_WRITE_VERSION = "v1"
   MESSENGER_IMAGE_QUOTA_TIME_ZONE = "Europe/Brussels"
-  MESSENGER_USER_DAILY_SPEND_CAP_USD = "0"
+  MESSENGER_USER_DAILY_SPEND_CAP_USD = "2.00"
   # Contextual text/vision decisions retain the existing consent and spend gates.
   MESSENGER_PHOTO_CONVERSATION_ENABLED = "true"
   # Desired bounded Test exposure: deploy only after the protected operator

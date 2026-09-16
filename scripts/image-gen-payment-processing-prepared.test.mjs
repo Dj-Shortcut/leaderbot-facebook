@@ -44,7 +44,7 @@ function readEnvAssignments(file) {
 }
 
 describe.each([
-  { stage: "desired bounded Test", config: app.config, exposure: "true" },
+  { stage: "desired bounded Test", config: app.config, exposure: "true", spendCapsDisabled: true },
   {
     stage: "settled photo-enabled predecessor",
     config: predecessorConfig,
@@ -55,7 +55,7 @@ describe.each([
     config: app.reviewedRollbackConfigs[predecessor.image].path,
     exposure: "false",
   },
-])("image-gen $stage payment processing", ({ config, exposure }) => {
+])("image-gen $stage payment processing", ({ config, exposure, spendCapsDisabled }) => {
   const env = readEnvAssignments(path.join(rootDir, config));
   it("keeps the drain, notification plane and reconciliation prepared", () => {
     expect(env.MOLLIE_BILLING_DRAIN_ENABLED).toBe("true");
@@ -82,12 +82,12 @@ describe.each([
     }
   });
 
-  it("keeps the reviewed offer and spend caps unchanged", () => {
+  it("preserves the offer and pins each stage's reviewed spend policy", () => {
     expect(env.MOLLIE_CREDIT_WORKSPACE_ID).toBe("1");
     expect(env.MESSENGER_PAID_IMAGE_PROVIDER_MAX_COST_USD).toBe("1.00");
-    expect(env.MESSENGER_GLOBAL_DAILY_SPEND_CAP_USD).toBe("5.00");
-    expect(env.MESSENGER_GLOBAL_MONTHLY_SPEND_CAP_USD).toBe("25.00");
-    expect(env.MESSENGER_USER_DAILY_SPEND_CAP_USD).toBe("2.00");
+    expect(env.MESSENGER_GLOBAL_DAILY_SPEND_CAP_USD).toBe(spendCapsDisabled ? "0" : "5.00");
+    expect(env.MESSENGER_GLOBAL_MONTHLY_SPEND_CAP_USD).toBe(spendCapsDisabled ? "0" : "25.00");
+    expect(env.MESSENGER_USER_DAILY_SPEND_CAP_USD).toBe(spendCapsDisabled ? "0" : "2.00");
   });
 
   /**
@@ -147,14 +147,14 @@ it("binds the original Test request and retains the exact photo-enabled predeces
   });
   expect(predecessor).toEqual({
     image:
-      "registry.fly.io/leaderbot-fb-image-gen@sha256:7165f3bac38c168f3b5d85e3153f7371388eeef7b5477c06f8eff63d9602cb8d",
-    identity: "deploy-35108204745-1",
-    path: "deploy/production/rollback-configs/image-gen-7165f3bac38c-deploy-35108204745-1.toml",
+      "registry.fly.io/leaderbot-fb-image-gen@sha256:a1f5a73069d1e7429d8b9373ec025a0bad9a3ee0d48aa76aebe391e3f4d4a22c",
+    identity: "deploy-35113258520-1",
+    path: "deploy/production/rollback-configs/image-gen-a1f5a73069d1-deploy-35113258520-1.toml",
     sha256: "0e1d34112abbd08362361820ba585e89807ebbcce4a5a6700f1eaaa23f09714a",
   });
   expect(app.reviewedRollbackConfigs[predecessor.image]).toEqual({
-    path: "deploy/production/rollback-configs/image-gen-7165f3bac38c-emergency-dark.toml",
-    sha256: "f0253b74e85b1cefc4e99d537eafa6dfd687167010834066353c2595c94a02db",
+    path: "deploy/production/rollback-configs/image-gen-a1f5a73069d1-emergency-dark.toml",
+    sha256: "2b55bf77e2f30084da1c6d7e6a20afead565e7a57ff331cb7098f6b03b913c6b",
   });
 });
 
@@ -166,13 +166,17 @@ it("keeps photo conversations enabled for the release and exact settled recovery
   );
   expect(desired.MESSENGER_PHOTO_CONVERSATION_ENABLED).toBe("true");
   expect(settled.MESSENGER_PHOTO_CONVERSATION_ENABLED).toBe("true");
-  expect(desired).toEqual(settled);
+  expect(desired).toEqual({
+    ...settled,
+    MESSENGER_GLOBAL_DAILY_SPEND_CAP_USD: "0",
+    MESSENGER_GLOBAL_MONTHLY_SPEND_CAP_USD: "0",
+    MESSENGER_USER_DAILY_SPEND_CAP_USD: "0",
+  });
   const darkExpected = {
     ...settled,
     MESSENGER_PAID_CREDITS_ENABLED: "false",
     MOLLIE_CREDIT_CHECKOUT_ENABLED: "false",
   };
-  delete darkExpected.MESSENGER_PHOTO_CONVERSATION_ENABLED;
   expect(dark).toEqual(darkExpected);
 });
 

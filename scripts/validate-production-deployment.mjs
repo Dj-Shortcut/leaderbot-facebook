@@ -8579,9 +8579,9 @@ export function validateCreditTestActivation(app, env, rootDir) {
     BILLING_NOTIFICATION_PLANE_ENABLED: "true",
     MOLLIE_RECONCILIATION_ENABLED: "true",
     MESSENGER_PAID_IMAGE_PROVIDER_MAX_COST_USD: "1.00",
-    MESSENGER_GLOBAL_DAILY_SPEND_CAP_USD: "5.00",
-    MESSENGER_GLOBAL_MONTHLY_SPEND_CAP_USD: "25.00",
-    MESSENGER_USER_DAILY_SPEND_CAP_USD: "2.00",
+    MESSENGER_GLOBAL_DAILY_SPEND_CAP_USD: "0",
+    MESSENGER_GLOBAL_MONTHLY_SPEND_CAP_USD: "0",
+    MESSENGER_USER_DAILY_SPEND_CAP_USD: "0",
   })) {
     if (String(env[key]) !== value)
       fail(`image-gen bounded Test activation requires ${key}=${value}`);

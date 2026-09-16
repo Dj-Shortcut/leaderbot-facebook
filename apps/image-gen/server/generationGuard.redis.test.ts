@@ -88,13 +88,16 @@ suite("distributed Redis spend admission", () => {
     await admit("u1-a", "user-a", 0.02, NOW, providerStart);
     await expect(
       admit("u1-b", "user-a", 0.01, NOW, providerStart)
-    ).rejects.toThrow();
+    ).rejects.toMatchObject({ limit: "user_daily" });
     await admit("u2-a", "user-b", 0.02, NOW, providerStart);
+    await expect(
+      admit("day-full", "user-c", 0.01, NOW, providerStart)
+    ).rejects.toMatchObject({ limit: "daily" });
     const nextDay = new Date("2031-02-15T00:00:01.000Z");
     await admit("next-day", "user-a", 0.02, nextDay, providerStart);
     await expect(
       admit("month-full", "user-c", 0.01, nextDay, providerStart)
-    ).rejects.toThrow();
+    ).rejects.toMatchObject({ limit: "monthly" });
     await admit(
       "next-month",
       "user-a",

@@ -67,7 +67,10 @@ and schema's UTF-8 bytes (excluding image data URLs), plus framing and 3,100 tok
 per image, with output reserved separately. GPT-5.4 mini's `auto`/`high` vision
 budget is at most 2,500 patches multiplied by 1.2, or 3,000 tokens; the reservation
 includes additional margin. Actual usage is recorded when returned. Existing
-global daily/monthly and per-user spend caps apply, including to the owner.
+configured spend caps apply, including to the owner. The pending owner-requested
+release sets global daily/monthly and per-user daily USD caps to explicit zero:
+the owner manages dollar budgets at the API provider. The scoped ledger, model
+pricing, transport fence and image-credit accounting remain intact.
 Rollback does not remove ledger entries.
 
 The earlier `gpt-4.1-mini-2025-04-14` and `gpt-4.1-2025-04-14` variants failed
@@ -77,9 +80,8 @@ asking which subjects were intended. Correct action/source fields alone did not
 prove a useful conversation. The current pinned model subsequently passed both
 suites (20/20 automatic checks) and separate semantic review;
 [the evidence record](photo-conversation-evaluation-2026-09-16.md) retains the
-earlier failures and the limits of that result. Provider caps apply before every
-conversation call; exceeding them fails closed rather than selecting a fallback
-model.
+earlier failures and the limits of that result. Provider rejection fails closed
+rather than selecting a fallback model.
 
 References: [model](https://developers.openai.com/api/docs/models/gpt-5.4-mini),
 [pricing](https://developers.openai.com/api/docs/pricing),
