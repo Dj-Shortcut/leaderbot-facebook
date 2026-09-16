@@ -5,10 +5,12 @@ import { freeformTransformFeature } from "./features/freeformTransformFeature";
 import { imageRequestFeature } from "./features/imageRequestFeature";
 import { assistantCommandsFeature } from "./features/assistantCommandsFeature";
 import { statsFeature } from "./features/statsFeature";
+import { customerTestModeFeature } from "./features/customerTestModeFeature";
 
 export function ensureDefaultBotFeaturesRegistered(): void {
   const defaults = [
     rateLimitFeature,
+    customerTestModeFeature,
     freeformTransformFeature,
     imageRequestFeature,
     conversationalEditingFeature,

@@ -134,10 +134,13 @@ Live payment enablement remains gated by the relevant P1 through P4 evidence.
         Test-only flags, empty retired pins and passing health/readiness.
         [Release evidence](credit-checkout-scheduler-verification.md) retains
         exact source/digest, activation provenance and rollback boundaries.
-  - [ ] Complete the actual Messenger Test checkout journey with an eligible
-        tester: fresh CTA, explicit confirmation, paid Test webhook, exactly one
-        eight-credit grant and premium image/edit delivery. The operator will
-        arrange the tester later. Local second-user/duplicate-webhook regression
+  - [ ] Deploy and verify the [owner customer-test switch](owner-customer-test-mode.md):
+        `/testklant aan|uit|status` preserves admin rights while applying ordinary
+        quota/credit/budget admission in Test Mode. No manual balance changes.
+  - [ ] Complete the actual Messenger Test checkout journey with the owner in
+        customer-test mode or another eligible user: fresh CTA, explicit
+        confirmation, paid Test webhook, exactly one eight-credit grant and
+        premium image/edit delivery. Local second-user/duplicate-webhook regression
         and successful deployment are not this production journey proof.
 
 - [ ] **P4 - Premium quality and Test Mode journey.** Bind the paid offer to a

@@ -1,6 +1,7 @@
+import { readMessengerExecutionAccess } from "./messengerCustomerTestMode";
 import { randomUUID } from "node:crypto";
 import { getDayKey } from "./messengerStateNormalization";
-import { getOrCreateState, type MessengerUserState } from "./messengerState";
+import { getOrCreateState, getState, type MessengerUserState } from "./messengerState";
 import {
   getAudioTranscriptionDailyLimit,
   getImageGenerationDailyLimit,
@@ -143,29 +144,9 @@ async function reserveVideoGenerationSlot(
   return null;
 }
 
-/**
- * Returns whether a Messenger PSID or tenant-safe user key has explicit test
- * access. Messenger admins are infrastructure owners and therefore share the
- * explicit bypass; normal customer accounts remain quota-bound.
- */
-export function hasQuotaBypass(psid: string, userKey: string): boolean {
-  const raw = [
-    process.env.MESSENGER_QUOTA_BYPASS_IDS ?? "",
-    process.env.MESSENGER_ADMIN_IDS ?? "",
-  ]
-    .filter(Boolean)
-    .join(",");
-  if (!raw.trim()) {
-    return false;
-  }
-
-  const ids = new Set(
-    raw
-      .split(",")
-      .map(item => item.trim())
-      .filter(Boolean)
-  );
-  return ids.has(psid) || ids.has(userKey);
+/** Always read the scoped preference, not the legacy quota-state copy. */
+export async function hasQuotaBypass(psid: string, userKey: string): Promise<boolean> {
+  return (await readMessengerExecutionAccess(psid, userKey)).quotaBypass;
 }
 
 function withSyncedQuota(
@@ -271,7 +252,7 @@ async function syncTranscriptionQuotaState(
 
 export async function canGenerate(psid: string): Promise<boolean> {
   const state = await syncQuotaState(psid);
-  if (hasQuotaBypass(psid, state.userKey)) {
+  if (await hasQuotaBypass(psid, state.userKey)) {
     return true;
   }
 
@@ -289,6 +270,7 @@ export async function reserveImageGenerationForAttempt(
   try {
     const now = Date.now();
     const fallbackState = await Promise.resolve(getOrCreateState(psid));
+    const bypass = await hasQuotaBypass(psid, fallbackState.userKey);
     const limit = getFreeDailyLimit();
     let allowed = false;
     const reservationState = {
@@ -300,7 +282,7 @@ export async function reserveImageGenerationForAttempt(
       updateStoredState<MessengerUserState>(psid, storedState => {
         const baseState = withSyncedQuota(storedState ?? fallbackState, now);
 
-        if (hasQuotaBypass(psid, baseState.userKey)) {
+        if (bypass) {
           allowed = true;
           return {
             ...baseState,
@@ -347,6 +329,8 @@ export async function commitImageGenerationSuccess(
   let committed = false;
   try {
     const now = Date.now();
+    const state = await getState(psid);
+    const bypass = state ? await hasQuotaBypass(psid, state.userKey) : false;
     const limit = getFreeDailyLimit();
 
     await Promise.resolve(
@@ -361,7 +345,7 @@ export async function commitImageGenerationSuccess(
           return baseState;
         }
 
-        if (hasQuotaBypass(psid, baseState.userKey)) {
+        if (bypass) {
           committed = true;
           return {
             ...baseState,
@@ -440,7 +424,7 @@ export async function canGenerateVideo(psid: string): Promise<boolean> {
     })
   );
 
-  if (hasQuotaBypass(psid, state.userKey)) {
+  if (await hasQuotaBypass(psid, state.userKey)) {
     return true;
   }
 
@@ -460,6 +444,7 @@ export async function reserveVideoGenerationForAttempt(
   try {
     const now = Date.now();
     const fallbackState = await Promise.resolve(getOrCreateState(psid));
+    const bypass = await hasQuotaBypass(psid, fallbackState.userKey);
     const limit = resolveVideoGenerationLimit(dailyLimit);
     const allowBypass = options?.allowBypass !== false;
     let allowed = false;
@@ -477,7 +462,7 @@ export async function reserveVideoGenerationForAttempt(
           now
         );
 
-        if (allowBypass && hasQuotaBypass(psid, baseState.userKey)) {
+        if (allowBypass && bypass) {
           allowed = true;
           return {
             ...baseState,
@@ -528,6 +513,8 @@ export async function commitVideoGenerationSuccess(
   let committed = false;
   try {
     const now = Date.now();
+    const state = await getState(psid);
+    const bypass = state ? await hasQuotaBypass(psid, state.userKey) : false;
     const limit = resolveVideoGenerationLimit(reservation.dailyLimit);
     const allowBypass = reservation.allowBypass !== false;
 
@@ -548,7 +535,7 @@ export async function commitVideoGenerationSuccess(
           return baseState;
         }
 
-        if (allowBypass && hasQuotaBypass(psid, baseState.userKey)) {
+        if (allowBypass && bypass) {
           committed = true;
           return {
             ...baseState,
@@ -612,7 +599,7 @@ export async function releaseVideoGenerationReservation(
 
 export async function canTranscribe(psid: string): Promise<boolean> {
   const state = await syncTranscriptionQuotaState(psid);
-  if (hasQuotaBypass(psid, state.userKey)) {
+  if (await hasQuotaBypass(psid, state.userKey)) {
     return true;
   }
 
@@ -641,6 +628,7 @@ export async function reserveTranscriptionForAttempt(
   try {
     const now = Date.now();
     const fallbackState = await Promise.resolve(getOrCreateState(psid));
+    const bypass = await hasQuotaBypass(psid, fallbackState.userKey);
     const limit = getTranscriptionLimit();
     let allowed = false;
 
@@ -651,7 +639,7 @@ export async function reserveTranscriptionForAttempt(
           now
         );
 
-        if (hasQuotaBypass(psid, baseState.userKey)) {
+        if (bypass) {
           allowed = true;
           return baseState;
         }
@@ -695,6 +683,7 @@ export async function commitTranscriptionSuccess(
   try {
     const now = Date.now();
     const fallbackState = await Promise.resolve(getOrCreateState(psid));
+    const bypass = await hasQuotaBypass(psid, fallbackState.userKey);
     const limit = getTranscriptionLimit();
 
     await Promise.resolve(
@@ -704,7 +693,7 @@ export async function commitTranscriptionSuccess(
           now
         );
 
-        if (hasQuotaBypass(psid, baseState.userKey)) {
+        if (bypass) {
           committed = true;
           return baseState;
         }
@@ -745,7 +734,7 @@ export async function releaseTranscriptionReservation(
 export async function increment(psid: string): Promise<void> {
   const now = Date.now();
   const current = await syncQuotaState(psid, now);
-  if (hasQuotaBypass(psid, current.userKey)) {
+  if (await hasQuotaBypass(psid, current.userKey)) {
     return;
   }
 
@@ -768,7 +757,7 @@ export async function increment(psid: string): Promise<void> {
 export async function incrementTranscription(psid: string): Promise<void> {
   const now = Date.now();
   const current = await syncTranscriptionQuotaState(psid, now);
-  if (hasQuotaBypass(psid, current.userKey)) {
+  if (await hasQuotaBypass(psid, current.userKey)) {
     return;
   }
 

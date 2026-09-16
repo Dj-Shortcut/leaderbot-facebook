@@ -29,6 +29,16 @@ mix it into the owner-bot review or subscription behavior.
 
 ## Current Messenger capabilities
 
+### Owner customer-test control (implementation; rollout pending)
+
+An existing Messenger administrator can use `/testklant aan|uit|status` after
+consent to test the ordinary quota/credit/budget path while retaining admin
+rights. This only changes metadata in that exact Page/user/privacy scope.
+It grants no credits and requires Mollie Test Mode when enabling. Ordinary
+users cannot operate it. No additional Meta permission is requested.
+See [operator instructions](owner-customer-test-mode.md). The actual checkout,
+verified paid webhook, credit grant and delivered image remain a separate gate.
+
 ### Bounded Test exposure — processing active, deployment pending
 
 The desired configuration enables the existing one-time credit flow in Mollie

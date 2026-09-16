@@ -418,6 +418,7 @@ function applyNormalizedStateShape(
   return {
     ...fallback,
     ...value,
+    customerTestMode: value?.customerTestMode === true,
     psid: resolvedPsid,
     userKey: getUserKey(value?.userKey ?? fallback.userKey),
     pageId: value?.pageId ?? fallback.pageId,
