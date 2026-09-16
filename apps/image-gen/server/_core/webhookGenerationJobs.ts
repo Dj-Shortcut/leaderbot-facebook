@@ -98,6 +98,7 @@ import {
   MessengerPrivacyFenceError,
 } from "./messengerPrivacySubject";
 import {
+  assertPaidCreditGenerationRecovery,
   commitDeliveredPaidCreditGeneration,
   readPaidCreditBalance,
   reservePaidCreditGeneration,
@@ -1463,6 +1464,16 @@ async function finishDuplicateGenerationIfCompleted(input: {
   let quotaStatus = completedGeneration.quotaStatus;
   let successNoticeStatus = completedGeneration.successNoticeStatus;
   let deliveryStatus = completedGeneration.deliveryStatus ?? "delivered";
+  if (completedGeneration.quotaAccountingMode === "paid_credit_delivery_v1") {
+    if (!input.paidCreditInput || !completedGeneration.paidCreditMode) {
+      throw new MessengerImageQuotaRecoveryError();
+    }
+    await assertPaidCreditGenerationRecovery({
+      ...input.paidCreditInput,
+      mode: completedGeneration.paidCreditMode,
+      deliveryAlreadyConfirmed: deliveryStatus === "delivered",
+    });
+  }
   const recoveryQuotaIdentity = quotaIdentityForCompletionRecovery(
     completedGeneration,
     input.successQuotaIdentity
@@ -2376,7 +2387,12 @@ function quotaIdentityForCompletionRecovery(
   completion: MessengerGenerationCompletion,
   currentFreeIdentity: MessengerImageQuotaIdentity | undefined
 ): MessengerImageQuotaIdentity | undefined {
-  if (completion.quotaAccountingMode === "startpilot_attempt_committed_v1") {
+  if (
+    completion.quotaAccountingMode === "startpilot_attempt_committed_v1" ||
+    completion.quotaAccountingMode === "paid_credit_delivery_v1"
+  ) {
+    // Paid recovery verifies its existing hold separately. Redis JSON rewrites
+    // may omit an explicit null; that must never turn a paid image into free use.
     return undefined;
   }
   if (!Object.hasOwn(completion, "quotaIdentity")) {

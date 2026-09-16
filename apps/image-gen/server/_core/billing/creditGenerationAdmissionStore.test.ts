@@ -47,11 +47,14 @@ beforeEach(() => {
 
 describe("credit generation reservation lookup", () => {
   it("requires one exact user-scoped deterministic reservation", async () => {
-    const harness = databaseReturning([{ status: "reserved" }]);
+    const harness = databaseReturning([
+      { status: "reserved", transportState: "known_accepted" },
+    ]);
     getDatabaseOrThrowMock.mockResolvedValue(harness.database);
 
     await expect(readCreditGenerationReservation(input)).resolves.toEqual({
       status: "reserved",
+      transportState: "known_accepted",
     });
 
     expect(harness.limit).toHaveBeenCalledWith(2);

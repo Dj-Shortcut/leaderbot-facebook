@@ -5,8 +5,8 @@ not an incident archive: completed deployment transcripts belong in Git history
 or a dedicated incident record and should be summarized here only when they
 change an open gate.
 
-Last reviewed: **2026-09-16** (checkout repair deployed and runtime verified;
-fresh Messenger payment/grant/delivery proof and photo assistant activation pending).
+Last reviewed: **2026-09-16** (fresh Test checkout and one eight-credit grant
+verified; paid image delivery repair and photo assistant activation pending).
 Last state reset: **2026-08-27**.
 
 ## Messenger bot and evaluator release gate
@@ -87,10 +87,29 @@ Behavior, costs, rollback and tests: [Photo conversation](photo-conversation.md)
   Restoring its active config restores the known checkout failure; its separate
   emergency rollback config disables checkout/paid admission while retaining
   financial recovery.
-- [ ] Complete a fresh consented Test checkout: Mollie opens, authoritative paid
-  status is verified, exactly one grant of 8 credits appears, and a premium image
-  is delivered using those credits. Green deployment and code checks do not
-  close this end-to-end gate.
+- [x] Verify a fresh consented Test checkout and grant. The owner's checkout
+  reached Mollie; the authoritative Test payment became paid at 13:52:57 UTC on
+  2026-09-16. The webhook applied exactly one immutable eight-credit grant at
+  13:52:59 UTC. Scoped metadata at 14:20 UTC showed balance 8, reserved 2,
+  available 6, and no generation debit.
+- [ ] Deploy and verify the paid-image delivery repair. Two outputs were saved,
+  but the production Redis-compatible interpreter rejected mutation of Lua
+  `ARGV` after persisting delivery intent. Recovery then mistook a paid
+  completion with an omitted JSON-null quota field for free-quota work.
+  The source correction keeps expiry in a local variable and validates the
+  original paid reservation without requesting free quota or another hold.
+  The Redis regression models both read-only arguments and dropped null fields;
+  native Redis alone does not reproduce this production behavior.
+- [ ] Resolve the two undelivered outputs and prove one receipt-backed debit
+  per delivered premium image. Their completions remain stored, but dead-letter
+  handling deleted the private job bodies; deployment does not replay them.
+  Prepare a reviewed completion-only recovery using the original request,
+  recipient/privacy scope and Meta attempt fence, with no provider-generation
+  fallback. Obtain approval for the concrete two-image recovery before sending;
+  do not reset queue markers or adjust balances manually.
+- [ ] Add a scoped, idempotent Messenger payment-success confirmation. The
+  current checkout return page confirms payment; the grant handler does not
+  enqueue a chat confirmation, so silence in Messenger is not grant failure.
 - [ ] Before live billing, repair and verify remaining restricted-runtime
   authority gaps outside the ordinary paid checkout: reconnect and reservation
   operator reads in `server/db.ts` and `creditReservationOperatorResolution.ts`

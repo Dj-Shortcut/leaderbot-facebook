@@ -11,6 +11,12 @@ export type SpendableCreditWallet = Readonly<{
 
 export type CreditGenerationReservationState = Readonly<{
   status: "initializing" | "reserved" | "committed" | "released" | "expired";
+  transportState:
+    | "pretransport"
+    | "transport_started"
+    | "known_accepted"
+    | "known_rejected"
+    | "output_not_delivered";
 }>;
 
 export type CurrentCreditWalletIdentity = Readonly<{
@@ -108,7 +114,10 @@ export async function readCreditGenerationReservation(input: {
 }): Promise<CreditGenerationReservationState | null> {
   const database = await getDatabaseOrThrow();
   const rows = await database
-    .select({ status: creditReservations.status })
+    .select({
+      status: creditReservations.status,
+      transportState: creditReservations.transportState,
+    })
     .from(creditReservations)
     .where(
       and(
