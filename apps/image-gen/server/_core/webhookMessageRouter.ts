@@ -2,6 +2,7 @@ import { type Lang } from "./i18n";
 import { safeLog } from "./messengerApi";
 import { t } from "./i18n";
 import { decodeMessengerActionInput } from "./messengerActionPayload";
+import { isCreditBalanceCommand } from "./creditBalanceAction";
 import {
   anonymizePsid,
   getOrCreateState,
@@ -127,6 +128,25 @@ export async function handleMessageEvent(
   const socialReply = getMessengerMessageSocialReply(message, input.lang);
   if (socialReply) {
     await ctx.sendLoggedText(input.psid, socialReply, input.reqId);
+    return;
+  }
+
+  const creditCommand = message.quick_reply?.payload
+    ? decodeMessengerActionInput(message.quick_reply.payload)
+    : message.text;
+  if (
+    !message.attachments?.length &&
+    creditCommand &&
+    isCreditBalanceCommand(creditCommand)
+  ) {
+    await handleTextMessage(ctx, {
+      psid: input.psid,
+      userId: input.userId,
+      reqId: input.reqId,
+      lang: input.lang,
+      text: creditCommand,
+      timestamp: input.event.timestamp ?? Date.now(),
+    });
     return;
   }
 

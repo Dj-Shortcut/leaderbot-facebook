@@ -123,16 +123,33 @@ Behavior, costs, rollback and tests: [Photo conversation](photo-conversation.md)
   `7165f3bac38c` and disables paid admission and checkout while retaining
   financial recovery; it also restores that runtime's completion defect.
   Keeping the repaired runtime available in dark mode closes that recovery gap.
-- [ ] Resolve the two undelivered outputs and prove one receipt-backed debit
-  per delivered premium image. Their completions remain stored, but dead-letter
-  handling deleted the private job bodies; deployment does not replay them.
-  Scoped readback at 15:15:48 UTC confirmed both original reservations still
-  reserved/known-accepted, with no commit, release, Messenger message-ID hash or
-  delivery receipt. A successful deployment does not close this delivery gate.
-  Prepare a reviewed completion-only recovery using the original request,
-  recipient/privacy scope and Meta attempt fence, with no provider-generation
-  fallback. Obtain approval for the concrete two-image recovery before sending;
-  do not reset queue markers or adjust balances manually.
+- [ ] Complete receipt-backed accounting for the two recovered outputs. The
+  owner authorized receipt of both saved images and confirmed both arrived.
+  The scoped completion-only recovery sent the original objects at 15:43:43 and
+  15:44:09 UTC on 2026-09-16, preserving original request/privacy/Meta-fence
+  identities. It created no provider generation, reservation or manual debit.
+  At 15:44:30 both completions had exact accepted Meta message-ID hashes but no
+  delivery receipts; balance remained 8, reserved 2, available 6. Do not resend
+  these images. Diagnose receipt ingress and prove one ordinary receipt-backed
+  debit per original reservation. Never manufacture a Meta receipt from the
+  owner's confirmation. A scoped balance notice was accepted at 15:48:07 UTC.
+  The Page subscription was missing `message_deliveries`; it was added and
+  independently read back at 15:59:39 UTC, preserving its three existing fields.
+  Future receipt ingress still needs a live delivery check; this does not prove
+  that Meta will replay receipts for the two earlier images.
+- [ ] Release and verify the Messenger **Credits** quick reply. The implementation
+  reads scoped free and available premium balances, including while an image is
+  processing, without changing pending edit state or starting provider work.
+  Photo menus add the pill at the Messenger rendering boundary; consent and
+  checkout controls retain their original actions. Test the deployed pill.
+- [ ] Resolve the owner's Test-mode per-user daily budget block. Both 15:49 UTC
+  photo-conversation attempts failed at spend admission with `user_daily_cap`.
+  Scoped readback at 15:53:45 UTC showed the configured USD 2/day user cap and
+  USD 2 in reserved estimates from seven image attempts, with final provider
+  costs unavailable; the global daily cap remains USD 5. Available purchased
+  credits do not override this cost guard. The pending release explains the
+  block without a retry loop. Raising the reviewed cap requires an explicit
+  budget decision; do not reset counters or bypass provider admission.
 - [ ] Add a scoped, idempotent Messenger payment-success confirmation. The
   current checkout return page confirms payment; the grant handler does not
   enqueue a chat confirmation, so silence in Messenger is not grant failure.

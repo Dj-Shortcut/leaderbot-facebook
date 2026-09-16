@@ -1225,6 +1225,11 @@ describe("messenger webhook dedupe", () => {
           title: "Privacy",
           payload: "OPENCLAW_ACTION:Privacy",
         },
+        {
+          content_type: "text",
+          title: "Credits",
+          payload: "OPENCLAW_ACTION:credits",
+        },
       ]
     );
     expect(
@@ -1305,6 +1310,11 @@ describe("messenger deterministic free text", () => {
           content_type: "text",
           title: "Privacy",
           payload: "OPENCLAW_ACTION:Privacy",
+        },
+        {
+          content_type: "text",
+          title: "Credits",
+          payload: "OPENCLAW_ACTION:credits",
         },
       ]
     );
@@ -2091,6 +2101,11 @@ describe("messenger deterministic free text", () => {
           title: "Privacy",
           payload: "OPENCLAW_ACTION:Privacy",
         },
+        {
+          content_type: "text",
+          title: "Credits",
+          payload: "OPENCLAW_ACTION:credits",
+        },
       ]
     );
     expect(
@@ -2147,6 +2162,11 @@ describe("messenger greeting behavior", () => {
           content_type: "text",
           title: "Privacy",
           payload: "OPENCLAW_ACTION:Privacy",
+        },
+        {
+          content_type: "text",
+          title: "Credits",
+          payload: "OPENCLAW_ACTION:credits",
         },
       ])
     );
@@ -2312,6 +2332,11 @@ describe("messenger greeting behavior", () => {
         title: "Privacy",
         payload: "OPENCLAW_ACTION:Privacy",
       },
+      {
+        content_type: "text",
+        title: "Credits",
+        payload: "OPENCLAW_ACTION:credits",
+      },
     ]);
   });
 
@@ -2371,6 +2396,11 @@ describe("messenger greeting behavior", () => {
           content_type: "text",
           title: "Nieuwe afbeelding",
           payload: "OPENCLAW_ACTION:new_image",
+        },
+        {
+          content_type: "text",
+          title: "Credits",
+          payload: "OPENCLAW_ACTION:credits",
         },
       ]
     );
@@ -2928,6 +2958,11 @@ describe("disabled bot features stay out of the runtime flow", () => {
           content_type: "text",
           title: "Privacy",
           payload: "OPENCLAW_ACTION:Privacy",
+        },
+        {
+          content_type: "text",
+          title: "Credits",
+          payload: "OPENCLAW_ACTION:credits",
         },
       ]
     );

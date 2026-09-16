@@ -2,6 +2,7 @@ import type { ConversationAction } from "./botResponse";
 import { isGdprConsentActionId } from "./consentActionIds";
 import type { QuickReply } from "./messengerApi";
 import { encodeMessengerActionInput } from "./messengerActionPayload";
+import { CREDIT_BALANCE_ACTION } from "./creditBalanceAction";
 
 const MESSENGER_QUICK_REPLY_TITLE_MAX_LENGTH = 20;
 const MESSENGER_BUTTON_LIMIT = 3;
@@ -40,7 +41,25 @@ export function renderMessengerQuickReplies(
     return [];
   }
 
-  const orderedActions = actions;
+  const photoMenuIds = new Set([
+    "new_image",
+    "edit_photo",
+    "change_background",
+    "combine_photos",
+    "privacy",
+  ]);
+  const addCredits =
+    actions.length < 13 &&
+    actions.some(action => photoMenuIds.has(action.id)) &&
+    !actions.some(
+      action =>
+        action.id === CREDIT_BALANCE_ACTION.id ||
+        isPlatformPayloadActionId(action.id) ||
+        action.url
+    );
+  const orderedActions = addCredits
+    ? [...actions, CREDIT_BALANCE_ACTION]
+    : actions;
 
   return orderedActions.flatMap(action => {
     if (action.url && normalizeSafeActionUrl(action.url)) {

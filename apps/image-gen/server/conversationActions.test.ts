@@ -124,6 +124,11 @@ describe("conversation actions", () => {
         title: "Privacy",
         payload: "OPENCLAW_ACTION:Privacy",
       },
+      {
+        content_type: "text",
+        title: "Credits",
+        payload: "OPENCLAW_ACTION:credits",
+      },
     ]);
   });
 
@@ -311,6 +316,29 @@ describe("conversation actions", () => {
         title: "New image",
         payload: "OPENCLAW_ACTION:new_image",
       },
+      {
+        content_type: "text",
+        title: "Credits",
+        payload: "OPENCLAW_ACTION:credits",
+      },
     ]);
+  });
+
+  it("keeps one Credits pill on photo menus and preserves consent controls", () => {
+    const credit = { id: "credits", label: "Credits", inputText: "credits" };
+    const image = {
+      id: "new_image",
+      label: "New image",
+      inputText: "new_image",
+    };
+    const replies = renderMessengerQuickReplies([image, credit]);
+    expect(replies.filter(reply => reply.title === "Credits")).toHaveLength(1);
+    expect(decodeMessengerActionInput(replies[1].payload)).toBe("credits");
+    expect(
+      renderMessengerQuickReplies([
+        image,
+        { id: "GDPR_DELETE_CONFIRM", label: "Delete" },
+      ]).some(reply => reply.title === "Credits")
+    ).toBe(false);
   });
 });

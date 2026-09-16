@@ -80,6 +80,7 @@ import {
   PHOTO_CONVERSATION_INPUT_USD_PER_TOKEN,
 } from "./_core/photoConversationContract";
 import { buildMessengerStorageObjectKey } from "./_core/messengerStorageObject";
+import { MessengerSpendBudgetExceededError } from "./_core/generationGuard";
 const psid = "synthetic-photo-user";
 const scope = () => ({
   workspaceId: 11,
@@ -509,6 +510,25 @@ describe("contextual photo service through Messenger routing", () => {
       expect(
         JSON.parse(m.fetch.mock.calls[1][1].body).input.slice(2, -1)
       ).toContainEqual({ role: "user", content: "Ik zoek een idee" });
+    }));
+  it("explains a spend-budget block without asking the user to retry or starting generation", async () =>
+    within(async () => {
+      await seed();
+      await twoImages();
+      m.spend.mockRejectedValueOnce(
+        new MessengerSpendBudgetExceededError(undefined, "user_daily")
+      );
+      await say(
+        "Zoom uit zodat het bovenlichaam meer zichtbaar wordt",
+        "budget-block"
+      );
+      expect(m.fetch).not.toHaveBeenCalled();
+      expect(runImage).not.toHaveBeenCalled();
+      expect(m.send).toHaveBeenCalledWith(
+        psid,
+        "De daglimiet voor beeldverwerking is bereikt. Je credits blijven behouden; deze aanvraag is niet gestart. Je kunt morgen weer verder."
+      );
+      expect(m.started).not.toHaveBeenCalled();
     }));
   it("invalidates old memory when uploads occur while the flag is disabled", async () =>
     within(async () => {
