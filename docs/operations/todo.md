@@ -58,6 +58,7 @@ Only diagnostic metadata is retained; no transcript or photo collection.
   synthetic model decisions alone do not prove that user journey.
 
 Behavior, costs, rollback and tests: [Photo conversation](photo-conversation.md).
+
 ## Current Test Mode checkout blocker
 
 - [ ] Deploy and verify the repair for the reported confirmation failure: a freshly opened
@@ -74,7 +75,19 @@ Behavior, costs, rollback and tests: [Photo conversation](photo-conversation.md)
   probes confirmed unchanged persisted state and made no provider call. This
   proves the claim repair under current grants, not deployment or paid delivery.
 - Safe route/payment-stage diagnostics and distinct link/confirmation/status
-  error screens accompany the fix. The changes on this branch are not deployed.
+  error screens accompany the fix. [PR #567](https://github.com/Dj-Shortcut/leaderbot-facebook/pull/567)
+  merged as `f2b168a53f6aa08b32949c3f298efcd3d9548204`; its main CI passed,
+  including the real restricted-principal MySQL regression and production
+  schema/container checks. The owner authorized deployment on 2026-09-16.
+- The pending release pins image
+  `sha256:7165f3bac38c168f3b5d85e3153f7371388eeef7b5477c06f8eff63d9602cb8d`,
+  built from current main `2bebfabd7e005e7dcb87c9a46cf3611c2b2a3dee` by [35099339826](https://github.com/Dj-Shortcut/leaderbot-facebook/actions/runs/35099339826)
+  with [provenance 47913521](https://github.com/Dj-Shortcut/leaderbot-facebook/attestations/47913521).
+  The verified settled predecessor is `deploy-35073398659-1` / `532e97416641`.
+  Restoring its active config also restores the known checkout failure; the
+  separate emergency rollback config disables checkout/paid admission while
+  retaining financial recovery. Protected deployment and runtime readback are
+  still required; this build is not a completed payment test.
 - Local Chromium verification of the real React page, routes and headers with
   synthetic dependencies proved automatic cookie storage, session reload and
   the confirmation request. It does not prove Messenger WebView behavior or
