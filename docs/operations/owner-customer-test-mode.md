@@ -1,9 +1,8 @@
 # Testen als gewone Messenger-klant
 
-Status: [PR #563](https://github.com/Dj-Shortcut/leaderbot-facebook/pull/563)
-is gemerged als `199a04e3def04a54b0f3cf6c0397da1184fa9694`. Deployment en de echte
-eigenaarstest moeten afzonderlijk worden bevestigd. Deze bediening voegt geen
-Meta-permissie toe.
+Status: gedeployd en onafhankelijk teruggelezen op **2026-09-16** via
+[deployment 35073398659/1](https://github.com/Dj-Shortcut/leaderbot-facebook/actions/runs/35073398659).
+De echte eigenaarstest blijft open. Deze bediening voegt geen Meta-permissie toe.
 
 De eigenaar kan in het eigen Messenger-gesprek met de Page sturen:
 
@@ -63,7 +62,7 @@ herneemt de oude eigenaarsvrijstellingen; die runtime is daarom ongeschikt om
 een klanttestronde voort te zetten. Gebruik de beschermde immutable deployment
 en het vastgelegde rollback-artifact zoals bij iedere image-gen-release.
 
-## Releasekandidaat 2026-09-16
+## Geverifieerde release 2026-09-16
 
 - Runtimebron: `199a04e3def04a54b0f3cf6c0397da1184fa9694` (PR #563).
 - [Trusted build 35071095029](https://github.com/Dj-Shortcut/leaderbot-facebook/actions/runs/35071095029)
@@ -80,5 +79,22 @@ en het vastgelegde rollback-artifact zoals bij iedere image-gen-release.
   oorspronkelijke auditverzoek en schema `0018_credit_checkout_reservation`
   blijven de releasegrenzen. Het manifest voert geen operatoractivatie uit.
 
-Dit is de gereviewde releasekandidaat; het bewijst nog geen deployment of
-daadwerkelijke Messenger-testbetaling.
+- [Release-PR #564](https://github.com/Dj-Shortcut/leaderbot-facebook/pull/564)
+  is gemerged als `67c100665938355bb9c7610865e67d150861664c`; alle vereiste
+  PR- en exacte main-CI-controles zijn geslaagd. Lokaal slaagden 1.909
+  productiecontracttests.
+- De beschermde deployment slaagde op 2026-09-16 om 08:28 UTC. De onafhankelijke
+  settled-readback bevestigde `deploy-35073398659-1`: twee app- en twee
+  worker-Machines draaien het hierboven vastgelegde image.
+- De read-only operatoraudit bevestigde om 08:29 UTC workspace 1, Test Mode,
+  commerciële autorisatie en alle vier scheduler-lanes ingeschakeld op epoch 2.
+  Het oorspronkelijke verzoek `8a62f93d-e092-4dd8-82ca-9e77bdd89d54` en operatorrun
+  `34581138362/2` bleven behouden. Er was geen herstelmutatie nodig.
+- Op alle vier Machines zijn `MOLLIE_MODE=test`, legacy/live billing uit en de
+  vier gepensioneerde testerpins leeg. `/healthz` en `/readyz` slagen;
+  `/credits/checkout/return` antwoordt met HTTP 200. De tijdelijke auditbundle
+  is verwijderd en die verwijdering is teruggelezen.
+
+Dit bewijst de deployment en de betalingsrandvoorwaarden. Er is hiermee geen
+Messenger-commando namens de eigenaar verstuurd en geen echte Test-betaling,
+creditgrant of premiumaflevering aangetoond. Voer daarvoor de testronde hierboven uit.
