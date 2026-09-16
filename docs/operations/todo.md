@@ -6,7 +6,7 @@ or a dedicated incident record and should be summarized here only when they
 change an open gate.
 
 Last reviewed: **2026-09-16** (fresh Test checkout and one eight-credit grant
-verified; photo assistant active; paid image delivery repair pending).
+verified; photo assistant and paid-image repair deployed; old-output recovery pending).
 Last state reset: **2026-08-27**.
 
 ## Messenger bot and evaluator release gate
@@ -83,7 +83,7 @@ Behavior, costs, rollback and tests: [Photo conversation](photo-conversation.md)
   proofs, attestations and rollback capture passed.
   The protected build and deployment prove the installed runtime, not a completed
   Mollie payment or credit grant.
-- The next repair release retains `deploy-35108204745-1` / `7165f3bac38c`
+- The repair release retains `deploy-35108204745-1` / `7165f3bac38c`
   as its exact predecessor, including active photo context and the checkout
   repair. Its separate emergency rollback config disables checkout/paid
   admission and photo context while retaining financial recovery. The previous
@@ -91,9 +91,9 @@ Behavior, costs, rollback and tests: [Photo conversation](photo-conversation.md)
 - [x] Verify a fresh consented Test checkout and grant. The owner's checkout
   reached Mollie; the authoritative Test payment became paid at 13:52:57 UTC on
   2026-09-16. The webhook applied exactly one immutable eight-credit grant at
-  13:52:59 UTC. Scoped metadata at 14:20 UTC showed balance 8, reserved 2,
+  13:52:59 UTC. Scoped metadata after the repair at 15:15 UTC showed balance 8, reserved 2,
   available 6, and no generation debit.
-- [ ] Deploy and verify the paid-image delivery repair. Two outputs were saved,
+- [x] Deploy and verify the paid-image delivery repair. Two outputs were saved,
   but the production Redis-compatible interpreter rejected mutation of Lua
   `ARGV` after persisting delivery intent. Recovery then mistook a paid
   completion with an omitted JSON-null quota field for free-quota work.
@@ -104,13 +104,31 @@ Behavior, costs, rollback and tests: [Photo conversation](photo-conversation.md)
   native Redis alone does not reproduce this production behavior.
   The reviewed source `bd67c6f502cda26a16f2282fbe479afeb2a4fcbc` passed exact
   main CI and [trusted build 35110414178](https://github.com/Dj-Shortcut/leaderbot-facebook/actions/runs/35110414178).
-  The pending production candidate is
+  The deployed runtime is
   `sha256:a1f5a73069d1e7429d8b9373ec025a0bad9a3ee0d48aa76aebe391e3f4d4a22c`,
   with [provenance 47938967](https://github.com/Dj-Shortcut/leaderbot-facebook/attestations/47938967).
-  Manifest review, protected deployment and independent live readback remain open.
+  [Protected deployment 35113258520/1](https://github.com/Dj-Shortcut/leaderbot-facebook/actions/runs/35113258520)
+  passed from manifest revision `000c6a6855889c9d008c2f9e5134435f29efdc80`.
+  Independent readback at 15:15:26 UTC verified identity `deploy-35113258520-1`,
+  release 391 and the exact new image on both app and both worker machines.
+  All 13 runtime assertions passed, with no drift, photo context enabled,
+  unchanged payment flags and HTTP 200 health/readiness on both public hosts.
+  The retained release artifact confirms the exact prior identity/image/schema
+  and rollback-config hash `0e1d34112abbd08362361820ba585e89807ebbcce4a5a6700f1eaaa23f09714a`.
+  CodeRabbit approved source PR #571; its rate limit prevented a second review
+  of release PR #572, which passed independent review and all required CI.
+- [ ] In the next runtime release, register an emergency-dark config for
+  `a1f5a73069d1e7429d8b9373ec025a0bad9a3ee0d48aa76aebe391e3f4d4a22c`
+  when it enters `reviewedRollbackImages`. The current reviewed dark path uses
+  `7165f3bac38c` and disables paid admission and checkout while retaining
+  financial recovery; it also restores that runtime's completion defect.
+  Keeping the repaired runtime available in dark mode closes that recovery gap.
 - [ ] Resolve the two undelivered outputs and prove one receipt-backed debit
   per delivered premium image. Their completions remain stored, but dead-letter
   handling deleted the private job bodies; deployment does not replay them.
+  Scoped readback at 15:15:48 UTC confirmed both original reservations still
+  reserved/known-accepted, with no commit, release, Messenger message-ID hash or
+  delivery receipt. A successful deployment does not close this delivery gate.
   Prepare a reviewed completion-only recovery using the original request,
   recipient/privacy scope and Meta attempt fence, with no provider-generation
   fallback. Obtain approval for the concrete two-image recovery before sending;
