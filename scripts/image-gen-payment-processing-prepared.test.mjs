@@ -9,9 +9,9 @@ import {
 } from "./validate-production-deployment.mjs";
 
 /**
- * Desired Test exposure and the exact prepared predecessor are separate.
- * Preserve checkout-off/processing-on recovery while enabling only the desired
- * Test configuration; neither this test nor a merged config proves a rollout.
+ * Desired Test exposure and the exact settled predecessor are separate.
+ * Preserve their bounded Test exposure and checkout-off/processing-on emergency
+ * recovery; neither this test nor a merged config proves a rollout.
  */
 
 const rootDir = path.resolve(fileURLToPath(import.meta.url), "..", "..");
@@ -45,9 +45,14 @@ function readEnvAssignments(file) {
 describe.each([
   { stage: "desired bounded Test", config: app.config, exposure: "true" },
   {
-    stage: "settled payment predecessor",
+    stage: "settled scheduler guard predecessor",
     config: predecessorConfig,
     exposure: "true",
+  },
+  {
+    stage: "emergency dark rollback",
+    config: app.reviewedRollbackConfigs[predecessor.image].path,
+    exposure: "false",
   },
 ])("image-gen $stage payment processing", ({ config, exposure }) => {
   const env = readEnvAssignments(path.join(rootDir, config));
@@ -122,7 +127,7 @@ describe.each([
   });
 });
 
-it("binds the Test request and retains the exact settled payment predecessor", () => {
+it("binds the original Test request and retains the exact settled scheduler guard predecessor", () => {
   expect(app.creditTestActivation).toEqual({
     state: "bounded_test",
     obsoletePrincipalSha256:
@@ -140,11 +145,11 @@ it("binds the Test request and retains the exact settled payment predecessor", (
     },
   });
   expect(predecessor.image).toBe(
-    "registry.fly.io/leaderbot-fb-image-gen@sha256:4b211aa3d68a7599bd3f18f4d166b9223f442332ff02528a99daa180b7d9afbd",
+    "registry.fly.io/leaderbot-fb-image-gen@sha256:e0b82c21ceca12130a892afd01b90cf83fcb3b7a42a2721a9c424a76f1d6f1cf",
   );
-  expect(predecessor.identity).toBe("deploy-34969598237-1");
+  expect(predecessor.identity).toBe("deploy-35065616049-1");
   expect(app.reviewedRollbackConfigs[predecessor.image]).toEqual({
-    path: "deploy/production/rollback-configs/image-gen-4b211aa3d68a-emergency-dark.toml",
+    path: "deploy/production/rollback-configs/image-gen-e0b82c21ceca-emergency-dark.toml",
     sha256: "f0253b74e85b1cefc4e99d537eafa6dfd687167010834066353c2595c94a02db",
   });
 });
