@@ -1,9 +1,6 @@
 import type { BotFeature } from "../features";
 import type { BotTextContext } from "../../botContext";
-import {
-  CREDIT_BALANCE_ACTION,
-  isCreditBalanceCommand,
-} from "../../creditBalanceAction";
+import { isCreditBalanceCommand } from "../../creditBalanceAction";
 import { readPaidCreditBalance } from "../../billing/creditGenerationAdmission";
 import { getMessengerImageQuotaStatus } from "../../messengerImageQuotaStore";
 import {
@@ -95,7 +92,7 @@ async function sendCreditBalance(ctx: BotTextContext): Promise<void> {
     ctx.logger.warn("messenger_credit_balance_unavailable", {});
     text = unavailable;
   }
-  await ctx.sendActions(text, [CREDIT_BALANCE_ACTION]);
+  await ctx.sendText(text);
 }
 
 export const creditsFeature: BotFeature = {
