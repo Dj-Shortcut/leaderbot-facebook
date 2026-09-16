@@ -635,7 +635,9 @@ async function lockCreditProviderBoundary(
       )
     )
     .limit(1)
-    .for("update");
+    // Runtime may only SELECT wallets; mutations belong to guarded routines.
+    // A shared lock keeps erasure/refund changes out until this transaction ends.
+    .for("share");
   const intents = await tx
     .select()
     .from(billingIntents)

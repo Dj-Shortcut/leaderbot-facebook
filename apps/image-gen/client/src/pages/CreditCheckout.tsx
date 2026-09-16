@@ -23,13 +23,23 @@ type CheckoutState =
     }>
   | Readonly<{
       kind: "returned";
-      status: "processing" | "paid" | "failed" | "canceled" | "expired";
+      status:
+        | "processing"
+        | "paid"
+        | "failed"
+        | "canceled"
+        | "expired"
+        | "unconfirmed";
     }>
-  | Readonly<{ kind: "error" }>;
+  | Readonly<{
+      kind: "error";
+      stage: "link" | "confirmation" | "return_status";
+    }>;
 
 const INTENT_PATH_PATTERN =
   /^\/credits\/checkout\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/;
 const CAPABILITY_PATTERN = /^[A-Za-z0-9_-]{43}$/;
+const RETURN_STATUS_WAIT_MS = 30_000;
 
 async function readJson(response: Response): Promise<unknown> {
   const contentType = response.headers.get("content-type") ?? "";
@@ -86,10 +96,11 @@ async function readCheckoutSession(
   return parseCreditCheckoutOffer(payload.offer);
 }
 
-async function readReturnStatus(): Promise<CheckoutState> {
+async function readReturnStatus(signal: AbortSignal): Promise<CheckoutState> {
   const response = await fetch("/api/credits/checkout/return-status", {
     credentials: "include",
     headers: { Accept: "application/json" },
+    signal,
   });
   if (!response.ok) throw new Error("Checkout return is unavailable");
   const payload = (await readJson(response)) as { status?: unknown };
@@ -106,6 +117,25 @@ async function readReturnStatus(): Promise<CheckoutState> {
 }
 
 function ReturnMessage({ status }: { status: string }) {
+  if (status === "unconfirmed") {
+    return (
+      <>
+        <h1 className="text-3xl font-semibold text-slate-950">
+          De betaalstatus is nog niet bevestigd
+        </h1>
+        <p className="mt-4 text-slate-700">
+          We hebben nog geen definitieve betaalstatus. Controleer later opnieuw
+          of ga terug naar Messenger. Start voorlopig geen nieuwe betaalpoging.
+        </p>
+        <a
+          href="/credits/checkout/return"
+          className="mt-5 inline-flex font-medium text-blue-700 hover:underline"
+        >
+          Betaalstatus opnieuw controleren
+        </a>
+      </>
+    );
+  }
   if (status === "paid") {
     return (
       <>
@@ -126,8 +156,8 @@ function ReturnMessage({ status }: { status: string }) {
           We controleren je betaling
         </h1>
         <p className="mt-4 text-slate-700">
-          De terugkeerpagina is geen betaalbewijs. De credits verschijnen pas
-          nadat Mollie de betaling server-side heeft bevestigd.
+          We wachten op de betaalbevestiging. Zodra je betaling bevestigd is,
+          worden je credits toegevoegd.
         </p>
       </>
     );
@@ -150,20 +180,34 @@ export default function CreditCheckout() {
 
   useEffect(() => {
     let active = true;
+    const statusController = new AbortController();
+    let statusTimeout: number | undefined;
     const load = async () => {
       try {
         if (window.location.pathname === "/credits/checkout/return") {
-          while (active) {
-            const returned = await readReturnStatus();
-            if (!active) return;
-            setState(returned);
-            if (
-              returned.kind !== "returned" ||
-              returned.status !== "processing"
-            ) {
-              return;
+          statusTimeout = window.setTimeout(() => {
+            if (active) {
+              setState({ kind: "returned", status: "unconfirmed" });
+              statusController.abort();
             }
-            await new Promise(resolve => window.setTimeout(resolve, 2_000));
+          }, RETURN_STATUS_WAIT_MS);
+          try {
+            while (active && !statusController.signal.aborted) {
+              const returned = await readReturnStatus(statusController.signal);
+              if (!active || statusController.signal.aborted) return;
+              setState(returned);
+              if (
+                returned.kind !== "returned" ||
+                returned.status !== "processing"
+              ) {
+                return;
+              }
+              await new Promise(resolve => window.setTimeout(resolve, 2_000));
+            }
+          } catch (error) {
+            if (!statusController.signal.aborted) throw error;
+          } finally {
+            window.clearTimeout(statusTimeout);
           }
           return;
         }
@@ -186,12 +230,22 @@ export default function CreditCheckout() {
         }
         if (active) setState({ kind: "ready", intentId: match[1], offer });
       } catch {
-        if (active) setState({ kind: "error" });
+        if (active) {
+          setState({
+            kind: "error",
+            stage:
+              window.location.pathname === "/credits/checkout/return"
+                ? "return_status"
+                : "link",
+          });
+        }
       }
     };
     void load();
     return () => {
       active = false;
+      window.clearTimeout(statusTimeout);
+      statusController.abort();
     };
   }, []);
 
@@ -211,7 +265,7 @@ export default function CreditCheckout() {
       const payload = (await readJson(response)) as { checkoutUrl?: unknown };
       window.location.assign(parseHostedCheckoutUrl(payload.checkoutUrl));
     } catch {
-      setState({ kind: "error" });
+      setState({ kind: "error", stage: "confirmation" });
     }
   };
 
@@ -304,12 +358,23 @@ export default function CreditCheckout() {
         {state.kind === "error" ? (
           <>
             <h1 className="text-3xl font-semibold text-slate-950">
-              Deze betaallink kan niet worden gebruikt
+              {state.stage === "confirmation"
+                ? "Mollie kon niet worden geopend"
+                : state.stage === "return_status"
+                  ? "De betaalstatus kon niet worden opgehaald"
+                  : "De betaallink kon niet worden geopend"}
             </h1>
             <p className="mt-4 text-slate-700">
-              Er is niets aangerekend. Ga terug naar Messenger en vraag daar een
-              nieuwe link.
+              {state.stage === "link"
+                ? "Ga terug naar Messenger. Heb je al een betaling gestart? Controleer eerst de betaalstatus voordat je een nieuwe poging doet."
+                : "We kunnen nog niet bevestigen of je betaling is verwerkt. Controleer eerst de betaalstatus voordat je een nieuwe betaalpoging doet."}
             </p>
+            <a
+              href="/credits/checkout/return"
+              className="mt-5 inline-flex font-medium text-blue-700 hover:underline"
+            >
+              Controleer betaalstatus
+            </a>
           </>
         ) : null}
 
