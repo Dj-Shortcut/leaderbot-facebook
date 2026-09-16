@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import { createHash } from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -45,7 +46,7 @@ function readEnvAssignments(file) {
 describe.each([
   { stage: "desired bounded Test", config: app.config, exposure: "true" },
   {
-    stage: "settled scheduler guard predecessor",
+    stage: "settled photo-enabled predecessor",
     config: predecessorConfig,
     exposure: "true",
   },
@@ -127,7 +128,7 @@ describe.each([
   });
 });
 
-it("binds the original Test request and retains the exact settled scheduler guard predecessor", () => {
+it("binds the original Test request and retains the exact photo-enabled predecessor", () => {
   expect(app.creditTestActivation).toEqual({
     state: "bounded_test",
     obsoletePrincipalSha256:
@@ -144,12 +145,91 @@ it("binds the original Test request and retains the exact settled scheduler guar
       deploymentIdentity: "deploy-34496956631-1",
     },
   });
-  expect(predecessor.image).toBe(
-    "registry.fly.io/leaderbot-fb-image-gen@sha256:e0b82c21ceca12130a892afd01b90cf83fcb3b7a42a2721a9c424a76f1d6f1cf",
-  );
-  expect(predecessor.identity).toBe("deploy-35065616049-1");
+  expect(predecessor).toEqual({
+    image:
+      "registry.fly.io/leaderbot-fb-image-gen@sha256:7165f3bac38c168f3b5d85e3153f7371388eeef7b5477c06f8eff63d9602cb8d",
+    identity: "deploy-35108204745-1",
+    path: "deploy/production/rollback-configs/image-gen-7165f3bac38c-deploy-35108204745-1.toml",
+    sha256: "0e1d34112abbd08362361820ba585e89807ebbcce4a5a6700f1eaaa23f09714a",
+  });
   expect(app.reviewedRollbackConfigs[predecessor.image]).toEqual({
-    path: "deploy/production/rollback-configs/image-gen-e0b82c21ceca-emergency-dark.toml",
+    path: "deploy/production/rollback-configs/image-gen-7165f3bac38c-emergency-dark.toml",
     sha256: "f0253b74e85b1cefc4e99d537eafa6dfd687167010834066353c2595c94a02db",
   });
+});
+
+it("keeps photo conversations enabled for the release and exact settled recovery", () => {
+  const desired = readEnvAssignments(path.join(rootDir, app.config));
+  const settled = readEnvAssignments(path.join(rootDir, predecessorConfig));
+  const dark = readEnvAssignments(
+    path.join(rootDir, app.reviewedRollbackConfigs[predecessor.image].path),
+  );
+  expect(desired.MESSENGER_PHOTO_CONVERSATION_ENABLED).toBe("true");
+  expect(settled.MESSENGER_PHOTO_CONVERSATION_ENABLED).toBe("true");
+  expect(desired).toEqual(settled);
+  const darkExpected = {
+    ...settled,
+    MESSENGER_PAID_CREDITS_ENABLED: "false",
+    MOLLIE_CREDIT_CHECKOUT_ENABLED: "false",
+  };
+  delete darkExpected.MESSENGER_PHOTO_CONVERSATION_ENABLED;
+  expect(dark).toEqual(darkExpected);
+});
+
+it("preserves the exact historical photo-only activation independently of the current runtime", () => {
+  // Immutable activation records are explicit fixtures: a later runtime release
+  // must not turn this historical OFF -> ON regression into ON -> ON.
+  const fixture = {
+    desired: {
+      path: "deploy/production/rollback-configs/image-gen-7165f3bac38c-deploy-35108204745-1.toml",
+      sha256: "0e1d34112abbd08362361820ba585e89807ebbcce4a5a6700f1eaaa23f09714a",
+    },
+    settled: {
+      path: "deploy/production/rollback-configs/image-gen-7165f3bac38c-deploy-35103111862-1.toml",
+      sha256: "4311fd1f4a6075a16ee16f08d83aadf63447bbc439044eb256f2206a37c44d99",
+    },
+    dark: {
+      path: "deploy/production/rollback-configs/image-gen-7165f3bac38c-emergency-dark.toml",
+      sha256: "f0253b74e85b1cefc4e99d537eafa6dfd687167010834066353c2595c94a02db",
+    },
+  };
+  for (const config of Object.values(fixture)) {
+    expect(
+      createHash("sha256")
+        .update(fs.readFileSync(path.join(rootDir, config.path)))
+        .digest("hex"),
+    ).toBe(config.sha256);
+  }
+  const desiredPath = path.join(rootDir, fixture.desired.path);
+  const settledPath = path.join(rootDir, fixture.settled.path);
+  const desired = readEnvAssignments(desiredPath);
+  const settled = readEnvAssignments(settledPath);
+  const dark = readEnvAssignments(path.join(rootDir, fixture.dark.path));
+
+  expect(settled.MESSENGER_PHOTO_CONVERSATION_ENABLED).toBeUndefined();
+  expect(dark.MESSENGER_PHOTO_CONVERSATION_ENABLED).toBeUndefined();
+  expect(desired).toEqual({
+    ...settled,
+    MESSENGER_PHOTO_CONVERSATION_ENABLED: "true",
+  });
+  expect(dark).toEqual({
+    ...settled,
+    MESSENGER_PAID_CREDITS_ENABLED: "false",
+    MOLLIE_CREDIT_CHECKOUT_ENABLED: "false",
+  });
+
+  const unchangedConfigLines = (file) =>
+    fs
+      .readFileSync(file, "utf8")
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(
+        (line) =>
+          line &&
+          !line.startsWith("#") &&
+          !/^MESSENGER_PHOTO_CONVERSATION_ENABLED\s*=/.test(line),
+      );
+  expect(unchangedConfigLines(desiredPath)).toEqual(
+    unchangedConfigLines(settledPath),
+  );
 });

@@ -1594,6 +1594,15 @@ delete, or otherwise mutate any gateway Machine, secret, or volume. Those
 actions remain separate, reviewed retirement steps with their own rollback and
 retention evidence.
 
+Update (2026-09-16): all four gateway Machines are stopped, so this method no
+longer produces evidence. A stopped app receives nothing, which is quiescence,
+not proof that no caller remains. The window that started at
+`2026-08-30T17:44:08Z` is void, because the approved Machine stop recorded the
+same day cannot be placed before that start and a Machine mutation resets the
+clock. Do not start Machines again only to satisfy this section. Record the
+replacement retirement evidence chosen in `docs/operations/todo.md` instead.
+Keep this section for any gateway that is running again.
+
 The manifest contract has four stages:
 
 1. `awaiting_rehearsal` binds the observed legacy Machine/image/volume tuple,

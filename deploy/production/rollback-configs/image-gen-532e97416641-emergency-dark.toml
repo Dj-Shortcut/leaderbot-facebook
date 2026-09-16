@@ -46,12 +46,10 @@ kill_timeout = 300
   MESSENGER_GENERATION_QUEUE_WRITE_VERSION = "v1"
   MESSENGER_IMAGE_QUOTA_TIME_ZONE = "Europe/Brussels"
   MESSENGER_USER_DAILY_SPEND_CAP_USD = "2.00"
-  # Contextual text/vision decisions retain the existing consent and spend gates.
-  MESSENGER_PHOTO_CONVERSATION_ENABLED = "true"
   # Desired bounded Test exposure: deploy only after the protected operator
   # enables processing and the protected rollout verifies fresh database proof.
-  MESSENGER_PAID_CREDITS_ENABLED = "true"
-  MOLLIE_CREDIT_CHECKOUT_ENABLED = "true"
+  MESSENGER_PAID_CREDITS_ENABLED = "false"
+  MOLLIE_CREDIT_CHECKOUT_ENABLED = "false"
   MOLLIE_CREDIT_WORKSPACE_ID = "1"
   # Conservative spend reservation for one paid medium image. This is not
   # booked as the provider's actual invoice cost and must be re-reviewed when

@@ -1,10 +1,16 @@
 # Contextual photo conversation
 
-Status: implemented behind `MESSENGER_PHOTO_CONVERSATION_ENABLED=true`. The
-pinned model passed the bounded real-model evaluation and independent semantic
-review on 2026-09-16. Protected activation/readback and a consented Messenger smoke
-remain open; this feature has not been deployed. The normal rollback value is
-`false`. See [evaluation evidence](photo-conversation-evaluation-2026-09-16.md).
+Status: active through the authorized protected
+[deployment 35108204745/1](https://github.com/Dj-Shortcut/leaderbot-facebook/actions/runs/35108204745).
+Independent readback on 2026-09-16 at 14:30:27 UTC verified
+`MESSENGER_PHOTO_CONVERSATION_ENABLED=true` on all four machines, with no secret
+override, exact release identity, healthy endpoints and unchanged payment flags.
+The pinned model passed bounded real-model evaluation and independent semantic
+review. A consented Messenger smoke remains open, including the separate
+paid-image delivery repair tracked in the production backlog.
+Feature-disable rollback uses `false`; an exact predecessor restore retains
+the predecessor's reviewed flag value.
+See [evaluation evidence](photo-conversation-evaluation-2026-09-16.md).
 This adds a photo assistant to the direct Messenger runtime. It does not restore
 OpenClaw or change Mollie, wallet, image quality, or owner test mode.
 
@@ -177,8 +183,11 @@ universal conversational correctness.
 
 Both bounded synthetic suites and their independent semantic review passed on
 2026-09-16; see [the evidence record](photo-conversation-evaluation-2026-09-16.md).
-Protected activation and a consented Messenger smoke are still required. Use the
-protected immutable build/manifest/deployment workflow. Verify the flag,
+Protected activation and independent runtime readback passed in deployment
+`35108204745/1`; a consented Messenger smoke is still required. Subsequent changes
+use the protected immutable build/manifest/deployment workflow. Verify the flag,
 health, readiness and exact release identity independently. Leave Mollie Test
-Mode and the existing commercial authorization epoch unchanged. Roll back through
-the reviewed deployment path with the flag disabled; do not change financial rows.
+Mode and the existing commercial authorization epoch unchanged. For feature-disable
+rollback, use the reviewed deployment path with the flag disabled. An exact
+predecessor restore keeps that predecessor's reviewed configuration; neither
+operation changes financial rows.

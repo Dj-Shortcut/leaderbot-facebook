@@ -519,6 +519,72 @@ export type DeliveredPaidCreditGenerationRecoveryInput =
     }>;
 
 /**
+ * Verifies the original paid hold before replaying an already generated image.
+ * This read-only check never admits provider work or creates another hold.
+ * A committed hold may reconcile confirmed delivery, but cannot resend output.
+ */
+export async function assertPaidCreditGenerationRecovery(
+  input: DeliveredPaidCreditGenerationRecoveryInput &
+    Readonly<{ deliveryAlreadyConfirmed: boolean }>,
+  dependencies: CreditGenerationAdmissionDependencies = defaultDependencies
+): Promise<void> {
+  assertInput(input);
+  if (input.mode !== "test" && input.mode !== "live") fail();
+  if (!input.deliveryAlreadyConfirmed) {
+    if (!dependencies.enabled()) fail();
+    const config = dependencies.config();
+    if (
+      config.mode !== input.mode ||
+      !isCreditCheckoutMessengerScopeAllowed(config, input)
+    ) {
+      fail();
+    }
+  }
+  const subjectScope = messengerScope(input);
+  const persistedIdentity = await dependencies.readWalletIdentity(subjectScope);
+  if (!persistedIdentity) fail();
+  const derived = dependencies.withKeyring(keys =>
+    withSelectedCreditCheckoutHmacKey({
+      keys,
+      scope: subjectScope,
+      persistedIdentity,
+      callback: ({ key, identity }) => {
+        const scope = walletScope(subjectScope, identity);
+        return Object.freeze({
+          scope,
+          material: deriveReservationMaterial(
+            key.secret,
+            scope,
+            input.requestId
+          ),
+        });
+      },
+    })
+  );
+  if (
+    !input.deliveryAlreadyConfirmed &&
+    !(await dependencies.readWallet(derived.scope))
+  ) {
+    fail();
+  }
+  const existing = await dependencies.readReservation({
+    scope: derived.scope,
+    reservationId: derived.material.reservationId,
+    generationRequestKeyHash: derived.material.generationRequestKeyHash,
+    ownerTokenHash: derived.material.ownerTokenHash,
+    reservedCreditCount: 1,
+  });
+  if (
+    !existing ||
+    existing.transportState !== "known_accepted" ||
+    (existing.status !== "reserved" &&
+      !(input.deliveryAlreadyConfirmed && existing.status === "committed"))
+  ) {
+    fail();
+  }
+}
+
+/**
  * Commits an existing paid hold only after its caller has re-read exact,
  * durable completion evidence with deliveryStatus="delivered". This function
  * reconstructs the original wallet/reservation binding and cannot reserve or

@@ -10,6 +10,27 @@ import {
 } from "vitest";
 
 const enabled = process.env.RUN_REDIS_INTEGRATION === "1";
+// Model the production compatibility runtime while executing real Redis Lua:
+// arguments are immutable and JSON null fields disappear on decode/re-encode.
+const READONLY_ARGUMENTS_NULL_DROPPING_PREFIX = `
+local originalArgs = ARGV
+local ARGV = setmetatable({}, {
+  __index = originalArgs,
+  __newindex = function() error('Attempt to modify a readonly table') end
+})
+local originalCjson = cjson
+local function dropNulls(value)
+  if value == originalCjson.null then return nil end
+  if type(value) == 'table' then
+    for key, child in pairs(value) do value[key] = dropNulls(child) end
+  end
+  return value
+end
+local cjson = {
+  decode = function(value) return dropNulls(originalCjson.decode(value)) end,
+  encode = originalCjson.encode
+}
+`;
 const { storageDeleteMock } = vi.hoisted(() => ({
   storageDeleteMock: vi.fn(async () => undefined),
 }));
@@ -415,6 +436,186 @@ describe.skipIf(!enabled)("messenger completion Redis CAS", () => {
       getMessengerGenerationCompletion(reqId, scope)
     ).resolves.toMatchObject({ deliveryStatus: "delivered" });
   });
+
+  it.each(["native", "readonly_arguments_null_dropping"] as const)(
+    "retains paid completion state, indexes, and original expiry across all writes with %s Lua",
+    async runtime => {
+      const scope = {
+        ...fence("a"),
+        userKey: createHash("sha256")
+          .update(`redis-runtime-compatibility-${runtime}-${run}`)
+          .digest("hex"),
+      };
+      const reqId = `req-runtime-compatibility-${runtime}-${run}`;
+      const objectKey = buildMessengerStorageObjectKey({
+        kind: "generated_image",
+        scope,
+        fileName: "1787461200230-123e4567-e89b-42d3-a456-426614174230.png",
+      });
+      const imageUrl = `https://assets.example/${objectKey}`;
+      const redis = await getRedisClient();
+      const evaluate = redis.eval.bind(redis);
+      let captured:
+        | { script: string; keyCount: number; args: Array<string | number> }
+        | undefined;
+      const spy = vi
+        .spyOn(redis, "eval")
+        .mockImplementation(async (script, keyCount, ...args) => {
+          if (keyCount === 5 && args[keyCount + 3] === "create") {
+            captured = { script, keyCount, args };
+          }
+          return evaluate(script, keyCount, ...args);
+        });
+      try {
+        await markMessengerGenerationCompleted(
+          reqId,
+          imageUrl,
+          scope.userKey,
+          Date.now(),
+          scope,
+          "paid_credit_delivery_v1",
+          null,
+          "test"
+        );
+      } finally {
+        spy.mockRestore();
+      }
+      if (!captured) throw new Error("Completion create script was not used");
+      const { script, keyCount, args } = captured;
+      const prefix =
+        runtime === "native" ? "" : READONLY_ARGUMENTS_NULL_DROPPING_PREFIX;
+      const initial = JSON.parse(String(args[keyCount]));
+      const originalExpiry = initial.expiresAt;
+      const messageIdHash = "a".repeat(64);
+      const cases = [
+        { mode: "create", before: "pending", after: "pending" },
+        { mode: "deliver", before: "pending", after: "delivered" },
+        {
+          mode: "delivery_start",
+          before: "pending",
+          after: "transport_started",
+        },
+        {
+          mode: "delivery_accept",
+          before: "transport_started",
+          after: "receipt_pending",
+        },
+        {
+          mode: "receipt_confirm",
+          before: "receipt_pending",
+          after: "delivered",
+        },
+        {
+          mode: "delivery_retry",
+          before: "transport_started",
+          after: "pending",
+        },
+        { mode: "quota", before: "pending", after: "pending" },
+        { mode: "notice", before: "pending", after: "pending" },
+      ];
+      try {
+        for (const testCase of cases) {
+          const keys = args
+            .slice(0, keyCount)
+            .map(key => `${key}:compatibility:${testCase.mode}`);
+          const values = [...args.slice(keyCount)];
+          values[0] = JSON.stringify({
+            ...initial,
+            deliveryStatus: testCase.before,
+            ...(testCase.before === "transport_started"
+              ? { deliveryStartedAt: initial.completedAt }
+              : {}),
+            ...(testCase.mode === "receipt_confirm"
+              ? { messengerMessageIdHash: messageIdHash }
+              : {}),
+          });
+          try {
+            await expect(
+              evaluate(prefix + script, keyCount, ...keys, ...values)
+            ).resolves.toEqual(["stored"]);
+            if (testCase.mode !== "create") {
+              values[0] = JSON.stringify({
+                ...initial,
+                expiresAt: originalExpiry + 60_000,
+                deliveryStatus: testCase.after,
+                deliveryStartedAt: initial.completedAt + 1,
+                messengerAcceptedAt: initial.completedAt + 2,
+                messengerMessageIdHash: messageIdHash,
+                deliveredAt: initial.completedAt + 3,
+                deliveryProof: "meta_delivery_receipt_v1",
+                receiptConfirmedAt: initial.completedAt + 3,
+                quotaStatus: { dailyUsed: 1 },
+                quotaCommittedAt: initial.completedAt + 4,
+                successNoticeSentAt: initial.completedAt + 5,
+              });
+              values[2] = originalExpiry + 60_000;
+              values[3] = testCase.mode;
+              await expect(
+                evaluate(prefix + script, keyCount, ...keys, ...values)
+              ).resolves.toEqual(["stored"]);
+            }
+            const retained = JSON.parse((await redis.get(keys[0]))!);
+            expect(retained, testCase.mode).toMatchObject({
+              reqId,
+              imageUrl,
+              ...scope,
+              deliveryStatus: testCase.after,
+              quotaAccountingMode: "paid_credit_delivery_v1",
+              paidCreditMode: "test",
+              expiresAt: originalExpiry,
+            });
+            expect(Object.hasOwn(retained, "quotaIdentity")).toBe(
+              runtime === "native" || testCase.mode === "create"
+            );
+            if (testCase.mode === "delivery_start") {
+              expect(retained.deliveryStartedAt).toBe(initial.completedAt + 1);
+            } else if (testCase.mode === "delivery_accept") {
+              expect(retained).toMatchObject({
+                messengerAcceptedAt: initial.completedAt + 2,
+                messengerMessageIdHash: messageIdHash,
+              });
+            } else if (testCase.mode === "receipt_confirm") {
+              expect(retained).toMatchObject({
+                deliveryProof: "meta_delivery_receipt_v1",
+                receiptConfirmedAt: initial.completedAt + 3,
+              });
+            } else if (testCase.mode === "delivery_retry") {
+              expect(retained).not.toHaveProperty("deliveryStartedAt");
+            } else if (testCase.mode === "quota") {
+              expect(retained).toMatchObject({
+                quotaStatus: { dailyUsed: 1 },
+                quotaCommittedAt: initial.completedAt + 4,
+              });
+            } else if (testCase.mode === "notice") {
+              expect(retained).toMatchObject({
+                successNoticeStatus: "sent",
+                successNoticeSentAt: initial.completedAt + 5,
+              });
+            }
+            await expect(redis.smembers(keys[1])).resolves.toEqual([keys[0]]);
+            await expect(redis.smembers(keys[3])).resolves.toEqual([objectKey]);
+            await expect(redis.smembers(keys[4])).resolves.toEqual([
+              String(scope.privacyEpoch),
+            ]);
+            for (const key of [keys[0], keys[1]]) {
+              await expect(
+                evaluate("return redis.call('pexpiretime', KEYS[1])", 1, key)
+              ).resolves.toBe(originalExpiry);
+            }
+            for (const key of [keys[3], keys[4]]) {
+              await expect(
+                evaluate("return redis.call('pexpiretime', KEYS[1])", 1, key)
+              ).resolves.toBe(Number(args[keyCount + 5]));
+            }
+          } finally {
+            await Promise.all(keys.map(key => redis.del(key)));
+          }
+        }
+      } finally {
+        await deleteMessengerGenerationCompletionsForUser(scope.userKey, scope);
+      }
+    }
+  );
 
   it("atomically consumes a receipt-first MID and rejects a duplicate exact-scope claim", async () => {
     const scope = receiptRaceFence;
