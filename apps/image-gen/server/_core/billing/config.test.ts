@@ -271,6 +271,44 @@ describe("Mollie configuration", () => {
     ).toThrow("MESSENGER_GLOBAL_DAILY_SPEND_CAP_USD is missing");
   });
 
+  it.each(["preflight", "drain"])(
+    "accepts the checked-in production spend policy during %s startup",
+    phase => {
+      if (phase === "preflight") useValidOfflinePreflightConfig();
+      else useValidSafetyDrainConfig();
+      const flyConfig = readFileSync(
+        new URL("../../../fly.toml", import.meta.url),
+        "utf8"
+      );
+      for (const name of [
+        "MESSENGER_GLOBAL_DAILY_SPEND_CAP_USD",
+        "MESSENGER_GLOBAL_MONTHLY_SPEND_CAP_USD",
+        "MESSENGER_USER_DAILY_SPEND_CAP_USD",
+      ]) {
+        const match = flyConfig.match(new RegExp(`^\\s*${name} = "([^"]+)"`, "m"));
+        expect(match).not.toBeNull();
+        process.env[name] = match![1];
+      }
+      expect(() =>
+        assertMollieNonSecretLaunchConfig({
+          requireOperationalFlags: phase !== "preflight",
+        })
+      ).not.toThrow();
+    }
+  );
+
+  it.each([
+    "MESSENGER_GLOBAL_DAILY_SPEND_CAP_USD",
+    "MESSENGER_GLOBAL_MONTHLY_SPEND_CAP_USD",
+    "MESSENGER_USER_DAILY_SPEND_CAP_USD",
+  ])("rejects invalid configured spend amounts for %s", name => {
+    useValidSafetyDrainConfig();
+    for (const value of ["-1", "NaN", "Infinity", "not-a-number", "", " "]) {
+      process.env[name] = value;
+      expect(() => assertMollieNonSecretLaunchConfig()).toThrow(name);
+    }
+  });
+
   it("rejects live mode before an offline preflight can run", () => {
     useValidOfflinePreflightConfig();
     process.env.MOLLIE_MODE = "live";

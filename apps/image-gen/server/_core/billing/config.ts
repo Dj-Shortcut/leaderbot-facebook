@@ -351,8 +351,10 @@ export function assertMollieNonSecretLaunchConfig(
     "MESSENGER_USER_DAILY_SPEND_CAP_USD",
   ] as const) {
     const value = Number(required(name));
-    if (!Number.isFinite(value) || value <= 0) {
-      throw new Error(`${name} must be a positive finite amount`);
+    // The owner manages provider budgets and can explicitly disable bot caps.
+    // Match generationGuard's zero-disabled policy without accepting bad input.
+    if (!Number.isFinite(value) || value < 0) {
+      throw new Error(`${name} must be a non-negative finite amount`);
     }
   }
 }
