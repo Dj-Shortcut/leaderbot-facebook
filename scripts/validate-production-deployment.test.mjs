@@ -272,6 +272,7 @@ function stageImageGenBridge(manifest, sourceCommit = "a".repeat(40)) {
   app.reviewedRollbackImageSchemaPhases = {
     [legacyImage]: ["0015_base"],
   };
+  app.reviewedArtifactRepositories = { [bridgeImage]: "Dj-Shortcut/leaderbot-facebook" };
   return { app, bridgeImage, legacyImage, sourceCommit };
 }
 
@@ -321,6 +322,9 @@ function stageImageGenReviewedRuntime(manifest, sourceCommit = "c".repeat(40)) {
     [predecessorImage]: ["0016_expand"],
   };
   app.databaseSchemaTransition.state = "runtime_reviewed";
+  app.reviewedArtifactRepositories = Object.fromEntries(
+    [runtimeImage, bridgeImage, predecessorImage].map((image) => [image, "Dj-Shortcut/leaderbot-facebook"]),
+  );
 
   return {
     app,
@@ -346,6 +350,7 @@ function stageStorageProxyRuntime(manifest, sourceCommit = "b".repeat(40)) {
   };
   app.reviewedRollbackSourceCommits = {};
   app.artifactTransition.state = "runtime_reviewed";
+  app.reviewedArtifactRepositories = { [runtimeImage]: "Dj-Shortcut/leaderbot-facebook" };
   return { app, legacyImage, runtimeImage, sourceCommit };
 }
 
@@ -3689,6 +3694,36 @@ describe("production deployment contract", () => {
 
     expect(() => validateProductionRepository(root)).toThrow(
       "must remove every private registry credential before deploy and upload",
+    );
+  });
+
+  it.each(["missing", "unrelated", "extra"])("rejects %s artifact repository binding", (mutation) => {
+    const root = createRepositoryFixture();
+    const manifestPath = path.join(root, "deploy/production/apps.json");
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+    const app = manifest.apps["image-gen"];
+    if (mutation === "missing") delete app.reviewedArtifactRepositories[app.reviewedImage];
+    if (mutation === "unrelated") app.reviewedArtifactRepositories[app.reviewedImage] = "attacker/leaderbot-facebook";
+    if (mutation === "extra") app.reviewedArtifactRepositories["unreviewed-image"] = "Dj-Shortcut/leaderbot-facebook";
+    fs.writeFileSync(manifestPath, JSON.stringify(manifest));
+    expect(() => validateProductionRepository(root)).toThrow("must pin the signing repository");
+  });
+
+  it.each([
+    ["image-gen", "REVIEWED_IMAGE"],
+    ["image-gen", "rollback_image"],
+    ["storage-proxy", "REVIEWED_IMAGE"],
+    ["storage-proxy", "rollback_image"],
+  ])("rejects omitted artifact identity verification for %s %s", (target, variable) => {
+    const root = createRepositoryFixture();
+    replaceFixtureText(
+      root,
+      ".github/workflows/deploy-production.yml",
+      `node scripts/verify-production-artifact-attestation.mjs ${target} "$${variable}"`,
+      "true",
+    );
+    expect(() => validateProductionRepository(root)).toThrow(
+      "must verify each exact desired and rollback artifact",
     );
   });
 

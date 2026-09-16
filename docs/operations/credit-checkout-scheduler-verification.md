@@ -93,3 +93,22 @@ This records release preparation, not deployment or a paid user journey.
 After protected rollout, a real Messenger Test payment and metadata-only
 webhook/grant readback are still required. The operator will arrange an eligible
 Messenger user; no tester registration or personal checkout link is needed.
+
+## Repository rename release gate (2026-09-16)
+
+Release PR #560 merged at `c81c21bfbd7c501b97aa6b3a23b749519cff5d05` after
+all required checks passed. Deployment
+[35062693238](https://github.com/Dj-Shortcut/leaderbot-facebook/actions/runs/35062693238)
+was canceled during validation when the intentional repository rename was
+detected. No product deployment or payment mutation occurred. All four Machines
+remained on `deploy-34969598237-1` / `sha256:4b211aa3d68a7599bd3f18f4d166b9223f442332ff02528a99daa180b7d9afbd`.
+
+The rename-aware audit was checked against production using the existing
+metadata-only readback: original activation provenance verified, commercial
+control and all four lanes enabled at epoch 2, and temporary bundle removal
+verified. Immutable request/fingerprint and Test-only flags were unchanged.
+The release gate now binds current API metadata to repository ID `1238456123`
+and retains each existing artifact's original signed repository name.
+
+Protected deployment and the actual Messenger Test payment-to-grant journey
+remain open until their separate evidence is recorded.

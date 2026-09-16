@@ -97,6 +97,13 @@
       "reviewedImage": "registry.fly.io/leaderbot-fb-image-gen@sha256:e0b82c21ceca12130a892afd01b90cf83fcb3b7a42a2721a9c424a76f1d6f1cf",
       "reviewedArtifactKind": "runtime",
       "reviewedSourceCommit": "f139c0c688369b605528975481eb2f0fa4626417",
+      "reviewedArtifactRepositories": {
+        "registry.fly.io/leaderbot-fb-image-gen@sha256:e0b82c21ceca12130a892afd01b90cf83fcb3b7a42a2721a9c424a76f1d6f1cf": "Dj-Shortcut/openclaw-facebook",
+        "registry.fly.io/leaderbot-fb-image-gen@sha256:4b211aa3d68a7599bd3f18f4d166b9223f442332ff02528a99daa180b7d9afbd": "Dj-Shortcut/openclaw-facebook",
+        "registry.fly.io/leaderbot-fb-image-gen@sha256:b1f3996faff2406eba3383465974895dc2dcbacd6432f5ab1591cb1e76be4bdf": "Dj-Shortcut/openclaw-facebook",
+        "registry.fly.io/leaderbot-fb-image-gen@sha256:c04c742f56de06cddb72907ca0bdc989200babd0ea7dcb73b318bf96a327b548": "Dj-Shortcut/openclaw-facebook",
+        "registry.fly.io/leaderbot-fb-image-gen@sha256:f2fa9d60e1fca02c09cb2764981a7134e908f2e33f127eb0e54e77030b4a7a4b": "Dj-Shortcut/openclaw-facebook"
+      },
       "reviewedSettledPredecessor": {
         "identity": "deploy-34969598237-1",
         "image": "registry.fly.io/leaderbot-fb-image-gen@sha256:4b211aa3d68a7599bd3f18f4d166b9223f442332ff02528a99daa180b7d9afbd",
@@ -222,6 +229,9 @@
       "reviewedImage": "registry.fly.io/leaderbot-storage-proxy@sha256:27dd75daaa30dac5a279fc097a57c14133efb419cbdbbd1fdefba26a21ffeace",
       "reviewedArtifactKind": "runtime",
       "reviewedSourceCommit": "cf099e654d289186416b00500cb8f975cbdd906b",
+      "reviewedArtifactRepositories": {
+        "registry.fly.io/leaderbot-storage-proxy@sha256:27dd75daaa30dac5a279fc097a57c14133efb419cbdbbd1fdefba26a21ffeace": "Dj-Shortcut/openclaw-facebook"
+      },
       "artifactTransition": {
         "state": "runtime_deployed",
         "legacyImage": "registry.fly.io/leaderbot-storage-proxy@sha256:334f78b92816a92e302a66c4d08742c28361a718b190227d3dbf7b933350cc28",

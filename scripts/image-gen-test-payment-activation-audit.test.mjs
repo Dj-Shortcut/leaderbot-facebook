@@ -75,7 +75,14 @@ function fixture() {
     run_attempt: 1,
     head_sha: operator.sourceSha,
     head_branch: "main",
-    head_repository: { full_name: "Dj-Shortcut/openclaw-facebook" },
+    head_repository: {
+      full_name: "Dj-Shortcut/leaderbot-facebook",
+      id: 1238456123,
+    },
+    repository: {
+      full_name: "Dj-Shortcut/leaderbot-facebook",
+      id: 1238456123,
+    },
     event: "workflow_dispatch",
     path: ".github/workflows/enable-image-gen-test-payments.yml",
     status: "completed",
@@ -135,8 +142,9 @@ describe("read-only committed Test payment activation proof", () => {
       expect(() => buildTestPaymentActivationAuditQuery(value)).toThrow();
     },
   );
-  it("proves enabled control, four lanes and the exact original mutation fingerprint", async () => {
+  it("reads the original activation through the renamed repository with its exact mutation fingerprint", async () => {
     const f = fixture();
+    const anchor = JSON.stringify(f.input.app.creditTestActivation.operator);
     const proof = await inspectCommittedTestPaymentActivation(
       f.session,
       f.input,
@@ -157,10 +165,13 @@ describe("read-only committed Test payment activation proof", () => {
     });
     expect(f.session.execute).toHaveBeenCalledTimes(2);
     expect(f.input.fetchImpl).toHaveBeenCalledWith(
-      "https://api.github.com/repos/Dj-Shortcut/openclaw-facebook/actions/runs/120/attempts/1",
+      "https://api.github.com/repos/Dj-Shortcut/leaderbot-facebook/actions/runs/120/attempts/1",
       expect.objectContaining({ redirect: "error" }),
     );
     expect(JSON.stringify(proof)).not.toContain("test-only");
+    expect(JSON.stringify(f.input.app.creditTestActivation.operator)).toBe(
+      anchor,
+    );
   });
   it("retains the original activation after desired and running frontend builds advance", async () => {
     const f = fixture();
@@ -517,6 +528,29 @@ describe("read-only committed Test payment activation proof", () => {
       inspectCommittedTestPaymentActivation(f.session, f.input),
     ).rejects.toThrow();
   });
+  describe.each(["head_repository", "repository"])(
+    "%s identity",
+    (field) => {
+      it.each([
+        { full_name: "Dj-Shortcut/leaderbot-facebook" },
+        { full_name: "Dj-Shortcut/leaderbot-facebook", id: 1238456124 },
+        { full_name: "Dj-Shortcut/leaderbot-facebook", id: "1238456123" },
+        { full_name: "Dj-Shortcut/openclaw-facebook", id: 1238456123 },
+        { full_name: "other/leaderbot-facebook", id: 1238456123 },
+        { full_name: "other/openclaw-facebook", id: 1238456123 },
+      ])(
+        "rejects foreign, recycled or mismatched historical repository metadata %j",
+        async (repository) => {
+          const f = fixture();
+          f.remoteRun[field] = repository;
+          await expect(
+            inspectCommittedTestPaymentActivation(f.session, f.input),
+          ).rejects.toThrow();
+          expect(f.session.execute).toHaveBeenCalledTimes(1);
+        },
+      );
+    },
+  );
   it("rejects disabled state during the GitHub lookup", async () => {
     const f = fixture();
     f.input.fetchImpl.mockImplementation(async () => {

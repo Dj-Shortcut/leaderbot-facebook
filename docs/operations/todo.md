@@ -131,8 +131,11 @@ Live payment enablement remains gated by the relevant P1 through P4 evidence.
         checkout journey. [Scheduler verification and release evidence](credit-checkout-scheduler-verification.md)
         records fresh matching enabled controls/lanes at epoch 2, the local
         second-user route-to-provider regression and trusted guard-runtime
-        build `35061070978`. Protected deployment and an actual Messenger
-        tester remain pending; no scheduler recovery mutation was needed.
+        build `35061070978`. Release PR #560 is merged. Deployment
+        `35062693238` was canceled before rollout because of the intentional
+        repository rename; the renamed-repository audit was verified read-only
+        at the same epoch 2. Deploy through the updated identity checks, then
+        complete the actual Messenger test; no scheduler repair was needed.
 
 - [ ] **P4 - Premium quality and Test Mode journey.** Bind the paid offer to a
       versioned premium provider policy and prove unit economics. In Mollie Test

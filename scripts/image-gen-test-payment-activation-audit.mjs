@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 
-const REPOSITORY = "Dj-Shortcut/openclaw-facebook";
+const REPOSITORY = "Dj-Shortcut/leaderbot-facebook";
+const REPOSITORY_ID = 1238456123;
 const WORKFLOW = ".github/workflows/enable-image-gen-test-payments.yml";
 const REASON = "protected workflow test payment preparation";
 const LANES = ["ai_finalization", "outbox", "profile_expiry", "reconciliation"];
@@ -262,6 +263,9 @@ export async function inspectCommittedTestPaymentActivation(
       run.head_sha !== original.sourceSha ||
       run.head_branch !== "main" ||
       run.head_repository?.full_name !== REPOSITORY ||
+      run.head_repository?.id !== REPOSITORY_ID ||
+      run.repository?.full_name !== REPOSITORY ||
+      run.repository?.id !== REPOSITORY_ID ||
       run.event !== "workflow_dispatch" ||
       run.path !== WORKFLOW ||
       run.status !== "completed" ||

@@ -32,12 +32,13 @@ const SOURCE = "a".repeat(40);
 const OLD = "b".repeat(64);
 const NOW = Date.parse("2026-09-10T12:00:00Z");
 const env = {
-  GITHUB_REPOSITORY: "Dj-Shortcut/openclaw-facebook",
+  GITHUB_REPOSITORY: "Dj-Shortcut/leaderbot-facebook",
+  GITHUB_REPOSITORY_ID: "1238456123",
   GITHUB_REF: "refs/heads/main",
   GITHUB_EVENT_NAME: "workflow_dispatch",
   GITHUB_SHA: SOURCE,
   GITHUB_WORKFLOW_REF:
-    "Dj-Shortcut/openclaw-facebook/.github/workflows/deploy-production.yml@refs/heads/main",
+    "Dj-Shortcut/leaderbot-facebook/.github/workflows/deploy-production.yml@refs/heads/main",
   GITHUB_RUN_ID: "123",
   GITHUB_RUN_ATTEMPT: "2",
   GITHUB_TOKEN: "test-github",
@@ -50,7 +51,8 @@ const remoteRun = {
   run_attempt: 2,
   head_sha: SOURCE,
   head_branch: "main",
-  head_repository: { full_name: env.GITHUB_REPOSITORY },
+  head_repository: { full_name: env.GITHUB_REPOSITORY, id: 1238456123 },
+  repository: { full_name: env.GITHUB_REPOSITORY, id: 1238456123 },
   event: "workflow_dispatch",
   path: ".github/workflows/deploy-production.yml",
   status: "in_progress",
@@ -638,9 +640,14 @@ describe("bounded credit Test activation", () => {
 describe("protected metadata proof", () => {
   it("binds the exact in-progress protected workflow attempt", async () => {
     expect(assertCreditTestRun(env).runAttempt).toBe("2");
+    const fetchImpl = fetchRun();
     await expect(
-      assertProtectedCreditTestRun(env, fetchRun()),
+      assertProtectedCreditTestRun(env, fetchImpl),
     ).resolves.toMatchObject({ sourceHead: SOURCE });
+    expect(fetchImpl).toHaveBeenCalledWith(
+      "https://api.github.com/repos/Dj-Shortcut/leaderbot-facebook/actions/runs/123/attempts/2",
+      expect.objectContaining({ redirect: "error" }),
+    );
   });
   it.each([
     { head_sha: "c".repeat(40) },
@@ -658,10 +665,52 @@ describe("protected metadata proof", () => {
     "GITHUB_REF",
     "GITHUB_WORKFLOW_REF",
     "GITHUB_REPOSITORY",
+    "GITHUB_REPOSITORY_ID",
     "GITHUB_RUN_ATTEMPT",
   ])("rejects invalid %s before API access", (key) => {
     expect(() => assertCreditTestRun({ ...env, [key]: "invalid" })).toThrow();
   });
+  it.each([
+    { GITHUB_REPOSITORY_ID: undefined },
+    { GITHUB_REPOSITORY_ID: "1238456124" },
+    { GITHUB_REPOSITORY: "Dj-Shortcut/openclaw-facebook" },
+    { GITHUB_REPOSITORY: "other/leaderbot-facebook" },
+    { GITHUB_REPOSITORY: "other/openclaw-facebook" },
+  ])(
+    "rejects renamed or recycled environment identity %j before API access",
+    async (change) => {
+      const candidate = { ...env, ...change };
+      candidate.GITHUB_WORKFLOW_REF = `${candidate.GITHUB_REPOSITORY}/.github/workflows/deploy-production.yml@refs/heads/main`;
+      const fetchImpl = fetchRun();
+      await expect(
+        assertProtectedCreditTestRun(candidate, fetchImpl),
+      ).rejects.toThrow();
+      expect(fetchImpl).not.toHaveBeenCalled();
+    },
+  );
+  describe.each(["head_repository", "repository"])(
+    "%s identity",
+    (field) => {
+      it.each([
+        { full_name: env.GITHUB_REPOSITORY },
+        { full_name: env.GITHUB_REPOSITORY, id: 1238456124 },
+        { full_name: env.GITHUB_REPOSITORY, id: "1238456123" },
+        { full_name: "Dj-Shortcut/openclaw-facebook", id: 1238456123 },
+        { full_name: "other/leaderbot-facebook", id: 1238456123 },
+        { full_name: "other/openclaw-facebook", id: 1238456123 },
+      ])(
+        "rejects foreign, recycled or mismatched repository metadata %j",
+        async (repository) => {
+          await expect(
+            assertProtectedCreditTestRun(
+              env,
+              fetchRun({ [field]: repository }),
+            ),
+          ).rejects.toThrow();
+        },
+      );
+    },
+  );
   it("only accepts a canonical hash in fixed read-only SQL", () => {
     expect(
       obsoletePrincipalProofQueries(OLD).every((q) => q.startsWith("SELECT ")),

@@ -449,13 +449,7 @@ jobs:
             --reviewed-schema-maximum image-gen "$REVIEWED_IMAGE")"
           fly auth docker
           docker pull "$REVIEWED_IMAGE"
-          signer="$GITHUB_REPOSITORY/.github/workflows/build-production-artifacts.yml"
-          gh attestation verify "oci://$REVIEWED_IMAGE" \
-            --repo "$GITHUB_REPOSITORY" \
-            --signer-workflow "$signer" \
-            --source-digest "$source_commit" \
-            --source-ref refs/heads/main \
-            --deny-self-hosted-runners
+          node scripts/verify-production-artifact-attestation.mjs image-gen "$REVIEWED_IMAGE" > /dev/null
           actual_source_commit="$(docker image inspect \
             --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' \
             "$REVIEWED_IMAGE")"
@@ -473,15 +467,8 @@ jobs:
           if [[ "$artifact_kind" = "migration-bridge" ]]; then
             expected_base="$(jq -er '.apps["image-gen"].databaseSchemaTransition.legacyBaseImage' deploy/production/apps.json)"
             predicate_type="$(jq -er '.apps["image-gen"].databaseSchemaTransition.bridgePredicateType' deploy/production/apps.json)"
-            actual_base="$(gh attestation verify "oci://$REVIEWED_IMAGE" \
-              --repo "$GITHUB_REPOSITORY" \
-              --signer-workflow "$signer" \
-              --source-digest "$source_commit" \
-              --source-ref refs/heads/main \
-              --predicate-type "$predicate_type" \
-              --deny-self-hosted-runners \
-              --format json \
-              --jq '.[0].verificationResult.statement.predicate.baseImage')"
+            actual_base="$(node scripts/verify-production-artifact-attestation.mjs image-gen "$REVIEWED_IMAGE" \
+              --predicate-type "$predicate_type" | jq -er '.[0].verificationResult.statement.predicate.baseImage')"
             test "$actual_base" = "$expected_base"
           fi
 
@@ -534,13 +521,7 @@ jobs:
             "$rollback_schema_phase"
           docker pull "$rollback_image"
           if [[ "$rollback_kind" != "legacy-bootstrap" ]]; then
-            signer="$GITHUB_REPOSITORY/.github/workflows/build-production-artifacts.yml"
-            gh attestation verify "oci://$rollback_image" \
-              --repo "$GITHUB_REPOSITORY" \
-              --signer-workflow "$signer" \
-              --source-digest "$rollback_source_commit" \
-              --source-ref refs/heads/main \
-              --deny-self-hosted-runners
+            node scripts/verify-production-artifact-attestation.mjs image-gen "$rollback_image" > /dev/null
             actual_rollback_source_commit="$(docker image inspect \
               --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' \
               "$rollback_image")"
@@ -560,15 +541,8 @@ jobs:
           if [[ "$rollback_kind" = "migration-bridge" ]]; then
             expected_base="$(jq -er '.apps["image-gen"].databaseSchemaTransition.legacyBaseImage' deploy/production/apps.json)"
             predicate_type="$(jq -er '.apps["image-gen"].databaseSchemaTransition.bridgePredicateType' deploy/production/apps.json)"
-            actual_base="$(gh attestation verify "oci://$rollback_image" \
-              --repo "$GITHUB_REPOSITORY" \
-              --signer-workflow "$signer" \
-              --source-digest "$rollback_source_commit" \
-              --source-ref refs/heads/main \
-              --predicate-type "$predicate_type" \
-              --deny-self-hosted-runners \
-              --format json \
-              --jq '.[0].verificationResult.statement.predicate.baseImage')"
+            actual_base="$(node scripts/verify-production-artifact-attestation.mjs image-gen "$rollback_image" \
+              --predicate-type "$predicate_type" | jq -er '.[0].verificationResult.statement.predicate.baseImage')"
             test "$actual_base" = "$expected_base"
           fi
           printf '%s\n' "$rollback_image" > "$RUNNER_TEMP/leaderbot-release/rollback-image.txt"
@@ -1156,12 +1130,7 @@ jobs:
             --reviewed-source-commit storage-proxy "$REVIEWED_IMAGE")"
           fly auth docker
           docker pull "$REVIEWED_IMAGE"
-          gh attestation verify "oci://$REVIEWED_IMAGE" \
-            --repo "$GITHUB_REPOSITORY" \
-            --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/build-production-artifacts.yml" \
-            --source-digest "$source_commit" \
-            --source-ref refs/heads/main \
-            --deny-self-hosted-runners
+          node scripts/verify-production-artifact-attestation.mjs storage-proxy "$REVIEWED_IMAGE" > /dev/null
           actual_source_commit="$(docker image inspect \
             --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' \
             "$REVIEWED_IMAGE")"
@@ -1197,12 +1166,7 @@ jobs:
           fi
           docker pull "$rollback_image"
           if [[ "$rollback_kind" != "legacy-bootstrap" ]]; then
-            gh attestation verify "oci://$rollback_image" \
-              --repo "$GITHUB_REPOSITORY" \
-              --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/build-production-artifacts.yml" \
-              --source-digest "$rollback_source_commit" \
-              --source-ref refs/heads/main \
-              --deny-self-hosted-runners
+            node scripts/verify-production-artifact-attestation.mjs storage-proxy "$rollback_image" > /dev/null
             actual_rollback_source_commit="$(docker image inspect \
               --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' \
               "$rollback_image")"

@@ -17,7 +17,8 @@ import { collectCreditTestSessionInventory } from "./credit-test-session-invento
 import { inspectCommittedTestPaymentActivation } from "./image-gen-test-payment-activation-audit.mjs";
 import { readCreditTestActivation } from "./validate-production-deployment.mjs";
 
-const REPOSITORY = "Dj-Shortcut/openclaw-facebook";
+const REPOSITORY = "Dj-Shortcut/leaderbot-facebook";
+const REPOSITORY_ID = 1238456123;
 const WORKFLOW = ".github/workflows/deploy-production.yml";
 const MAX_AGE_MS = 15 * 60_000;
 const sha = (value) =>
@@ -58,6 +59,7 @@ export function creditTestProofPublicErrorCode(error) {
 export function assertCreditTestRun(env) {
   if (
     env.GITHUB_REPOSITORY !== REPOSITORY ||
+    env.GITHUB_REPOSITORY_ID !== String(REPOSITORY_ID) ||
     env.GITHUB_REF !== "refs/heads/main" ||
     env.GITHUB_EVENT_NAME !== "workflow_dispatch" ||
     env.GITHUB_WORKFLOW_REF !== `${REPOSITORY}/${WORKFLOW}@refs/heads/main` ||
@@ -95,6 +97,9 @@ export async function assertProtectedCreditTestRun(env, fetchImpl = fetch) {
     body.head_sha !== run.sourceHead ||
     body.head_branch !== "main" ||
     body.head_repository?.full_name !== REPOSITORY ||
+    body.head_repository?.id !== REPOSITORY_ID ||
+    body.repository?.full_name !== REPOSITORY ||
+    body.repository?.id !== REPOSITORY_ID ||
     body.event !== "workflow_dispatch" ||
     body.path !== WORKFLOW ||
     body.status !== "in_progress" ||
