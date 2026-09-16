@@ -1340,10 +1340,10 @@ describe("production deployment contract", () => {
     expect(app.deploymentEnabled).toBe(true);
     expect(app.reviewedArtifactKind).toBe("runtime");
     expect(app.reviewedImage).toBe(
-      "registry.fly.io/leaderbot-fb-image-gen@sha256:bec463108c3c839e10d1b7c5c4dcd6318905ed6b26621f86b12560cca371c561",
+      "registry.fly.io/leaderbot-fb-image-gen@sha256:10a7607a671d564d3e56100a8e2a3d28936621f3ffd4788c0547ec32c866502a",
     );
     expect(app.reviewedSourceCommit).toBe(
-      "0d406cdc1df478776da6606fb475c112ed10d8b1",
+      "3512e522aacdc5643b1c2824aaa91181bb386fe9",
     );
     expect(app.reviewedImageSchemaPhases).toEqual([
       "0018_credit_checkout_reservation",

@@ -152,7 +152,12 @@ Behavior, costs, rollback and tests: [Photo conversation](photo-conversation.md)
   The startup validator now accepts explicit zero, retaining rejection of
   missing, negative and non-finite values; a regression loads the actual desired
   Fly spend settings into both billing startup paths. Rebuild and deploy this
-  repair before verifying the Credits action. The implementation
+  repair before verifying the Credits action. Source fix PR #577 merged at
+  `3512e522aacdc5643b1c2824aaa91181bb386fe9`; trusted build
+  [35131224373](https://github.com/Dj-Shortcut/leaderbot-facebook/actions/runs/35131224373)
+  produced repaired runtime `10a7607a671d...`, now pinned for deployment. Recovery
+  attempt 2 passed; all four predecessor Machines and both health endpoints were
+  verified healthy at 17:49 UTC. The implementation
   reads scoped free and available premium balances, including while an image is
   processing, without changing pending edit state or starting provider work.
   Photo menus add the pill at the Messenger rendering boundary; consent and
