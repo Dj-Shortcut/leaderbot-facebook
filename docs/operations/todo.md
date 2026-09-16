@@ -5,8 +5,8 @@ not an incident archive: completed deployment transcripts belong in Git history
 or a dedicated incident record and should be summarized here only when they
 change an open gate.
 
-Last reviewed: **2026-09-16** (owner customer-test switch deployed; actual
-Messenger payment/grant/delivery journey blocked at checkout confirmation).
+Last reviewed: **2026-09-16** (checkout repair deployed and runtime verified;
+fresh Messenger payment/grant/delivery proof and photo assistant activation pending).
 Last state reset: **2026-08-27**.
 
 ## Messenger bot and evaluator release gate
@@ -49,9 +49,10 @@ Only diagnostic metadata is retained; no transcript or photo collection.
   `gpt-5.4-mini-2026-03-17`, low reasoning: 20/20 action/source checks and independent
   semantic review passed on 2026-09-16. Earlier failures and the synthetic-only
   proof boundary are retained in [the evidence record](photo-conversation-evaluation-2026-09-16.md).
-- [ ] Complete protected release activation and independent readback of the exact
-  artifact, feature flag, health/readiness and rollback. Keep the flag off until
-  that reviewed release; the operator evaluation did not deploy the feature.
+- [ ] Activate the contextual photo assistant through a reviewed protected release
+  and independently verify its feature flag, health/readiness and rollback. Its
+  code is included in deployment `35103111862/1`, but
+  `MESSENGER_PHOTO_CONVERSATION_ENABLED` remains off; activation is still pending.
 - [ ] Complete a consented Messenger smoke for generated image + new upload,
   natural combination, criticism, corrective follow-up and ordinary conversation.
   Verify the rendered image, exact source selection, delivery and credit boundaries;
@@ -59,49 +60,30 @@ Only diagnostic metadata is retained; no transcript or photo collection.
 
 Behavior, costs, rollback and tests: [Photo conversation](photo-conversation.md).
 
-## Current Test Mode checkout blocker
+## Test Mode checkout repair and payment proof
 
-- [ ] Deploy and verify the repair for the reported confirmation failure: a freshly opened
-  link displayed the offer, but clicking **Testbetaling starten** showed a
-  generic unusable-link error. A bounded production metadata read observed one
-  claimed `created` Test intent and no payment/provider operation. A fresh
-  owner-approved attempt reproduced `ER_TABLEACCESS_DENIED_ERROR` (1142) at
-  the wallet's `SELECT ... FOR UPDATE` under the real runtime principal.
-  Wallet tables intentionally permit runtime reads and guarded-routine writes.
-  The fix uses `FOR SHARE` for payment-path wallet/ledger reads: concurrent
-  mutations still wait, and direct credit-table writes remain denied.
-- On both production app machines, the corrected claim completed all boundary
-  reads, operation insertion and intent update in a rollback-only probe. Both
-  probes confirmed unchanged persisted state and made no provider call. This
-  proves the claim repair under current grants, not deployment or paid delivery.
-- Safe route/payment-stage diagnostics and distinct link/confirmation/status
-  error screens accompany the fix. [PR #567](https://github.com/Dj-Shortcut/leaderbot-facebook/pull/567)
-  merged as `f2b168a53f6aa08b32949c3f298efcd3d9548204`; its main CI passed,
-  including the real restricted-principal MySQL regression and production
-  schema/container checks. The owner authorized deployment on 2026-09-16.
-- The pending release pins image
+- [x] Deploy the checkout confirmation repair from [PR #567](https://github.com/Dj-Shortcut/leaderbot-facebook/pull/567).
+  Payment-path wallet/ledger reads now use shared locks compatible with the
+  restricted runtime principal, while direct credit-table writes remain denied.
+  Safe diagnostics and distinct confirmation/status screens accompany the fix.
+- [x] Protected [deployment 35103111862/1](https://github.com/Dj-Shortcut/leaderbot-facebook/actions/runs/35103111862)
+  passed from release revision `8f6de571c14b3488140e0a53af50336f4318a51c`.
+  Independent readback at 13:43 UTC verified `deploy-35103111862-1`, Fly release
+  389, all four started machines (two app, two worker), and no drift on image
   `sha256:7165f3bac38c168f3b5d85e3153f7371388eeef7b5477c06f8eff63d9602cb8d`,
-  built from current main `2bebfabd7e005e7dcb87c9a46cf3611c2b2a3dee` by [35099339826](https://github.com/Dj-Shortcut/leaderbot-facebook/actions/runs/35099339826)
-  with [provenance 47913521](https://github.com/Dj-Shortcut/leaderbot-facebook/attestations/47913521).
-  The verified settled predecessor is `deploy-35073398659-1` / `532e97416641`.
-  Restoring its active config also restores the known checkout failure; the
-  separate emergency rollback config disables checkout/paid admission while
-  retaining financial recovery. Protected deployment and runtime readback are
-  still required; this build is not a completed payment test.
-- Local Chromium verification of the real React page, routes and headers with
-  synthetic dependencies proved automatic cookie storage, session reload and
-  the confirmation request. It does not prove Messenger WebView behavior or
-  the production database/provider flow.
-- Local MySQL regression uses a temporary SELECT-only wallet account and the
-  real checkout claim. It proves that the old update lock and direct wallet
-  writes are denied, while the shared lock permits checkout and blocks a
-  concurrent wallet mutation until commit. The disposable fixture matches the
-  current 0018 schema contract; local case-insensitive table naming prevents
-  production engine-preflight equivalence. CI retains the unmodified engine
-  contract and runs this regression in its existing MySQL suite.
-- [ ] After deployment, use a fresh consented Test checkout to prove Mollie
-  opens, authoritative paid status, exactly one grant of 8 credits,
-  and usable premium image delivery. Green code checks alone do not close this.
+  runtime source `2bebfabd7e005e7dcb87c9a46cf3611c2b2a3dee`.
+  Both public hostnames returned HTTP 200 for health/readiness; bounded Test
+  proofs, attestations and rollback capture passed.
+  The protected build and deployment prove the installed runtime, not a completed
+  Mollie payment or credit grant.
+- The retained predecessor is `deploy-35073398659-1` / `532e97416641`.
+  Restoring its active config restores the known checkout failure; its separate
+  emergency rollback config disables checkout/paid admission while retaining
+  financial recovery.
+- [ ] Complete a fresh consented Test checkout: Mollie opens, authoritative paid
+  status is verified, exactly one grant of 8 credits appears, and a premium image
+  is delivered using those credits. Green deployment and code checks do not
+  close this end-to-end gate.
 - [ ] Before live billing, repair and verify remaining restricted-runtime
   authority gaps outside the ordinary paid checkout: reconnect and reservation
   operator reads in `server/db.ts` and `creditReservationOperatorResolution.ts`

@@ -1,10 +1,11 @@
 # Contextual photo conversation
 
-Status: implemented behind `MESSENGER_PHOTO_CONVERSATION_ENABLED=true`. The
-pinned model passed the bounded real-model evaluation and independent semantic
-review on 2026-09-16. Protected activation/readback and a consented Messenger smoke
-remain open; this feature has not been deployed. The normal rollback value is
-`false`. See [evaluation evidence](photo-conversation-evaluation-2026-09-16.md).
+Status: code included in [deployment 35103111862/1](https://github.com/Dj-Shortcut/leaderbot-facebook/actions/runs/35103111862),
+with `MESSENGER_PHOTO_CONVERSATION_ENABLED` still off. The pinned model passed the
+bounded real-model evaluation and independent semantic review on 2026-09-16.
+Protected activation/readback and a consented Messenger smoke remain open.
+The normal rollback value is `false`.
+See [evaluation evidence](photo-conversation-evaluation-2026-09-16.md).
 This adds a photo assistant to the direct Messenger runtime. It does not restore
 OpenClaw or change Mollie, wallet, image quality, or owner test mode.
 
