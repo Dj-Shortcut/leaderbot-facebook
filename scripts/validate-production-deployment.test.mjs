@@ -1321,6 +1321,8 @@ describe("production deployment contract", () => {
       "registry.fly.io/leaderbot-fb-image-gen@sha256:e0b82c21ceca12130a892afd01b90cf83fcb3b7a42a2721a9c424a76f1d6f1cf";
     const previousOwnerTestPredecessorImage =
       "registry.fly.io/leaderbot-fb-image-gen@sha256:532e974166413faf86917800bbd83831d031ee23c71542bb24d411c5f9e9ea93";
+    const settledPredecessorImage =
+      "registry.fly.io/leaderbot-fb-image-gen@sha256:a1f5a73069d1e7429d8b9373ec025a0bad9a3ee0d48aa76aebe391e3f4d4a22c";
     const predecessorImage =
       "registry.fly.io/leaderbot-fb-image-gen@sha256:7165f3bac38c168f3b5d85e3153f7371388eeef7b5477c06f8eff63d9602cb8d";
     const emergencyRollbackImage =
@@ -1338,10 +1340,10 @@ describe("production deployment contract", () => {
     expect(app.deploymentEnabled).toBe(true);
     expect(app.reviewedArtifactKind).toBe("runtime");
     expect(app.reviewedImage).toBe(
-      "registry.fly.io/leaderbot-fb-image-gen@sha256:a1f5a73069d1e7429d8b9373ec025a0bad9a3ee0d48aa76aebe391e3f4d4a22c",
+      "registry.fly.io/leaderbot-fb-image-gen@sha256:bec463108c3c839e10d1b7c5c4dcd6318905ed6b26621f86b12560cca371c561",
     );
     expect(app.reviewedSourceCommit).toBe(
-      "bd67c6f502cda26a16f2282fbe479afeb2a4fcbc",
+      "0d406cdc1df478776da6606fb475c112ed10d8b1",
     );
     expect(app.reviewedImageSchemaPhases).toEqual([
       "0018_credit_checkout_reservation",
@@ -1350,7 +1352,7 @@ describe("production deployment contract", () => {
       "972e89225a2d25540d6abfa7bb4e75303f6a94b2f80b4ec26152a95b9b44eeb9",
     );
     expect(app.reviewedRollbackImages).toEqual([
-      app.reviewedImage,
+      settledPredecessorImage,
       predecessorImage,
       previousOwnerTestPredecessorImage,
       previousSchedulerPredecessorImage,
@@ -1360,7 +1362,7 @@ describe("production deployment contract", () => {
       emergencyRollbackImage,
     ]);
     expect(app.reviewedRollbackArtifactKinds).toEqual({
-      [app.reviewedImage]: "runtime",
+      [settledPredecessorImage]: "runtime",
       [predecessorImage]: "runtime",
       [previousOwnerTestPredecessorImage]: "runtime",
       [previousSchedulerPredecessorImage]: "runtime",
@@ -1370,7 +1372,7 @@ describe("production deployment contract", () => {
       [emergencyRollbackImage]: "runtime",
     });
     expect(app.reviewedRollbackSourceCommits).toEqual({
-      [app.reviewedImage]: "bd67c6f502cda26a16f2282fbe479afeb2a4fcbc",
+      [settledPredecessorImage]: "bd67c6f502cda26a16f2282fbe479afeb2a4fcbc",
       [predecessorImage]: "2bebfabd7e005e7dcb87c9a46cf3611c2b2a3dee",
       [previousOwnerTestPredecessorImage]:
         "199a04e3def04a54b0f3cf6c0397da1184fa9694",
@@ -1383,7 +1385,7 @@ describe("production deployment contract", () => {
       [emergencyRollbackImage]: "b9caea7951b44d1f97bbd1bc742c25aca68264e9",
     });
     expect(app.reviewedRollbackImageSchemaPhases).toEqual({
-      [app.reviewedImage]: ["0018_credit_checkout_reservation"],
+      [settledPredecessorImage]: ["0018_credit_checkout_reservation"],
       [predecessorImage]: ["0018_credit_checkout_reservation"],
       [previousOwnerTestPredecessorImage]: ["0018_credit_checkout_reservation"],
       [previousSchedulerPredecessorImage]: ["0018_credit_checkout_reservation"],
@@ -1394,12 +1396,12 @@ describe("production deployment contract", () => {
     });
     expect(app.reviewedSettledPredecessor).toEqual({
       identity: "deploy-35113258520-1",
-      image: app.reviewedImage,
+      image: settledPredecessorImage,
       path: "deploy/production/rollback-configs/image-gen-a1f5a73069d1-deploy-35113258520-1.toml",
       sha256:
         "0e1d34112abbd08362361820ba585e89807ebbcce4a5a6700f1eaaa23f09714a",
     });
-    expect(app.reviewedRollbackConfigs[app.reviewedImage]).toEqual({
+    expect(app.reviewedRollbackConfigs[settledPredecessorImage]).toEqual({
       path: "deploy/production/rollback-configs/image-gen-a1f5a73069d1-emergency-dark.toml",
       sha256: "2b55bf77e2f30084da1c6d7e6a20afead565e7a57ff331cb7098f6b03b913c6b",
     });
@@ -1431,6 +1433,7 @@ describe("production deployment contract", () => {
     });
     expect(app.reviewedArtifactRepositories).toEqual({
       [app.reviewedImage]: "Dj-Shortcut/leaderbot-facebook",
+      [settledPredecessorImage]: "Dj-Shortcut/leaderbot-facebook",
       [predecessorImage]: "Dj-Shortcut/leaderbot-facebook",
       [previousOwnerTestPredecessorImage]: "Dj-Shortcut/leaderbot-facebook",
       [previousSchedulerPredecessorImage]: "Dj-Shortcut/openclaw-facebook",

@@ -94,10 +94,11 @@
       "sourceDeployEnabled": false,
       "sourceDeployBlockReason": "Production deploys require an immutable image built from reviewed source and recorded in this manifest before rollout.",
       "trustedBuilderWorkflow": ".github/workflows/build-production-artifacts.yml",
-      "reviewedImage": "registry.fly.io/leaderbot-fb-image-gen@sha256:a1f5a73069d1e7429d8b9373ec025a0bad9a3ee0d48aa76aebe391e3f4d4a22c",
+      "reviewedImage": "registry.fly.io/leaderbot-fb-image-gen@sha256:bec463108c3c839e10d1b7c5c4dcd6318905ed6b26621f86b12560cca371c561",
       "reviewedArtifactKind": "runtime",
-      "reviewedSourceCommit": "bd67c6f502cda26a16f2282fbe479afeb2a4fcbc",
+      "reviewedSourceCommit": "0d406cdc1df478776da6606fb475c112ed10d8b1",
       "reviewedArtifactRepositories": {
+        "registry.fly.io/leaderbot-fb-image-gen@sha256:bec463108c3c839e10d1b7c5c4dcd6318905ed6b26621f86b12560cca371c561": "Dj-Shortcut/leaderbot-facebook",
         "registry.fly.io/leaderbot-fb-image-gen@sha256:a1f5a73069d1e7429d8b9373ec025a0bad9a3ee0d48aa76aebe391e3f4d4a22c": "Dj-Shortcut/leaderbot-facebook",
         "registry.fly.io/leaderbot-fb-image-gen@sha256:7165f3bac38c168f3b5d85e3153f7371388eeef7b5477c06f8eff63d9602cb8d": "Dj-Shortcut/leaderbot-facebook",
         "registry.fly.io/leaderbot-fb-image-gen@sha256:532e974166413faf86917800bbd83831d031ee23c71542bb24d411c5f9e9ea93": "Dj-Shortcut/leaderbot-facebook",
