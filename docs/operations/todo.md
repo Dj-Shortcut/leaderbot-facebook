@@ -5,8 +5,8 @@ not an incident archive: completed deployment transcripts belong in Git history
 or a dedicated incident record and should be summarized here only when they
 change an open gate.
 
-Last reviewed: **2026-09-15** (combined Messenger release gates; existing
-product gates retain their recorded evidence).
+Last reviewed: **2026-09-16** (owner customer-test switch deployed; actual
+Messenger payment/grant/delivery journey remains open).
 Last state reset: **2026-08-27**.
 
 ## Messenger bot and evaluator release gate
@@ -16,8 +16,8 @@ simple evaluator. The combined runtime is deployed; user-journey verification
 and sampled-monitor coverage remain open.
 
 - [x] Protected [deployment 34969598237/1](https://github.com/Dj-Shortcut/openclaw-facebook/actions/runs/34969598237)
-  passed from `bbdfb77c978dae186dff9a6856b2f5d9ec1c94f6`. Production is independently
-  verified as `deploy-34969598237-1`, Fly release 386, with image
+  passed from `bbdfb77c978dae186dff9a6856b2f5d9ec1c94f6`. At that release,
+  production was independently verified as `deploy-34969598237-1`, Fly release 386, with image
   `registry.fly.io/leaderbot-fb-image-gen@sha256:4b211aa3d68a7599bd3f18f4d166b9223f442332ff02528a99daa180b7d9afbd`.
   Runtime source is `afb6c8cd48e7e795ee05eba0283d2ba165d15881`, built by
   [34960072965](https://github.com/Dj-Shortcut/openclaw-facebook/actions/runs/34960072965)
@@ -134,9 +134,13 @@ Live payment enablement remains gated by the relevant P1 through P4 evidence.
         Test-only flags, empty retired pins and passing health/readiness.
         [Release evidence](credit-checkout-scheduler-verification.md) retains
         exact source/digest, activation provenance and rollback boundaries.
-  - [ ] Deploy and verify the [owner customer-test switch](owner-customer-test-mode.md):
+  - [x] Deploy and verify the [owner customer-test switch](owner-customer-test-mode.md):
         `/testklant aan|uit|status` preserves admin rights while applying ordinary
-        quota/credit/budget admission in Test Mode. No manual balance changes.
+        quota/credit/budget admission in Test Mode. Protected deployment
+        [35073398659/1](https://github.com/Dj-Shortcut/leaderbot-facebook/actions/runs/35073398659)
+        and independent all-Machine, epoch-2 activation and health/readiness
+        checks passed. Test-only flags and empty retired pins remain verified.
+        No manual balance changes; the owner enables the switch in Messenger.
   - [ ] Complete the actual Messenger Test checkout journey with the owner in
         customer-test mode or another eligible user: fresh CTA, explicit
         confirmation, paid Test webhook, exactly one eight-credit grant and

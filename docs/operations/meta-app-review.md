@@ -29,19 +29,21 @@ mix it into the owner-bot review or subscription behavior.
 
 ## Current Messenger capabilities
 
-### Owner customer-test control (implementation; rollout pending)
+### Owner customer-test control (deployed; user journey pending)
 
 An existing Messenger administrator can use `/testklant aan|uit|status` after
 consent to test the ordinary quota/credit/budget path while retaining admin
 rights. This only changes metadata in that exact Page/user/privacy scope.
 It grants no credits and requires Mollie Test Mode when enabling. Ordinary
-users cannot operate it. No additional Meta permission is requested.
+users cannot operate it. No additional Meta permission is requested. Protected
+[deployment 35073398659/1](https://github.com/Dj-Shortcut/leaderbot-facebook/actions/runs/35073398659)
+and independent all-Machine/read-only activation checks passed on 2026-09-16.
 See [operator instructions](owner-customer-test-mode.md). The actual checkout,
 verified paid webhook, credit grant and delivered image remain a separate gate.
 
-### Bounded Test exposure — processing active, deployment pending
+### Bounded Test exposure — deployed, user journey pending
 
-The desired configuration enables the existing one-time credit flow in Mollie
+The deployed configuration enables the existing one-time credit flow in Mollie
 Test Mode for every eligible Messenger user, without a tester registry, personal
 approval or customer login. The offer remains EUR 4.99 for eight non-expiring
 medium-quality image credits. Consent, the user-initiated response window,
@@ -51,9 +53,10 @@ apply; no new Meta permission or customer portal is introduced.
 Protected operator run
 [34581138362/2](https://github.com/Dj-Shortcut/openclaw-facebook/actions/runs/34581138362/attempts/2)
 committed the initial Test processing activation at epoch 2 and verified cleanup.
-Actual Fly Machines still remain on the checkout-off predecessor until the
-separate protected deployment completes. The operator made no payment or grant.
-A merged configuration is not exposure or delivery evidence. The signed
+Independent readback after deployment `35073398659/1` confirmed all four Fly
+Machines on the reviewed runtime, Test-only flags, empty retired tester pins,
+and commercial/outbox authorization at the same epoch 2. The original operator
+activation was retained; this release made no payment or grant. The signed
 `app.leaderbot.live` browser handoff, explicit confirmation, trusted Test payment,
 exactly-once grant and delivered paid edit still require the demo evidence below.
 No successful end-to-end Test payment or live-money enablement is claimed.
