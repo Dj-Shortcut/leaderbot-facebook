@@ -128,10 +128,11 @@ Live payment enablement remains gated by the relevant P1 through P4 evidence.
       direct Mollie command has been removed. The production trigger remains
       the daily free-credit exhaustion path only.
   - [ ] Deploy the reservation outbox-epoch guard and complete the real Test
-        checkout journey. [2026-09-15 scheduler verification](credit-checkout-scheduler-verification.md)
-        records matching enabled production controls/lanes at epoch 2 and the
-        local second-user route-to-provider regression. No scheduler recovery
-        mutation was needed; real payment-to-delivery proof remains open.
+        checkout journey. [Scheduler verification and release evidence](credit-checkout-scheduler-verification.md)
+        records fresh matching enabled controls/lanes at epoch 2, the local
+        second-user route-to-provider regression and trusted guard-runtime
+        build `35061070978`. Protected deployment and an actual Messenger
+        tester remain pending; no scheduler recovery mutation was needed.
 
 - [ ] **P4 - Premium quality and Test Mode journey.** Bind the paid offer to a
       versioned premium provider policy and prove unit economics. In Mollie Test

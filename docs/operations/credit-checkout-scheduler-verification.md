@@ -68,3 +68,28 @@ The code change still needs deployment. These tests and the production
 scheduler readback do not prove a real Messenger checkout/payment or paid image
 delivery; the P3/P4 journey gates remain open in `todo.md`. Rollback of this
 change is a code revert with no schema/config or financial-data rollback.
+
+## Guard runtime release preparation (2026-09-16)
+
+Trusted build [35061070978](https://github.com/Dj-Shortcut/openclaw-facebook/actions/runs/35061070978)
+produced runtime `sha256:e0b82c21ceca12130a892afd01b90cf83fcb3b7a42a2721a9c424a76f1d6f1cf`
+from reviewed main `f139c0c688369b605528975481eb2f0fa4626417`, including the
+reservation guard and second-user route-to-provider regression from PR #555.
+The runtime remains on schema `0018_credit_checkout_reservation`.
+
+Fresh read-only inspection verified settled predecessor
+`deploy-34969598237-1` / `sha256:4b211aa3d68a7599bd3f18f4d166b9223f442332ff02528a99daa180b7d9afbd`.
+The manifest retains both its exact exposed restore configuration and a dark
+emergency rollback configuration. No runtime environment settings change.
+
+The existing audited activation readback again verified commercial control and
+all four scheduler lanes enabled at epoch 2, including outbox. It verified the
+original activation provenance, then removed and checked removal of the
+temporary audit bundle. All four running Machines retained Test Mode, closed
+legacy/live billing and empty retired tester pins. No scheduler repair was
+necessary; no payment, intent, wallet or provider-operation row was edited.
+
+This records release preparation, not deployment or a paid user journey.
+After protected rollout, a real Messenger Test payment and metadata-only
+webhook/grant readback are still required. The operator will arrange an eligible
+Messenger user; no tester registration or personal checkout link is needed.
