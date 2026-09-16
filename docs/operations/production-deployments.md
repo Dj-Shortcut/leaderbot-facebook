@@ -40,6 +40,29 @@ image-gen lockfile for the Actions dependency cache; the image-gen release
 step therefore reuses packages without changing the immutable artifact or
 production approval gates.
 
+### Repository rename and historical artifact signatures
+
+The canonical repository is `Dj-Shortcut/leaderbot-facebook`, GitHub repository
+ID `1238456123`, owned by account ID `78924184`. The previous name
+`Dj-Shortcut/openclaw-facebook` remains the signing identity of images built
+before the rename; a repository redirect does not rewrite those certificates.
+
+`reviewedArtifactRepositories` pins that identity per exact trusted image.
+`verify-production-artifact-attestation.mjs` fetches bundles from the canonical
+repository after checking its immutable ID and owner, then uses the explicitly
+reviewed signing name for offline-bundle signature verification. It verifies the
+certificate's repository/owner IDs, exact source commit, main ref, hosted runner
+and builder workflow before accepting the result. New artifacts must record the
+name under which they were signed. Do not replace historical names globally or
+accept an arbitrary alias when verification fails. The same checks cover the
+selected release and its rollback artifact.
+
+The current Test proof and original activation readback use the canonical API
+name and require both returned repository objects to carry that same immutable
+repository ID. The original operator request, audit fingerprint, source commit
+and execution epoch remain unchanged. A rename never authorizes another
+activation or edits to financial rows.
+
 ### Credit readiness without the retired customer portal
 
 With legacy sales (`MOLLIE_BILLING_ENABLED`) disabled, credit startup and
