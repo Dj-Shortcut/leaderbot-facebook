@@ -6,6 +6,12 @@ import express, {
   type Response,
 } from "express";
 
+import { createLogger } from "../logger";
+import {
+  CREDIT_CHECKOUT_PAYMENT_STAGES,
+  CreditCheckoutPaymentError,
+  type CreditCheckoutPaymentStage,
+} from "./creditCheckoutPaymentService";
 import {
   CREDIT_CHECKOUT_SESSION_COOKIE,
   CREDIT_CHECKOUT_SESSION_MAX_AGE_MS,
@@ -17,6 +23,7 @@ import {
 import { isCreditPaymentGrantComplete } from "./creditPaymentWebhookStore";
 
 const CREDIT_CHECKOUT_BODY_LIMIT = "2kb";
+const logger = createLogger({});
 const INTENT_ID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
@@ -66,6 +73,7 @@ export function registerCreditCheckoutRoutes(
       try {
         session = await claim({ intentId, capability });
       } catch {
+        logCheckoutFailure("claim", "claim");
         unavailable(res);
         return;
       }
@@ -93,6 +101,7 @@ export function registerCreditCheckoutRoutes(
         }
         noStore(res).status(200).json({ offer: session.offer });
       } catch {
+        logCheckoutFailure("session", "session");
         unavailable(res);
       }
     })
@@ -100,35 +109,58 @@ export function registerCreditCheckoutRoutes(
 
   app.post(
     "/api/credits/checkout/:intentId/confirm",
-    json,
+    (req, res, next) => {
+      json(req, res, (error: unknown) => {
+        if (error) {
+          logCheckoutFailure("confirm", "body_validation");
+          unavailable(res);
+          return;
+        }
+        next();
+      });
+    },
     asyncRoute(async (req, res) => {
       if (!isSameOriginMutation(req)) {
+        logCheckoutFailure("confirm", "origin_validation");
         unavailable(res);
         return;
       }
       if (!isExactEmptyBody(req.body)) {
+        logCheckoutFailure("confirm", "body_validation");
         unavailable(res);
         return;
       }
       const intentId = singleParam(req.params.intentId);
       if (!intentId || !INTENT_ID_PATTERN.test(intentId)) {
+        logCheckoutFailure("confirm", "intent_validation");
         unavailable(res);
         return;
       }
       const cookieValue = readSessionCookie(req);
+      if (!cookieValue) {
+        logCheckoutFailure("confirm", "session_missing");
+        unavailable(res);
+        return;
+      }
+      let stage: "session" | "payment_confirmation" | "checkout_url" =
+        "session";
       try {
         const session = await readSession(cookieValue, {
           requireUnexpired: true,
         });
         if (session.intentId !== intentId) {
+          logCheckoutFailure("confirm", "session_intent_mismatch");
           unavailable(res);
           return;
         }
+        stage = "payment_confirmation";
         const result = await dependencies.confirm(session);
+        stage = "checkout_url";
         noStore(res)
           .status(200)
           .json({ checkoutUrl: exactHostedCheckoutUrl(result.checkoutUrl) });
-      } catch {
+      } catch (error) {
+        logCheckoutFailure("confirm", stage, error);
         unavailable(res);
       }
     })
@@ -138,19 +170,74 @@ export function registerCreditCheckoutRoutes(
     "/api/credits/checkout/return-status",
     asyncRoute(async (req, res) => {
       const cookieValue = readSessionCookie(req);
+      let stage: "session" | "grant_status" = "session";
       try {
         const session = await readSession(cookieValue, {
           requireUnexpired: false,
         });
+        stage = "grant_status";
         const status = await resolveReturnStatus(session, grantComplete);
         noStore(res).status(200).json({
           status,
         });
       } catch {
+        logCheckoutFailure("return_status", stage);
         unavailable(res);
       }
     })
   );
+}
+
+function logCheckoutFailure(
+  operation: "claim" | "session" | "confirm" | "return_status",
+  stage:
+    | "claim"
+    | "session"
+    | "payment_confirmation"
+    | "checkout_url"
+    | "grant_status"
+    | "origin_validation"
+    | "body_validation"
+    | "intent_validation"
+    | "session_missing"
+    | "session_intent_mismatch",
+  error?: unknown
+): void {
+  // Only server-owned enum values enter this event. Never attach the thrown
+  // error or request/session/provider data, even through the logger redactor.
+  logger.warn({
+    event: "credit_checkout_request_failed",
+    operation,
+    stage,
+    category:
+      stage === "checkout_url"
+        ? "invalid_redirect"
+        : stage === "origin_validation" ||
+            stage === "body_validation" ||
+            stage === "intent_validation" ||
+            stage === "session_missing" ||
+            stage === "session_intent_mismatch"
+          ? "request_rejected"
+          : "dependency_failure",
+    ...(stage === "payment_confirmation"
+      ? { paymentStage: readPaymentFailureStage(error) }
+      : {}),
+  });
+}
+
+function readPaymentFailureStage(error: unknown): CreditCheckoutPaymentStage {
+  try {
+    if (error instanceof CreditCheckoutPaymentError) {
+      const candidate = error.stage;
+      return (
+        CREDIT_CHECKOUT_PAYMENT_STAGES.find(stage => stage === candidate) ??
+        "unknown"
+      );
+    }
+  } catch {
+    // Never inspect any other field if a foreign or malformed error fails.
+  }
+  return "unknown";
 }
 
 async function resolveReturnStatus(

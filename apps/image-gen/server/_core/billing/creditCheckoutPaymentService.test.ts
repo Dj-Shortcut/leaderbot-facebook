@@ -207,6 +207,48 @@ function harness(
 describe("confirmCreditCheckoutPayment", () => {
   beforeEach(() => vi.clearAllMocks());
 
+  it("identifies a failed claim without retaining database errors or their causes", async () => {
+    const test = harness();
+    const secret = "private-cookie-and-database-values";
+    const original = new Error(secret, { cause: new Error(secret) });
+    test.claim.mockRejectedValueOnce(original);
+    const error = await confirmCreditCheckoutPayment(
+      session(),
+      test.dependencies
+    ).catch(value => value);
+    expect(error).toBeInstanceOf(CreditCheckoutPaymentError);
+    expect(error.stage).toBe("claim");
+    expect(error.cause).toBeUndefined();
+    expect(`${error.stack}${JSON.stringify(error)}`).not.toContain(secret);
+    expect(test.markTransportStarted).not.toHaveBeenCalled();
+    expect(test.createCreditPayment).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["claim", { claim: false }],
+    ["transport_start", { transport: false }],
+    ["provider_request", { providerError: new MollieApiError(422, "private") }],
+    [
+      "provider_recovery",
+      { recoveryPaymentId: PAYMENT_ID, providerError: new Error("private") },
+    ],
+    ["finalization", { finalized: { recorded: false, authorized: false } }],
+    ["exposure", { exposed: false }],
+  ] as const)("reports the failed %s stage", async (stage, options) => {
+    const test = harness(options);
+    await expect(
+      confirmCreditCheckoutPayment(session(), test.dependencies)
+    ).rejects.toMatchObject({ stage });
+  });
+
+  it("distinguishes failure recording from the original provider failure", async () => {
+    const test = harness({ providerError: new MollieApiError(422, "private") });
+    test.finalize.mockRejectedValueOnce(new Error("private database values"));
+    await expect(
+      confirmCreditCheckoutPayment(session(), test.dependencies)
+    ).rejects.toMatchObject({ stage: "failure_recording" });
+  });
+
   it("persists the exact known response before exposing its checkout URL", async () => {
     const test = harness();
     await expect(

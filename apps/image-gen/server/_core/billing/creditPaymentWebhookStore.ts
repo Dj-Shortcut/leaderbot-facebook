@@ -1106,7 +1106,9 @@ async function lockCreditPaymentBoundary(
             )
           )
           .limit(1)
-          .for("update")
+          // Runtime has SELECT-only wallet access. Keep the scope stable while
+          // the earlier execution-control lock serializes financial writers.
+          .for("share")
       : [];
   const intents = await tx
     .select()
@@ -1384,6 +1386,9 @@ async function lockCreditPaymentFinancialEvidence(
   ) {
     return null;
   }
+  // Ledger entries are immutable and runtime has SELECT-only access. Shared
+  // locks retain current evidence; the locked wallet/control fence excludes
+  // concurrent financial mutations until this transaction completes.
   const grants = await tx
     .select({ entryId: creditLedger.entryId })
     .from(creditLedger)
@@ -1412,7 +1417,7 @@ async function lockCreditPaymentFinancialEvidence(
       )
     )
     .limit(2)
-    .for("update");
+    .for("share");
   const rootGrantEntryId = grants.length === 1 ? grants[0]?.entryId : undefined;
   if (!rootGrantEntryId || !UUID_PATTERN.test(rootGrantEntryId)) return null;
   const adjustments = await tx
@@ -1438,7 +1443,7 @@ async function lockCreditPaymentFinancialEvidence(
       )
     )
     .limit(3)
-    .for("update");
+    .for("share");
   return { rootGrantEntryId, adjustments };
 }
 
