@@ -127,15 +127,18 @@ Live payment enablement remains gated by the relevant P1 through P4 evidence.
       Test Mode must exercise that same signed checkout path; the temporary
       direct Mollie command has been removed. The production trigger remains
       the daily free-credit exhaustion path only.
-  - [ ] Deploy the reservation outbox-epoch guard and complete the real Test
-        checkout journey. [Scheduler verification and release evidence](credit-checkout-scheduler-verification.md)
-        records fresh matching enabled controls/lanes at epoch 2, the local
-        second-user route-to-provider regression and trusted guard-runtime
-        build `35061070978`. Release PR #560 is merged. Deployment
-        `35062693238` was canceled before rollout because of the intentional
-        repository rename; the renamed-repository audit was verified read-only
-        at the same epoch 2. Deploy through the updated identity checks, then
-        complete the actual Messenger test; no scheduler repair was needed.
+  - [x] Deploy the reservation outbox-epoch guard. Protected deployment
+        [35065616049/1](https://github.com/Dj-Shortcut/leaderbot-facebook/actions/runs/35065616049)
+        succeeded after PRs #560/#561. Independent readback proved all four
+        Machines on the reviewed runtime, enabled commercial/outbox epoch 2,
+        Test-only flags, empty retired pins and passing health/readiness.
+        [Release evidence](credit-checkout-scheduler-verification.md) retains
+        exact source/digest, activation provenance and rollback boundaries.
+  - [ ] Complete the actual Messenger Test checkout journey with an eligible
+        tester: fresh CTA, explicit confirmation, paid Test webhook, exactly one
+        eight-credit grant and premium image/edit delivery. The operator will
+        arrange the tester later. Local second-user/duplicate-webhook regression
+        and successful deployment are not this production journey proof.
 
 - [ ] **P4 - Premium quality and Test Mode journey.** Bind the paid offer to a
       versioned premium provider policy and prove unit economics. In Mollie Test

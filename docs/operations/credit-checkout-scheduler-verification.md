@@ -1,4 +1,4 @@
-# Credit checkout scheduler verification — 2026-09-15
+# Credit checkout scheduler verification — 2026-09-15–16
 
 ## Production readback
 
@@ -64,9 +64,8 @@ test sources reported five pre-existing errors in the older MySQL helper/tests;
 running it against the unchanged baseline reproduced the same diagnostics.
 The repository's required application TypeScript check passed.
 
-The code change still needs deployment. These tests and the production
-scheduler readback do not prove a real Messenger checkout/payment or paid image
-delivery; the P3/P4 journey gates remain open in `todo.md`. Rollback of this
+The deployment is recorded below. These tests and the production scheduler
+readback do not prove a real Messenger checkout/payment or paid image delivery; the P3/P4 journey gates remain open in `todo.md`. Rollback of this
 change is a code revert with no schema/config or financial-data rollback.
 
 ## Guard runtime release preparation (2026-09-16)
@@ -110,5 +109,41 @@ verified. Immutable request/fingerprint and Test-only flags were unchanged.
 The release gate now binds current API metadata to repository ID `1238456123`
 and retains each existing artifact's original signed repository name.
 
-Protected deployment and the actual Messenger Test payment-to-grant journey
-remain open until their separate evidence is recorded.
+The protected deployment subsequently succeeded as recorded below. The actual
+Messenger Test payment-to-grant journey remains open.
+
+## Successful protected rollout and independent readback (2026-09-16)
+
+[Deployment 35065616049/1](https://github.com/Dj-Shortcut/leaderbot-facebook/actions/runs/35065616049)
+succeeded from reviewed main `620c90fb4f193f4ac00b33e917a77404af1d046d`
+after release PR #560 and repository-identity PR #561. The workflow verified
+desired/rollback artifact signatures, ran the original activation audit in both
+fresh Test-proof steps, completed schema verification, rolled all four Machines,
+checked runtime database principals and passed health/readiness. Gateway and
+storage-proxy deployment jobs were skipped.
+
+Independent post-deployment inspection at `2026-09-16T06:57:59.710Z` confirmed:
+
+- Exact settled identity `deploy-35065616049-1`.
+- All two app and two worker Machines started on
+  `sha256:e0b82c21ceca12130a892afd01b90cf83fcb3b7a42a2721a9c424a76f1d6f1cf`.
+- `MOLLIE_MODE=test`, legacy/live billing disabled and all four retired tester
+  pins empty on every Machine.
+- Workspace 1 Test commercial control and all four scheduler lanes, including
+  outbox, enabled at epoch 2. Original activation provenance verified; temporary
+  readback bundle removed and absence verified.
+- Public `/healthz` returned `ok`; `/readyz` returned `ok: true`,
+  `phase: operational`, every check passed. Checkout return page returned 200.
+
+The workflow retained `image-gen-release-35065616049-1` and
+`image-gen-rollback-35065616049-1` evidence artifacts. The reviewed manifest
+continues to retain the exact previous release and its dark emergency rollback.
+No payment, intent, wallet or provider-operation rows were manually edited, and
+no scheduler reactivation was needed.
+
+**Still required:** an eligible user's fresh Messenger CTA, explicit checkout
+confirmation, Mollie Test paid status, authoritative webhook persistence, exactly
+one eight-credit grant and subsequent premium image/edit delivery. The user
+will arrange the tester later. The handoff expires after ten minutes and must
+come from that user's normal Messenger journey. Deployment/readiness and the
+local duplicate-webhook regression are not substitutes for that evidence.
