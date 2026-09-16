@@ -139,7 +139,12 @@ Behavior, costs, rollback and tests: [Photo conversation](photo-conversation.md)
   independently read back at 15:59:39 UTC, preserving its three existing fields.
   Future receipt ingress still needs a live delivery check; this does not prove
   that Meta will replay receipts for the two earlier images.
-- [ ] Release and verify the Messenger **Credits** quick reply. The implementation
+- [ ] Release and verify the Messenger **Credits** quick reply. Source PR #575 merged at
+  `0d406cdc1df478776da6606fb475c112ed10d8b1`. Trusted build
+  [35126862746](https://github.com/Dj-Shortcut/leaderbot-facebook/actions/runs/35126862746)
+  produced runtime `bec463108c3c...` with schema `0018`; its exact image, source
+  and signing repository are pinned for the protected rollout. Deployment and
+  the live Credits check remain pending. The implementation
   reads scoped free and available premium balances, including while an image is
   processing, without changing pending edit state or starting provider work.
   Photo menus add the pill at the Messenger rendering boundary; consent and
