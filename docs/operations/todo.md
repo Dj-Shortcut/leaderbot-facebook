@@ -143,8 +143,16 @@ Behavior, costs, rollback and tests: [Photo conversation](photo-conversation.md)
   `0d406cdc1df478776da6606fb475c112ed10d8b1`. Trusted build
   [35126862746](https://github.com/Dj-Shortcut/leaderbot-facebook/actions/runs/35126862746)
   produced runtime `bec463108c3c...` with schema `0018`; its exact image, source
-  and signing repository are pinned for the protected rollout. Deployment and
-  the live Credits check remain pending. The implementation
+  and signing repository were pinned for the protected rollout. Deployment
+  [35128951165](https://github.com/Dj-Shortcut/leaderbot-facebook/actions/runs/35128951165)
+  was cancelled after the app process repeatedly exited at startup: billing's
+  launch validation still rejected the explicitly disabled USD caps. Exact
+  protected recovery is tracked in run
+  [35130050735](https://github.com/Dj-Shortcut/leaderbot-facebook/actions/runs/35130050735).
+  The startup validator now accepts explicit zero, retaining rejection of
+  missing, negative and non-finite values; a regression loads the actual desired
+  Fly spend settings into both billing startup paths. Rebuild and deploy this
+  repair before verifying the Credits action. The implementation
   reads scoped free and available premium balances, including while an image is
   processing, without changing pending edit state or starting provider work.
   Photo menus add the pill at the Messenger rendering boundary; consent and
