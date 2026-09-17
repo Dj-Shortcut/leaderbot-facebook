@@ -34,7 +34,6 @@ import {
 } from "../whatsappGenerationScope";
 import { resolveMessengerGenerationOwnership } from "../workspaceEntitlementRuntime";
 import {
-  eraseWebhookIngressDeliveriesForSubject,
   getWebhookIngressSubjectKey,
   getWebhookIngressSubjectLeaseKey,
   getWebhookIngressSubjectTombstoneKey,
