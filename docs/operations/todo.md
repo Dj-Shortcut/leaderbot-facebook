@@ -900,3 +900,5 @@ administration, or undocumented manual steps.
 - Meta review: `docs/operations/meta-app-review.md`
 - Deployment and rollback: `docs/operations/production-deployments.md`
 - Security: `docs/security/SECURITY.md`
+
+- Fallow review and measured cleanup: [2026-09-17 record](fallow-maintainability-2026-09-17.md). Small internal-export candidates remain for triage; broader privacy, payment, and generation refactors require a separate contract review.
