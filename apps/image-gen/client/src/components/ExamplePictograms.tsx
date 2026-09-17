@@ -117,7 +117,7 @@ function Person() {
 }
 
 /** Replace the background: the person stays, the setting behind them swaps. */
-export function BackgroundPictogram({ className }: PictogramProps) {
+function BackgroundPictogram({ className }: PictogramProps) {
   return (
     <PictogramSvg className={className}>
       <Frame />
@@ -133,7 +133,7 @@ export function BackgroundPictogram({ className }: PictogramProps) {
 }
 
 /** Freshen up a photo: the same shot, polished on one side of the split. */
-export function PolishPictogram({ className }: PictogramProps) {
+function PolishPictogram({ className }: PictogramProps) {
   return (
     <PictogramSvg className={className}>
       <Frame />
@@ -156,7 +156,7 @@ export function PolishPictogram({ className }: PictogramProps) {
 }
 
 /** Prepare a product photo: the item on a clean, even surface. */
-export function ProductPictogram({ className }: PictogramProps) {
+function ProductPictogram({ className }: PictogramProps) {
   return (
     <PictogramSvg className={className}>
       <Frame />
@@ -173,7 +173,7 @@ export function ProductPictogram({ className }: PictogramProps) {
 }
 
 /** A brand-new image from text: written lines, no photo attached. */
-export function TextToImagePictogram({ className }: PictogramProps) {
+function TextToImagePictogram({ className }: PictogramProps) {
   return (
     <PictogramSvg className={className}>
       <Frame />
@@ -191,7 +191,7 @@ export function TextToImagePictogram({ className }: PictogramProps) {
 }
 
 /** Adjust light and colour: the same scene, warmer and brighter. */
-export function LightPictogram({ className }: PictogramProps) {
+function LightPictogram({ className }: PictogramProps) {
   return (
     <PictogramSvg className={className}>
       <Frame />
@@ -208,7 +208,7 @@ export function LightPictogram({ className }: PictogramProps) {
 }
 
 /** Merge photos: several pictures in, one picture out. */
-export function MergePictogram({ className }: PictogramProps) {
+function MergePictogram({ className }: PictogramProps) {
   return (
     <PictogramSvg className={className}>
       <Frame />
