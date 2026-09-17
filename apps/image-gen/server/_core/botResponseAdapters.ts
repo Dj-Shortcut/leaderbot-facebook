@@ -40,27 +40,28 @@ function actionsFallbackText(
     .join("\n");
 }
 
+function resolveActionPrompt(
+  text: string,
+  actions: ConversationAction[] | undefined
+) {
+  const inferredActions = inferConversationActions(text);
+  if (!inferredActions.length && !actions?.length) {
+    return null;
+  }
+
+  return {
+    text: inferredActions.length ? stripNumberedConversationChoices(text) : text,
+    actions: actions?.length ? [...inferredActions, ...actions] : inferredActions,
+  };
+}
+
 async function sendTextResponse(
   response: Extract<BotResponse, { kind: "text" }>,
   options: BotResponseSendOptions
 ): Promise<void> {
-  if (response.actions?.length && options.sendActionPrompt) {
-    const inferredActions = inferConversationActions(response.text);
-    await options.sendActionPrompt(
-      inferredActions.length
-        ? stripNumberedConversationChoices(response.text)
-        : response.text,
-      [...inferredActions, ...response.actions]
-    );
-    return;
-  }
-
-  const inferredActions = inferConversationActions(response.text);
-  if (inferredActions.length && options.sendActionPrompt) {
-    await options.sendActionPrompt(
-      stripNumberedConversationChoices(response.text),
-      inferredActions
-    );
+  const prompt = resolveActionPrompt(response.text, response.actions);
+  if (prompt && options.sendActionPrompt) {
+    await options.sendActionPrompt(prompt.text, prompt.actions);
     return;
   }
 
@@ -94,23 +95,11 @@ async function sendConversationResponse(
     }
   }
 
-  if (response.text && response.actions?.length && options.sendActionPrompt) {
-    const inferredActions = inferConversationActions(response.text);
-    await options.sendActionPrompt(
-      inferredActions.length
-        ? stripNumberedConversationChoices(response.text)
-        : response.text,
-      [...inferredActions, ...response.actions]
-    );
-    return;
-  }
-
-  const inferredActions = inferConversationActions(response.text);
-  if (response.text && inferredActions.length && options.sendActionPrompt) {
-    await options.sendActionPrompt(
-      stripNumberedConversationChoices(response.text),
-      inferredActions
-    );
+  const prompt = response.text
+    ? resolveActionPrompt(response.text, response.actions)
+    : null;
+  if (prompt && options.sendActionPrompt) {
+    await options.sendActionPrompt(prompt.text, prompt.actions);
     return;
   }
 
