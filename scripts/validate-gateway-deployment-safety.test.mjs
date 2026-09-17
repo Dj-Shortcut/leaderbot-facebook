@@ -4,7 +4,6 @@ import {
   validateFlyGatewayConfig,
   validateGatewayDeploymentSafety,
   validateManagedRedeployHandoff,
-  validateManagedUpdateWorkflow,
   validatePluginWorkflow,
 } from "./validate-gateway-deployment-safety.mjs";
 
@@ -22,14 +21,6 @@ const validFlyConfig = [
   "",
   "[[vm]]",
   'memory = "4096"',
-].join("\n");
-
-const validUpdateWorkflow = [
-  "managed-redeploy-handoff.md",
-  "approval_status: pending",
-  'gh pr ready "$branch" --undo',
-  'git push --force-with-lease origin "$branch"',
-  "gh pr create --draft",
 ].join("\n");
 
 const validManagedRedeployHandoff = [
@@ -69,7 +60,7 @@ describe("gateway deployment safety validation", () => {
       expect(testPaths).toContain(testPath);
   });
 
-  it("accepts the checked-in gateway config and update workflow", () => {
+  it("accepts the retained gateway config, CI workflow, and recovery handoff", () => {
     expect(validateGatewayDeploymentSafety()).toEqual({
       agentModel: "openai/gpt-5.4-mini",
       heapLimitMiB: 1536,
@@ -158,91 +149,6 @@ describe("gateway deployment safety validation", () => {
       validateFlyGatewayConfig(`${validFlyConfig}\n\n[[vm]]\nmemory = "512"`),
     ).toThrow("VM allocation");
   });
-
-  it("rejects update automation that deploys or skips draft approval", () => {
-    expect(() =>
-      validateManagedUpdateWorkflow(`${validUpdateWorkflow}\nfly deploy`),
-    ).toThrow("must never deploy");
-    expect(() =>
-      validateManagedUpdateWorkflow(validUpdateWorkflow.replace("--draft", "")),
-    ).toThrow("created as drafts");
-    expect(() =>
-      validateManagedUpdateWorkflow(
-        validUpdateWorkflow.replace('gh pr ready "$branch" --undo\n', ""),
-      ),
-    ).toThrow("returned to draft");
-    expect(() =>
-      validateManagedUpdateWorkflow(
-        validUpdateWorkflow.replace(
-          'gh pr ready "$branch" --undo\ngit push --force-with-lease origin "$branch"',
-          'git push --force-with-lease origin "$branch"\ngh pr ready "$branch" --undo',
-        ),
-      ),
-    ).toThrow("before force-pushing");
-  });
-
-  it.each([
-    "gh pr create --title unsafe",
-    "gh pr create --title unsafe # --draft",
-    'gh pr create --body "mention --draft later"',
-    "gh pr create --title unsafe; echo --draft",
-  ])("requires draft mode on every creation command: %s", (createCommand) => {
-    expect(() =>
-      validateManagedUpdateWorkflow(`${validUpdateWorkflow}\n${createCommand}`),
-    ).toThrow("created as drafts");
-  });
-
-  it.each(["# gh pr create --draft", 'echo "gh pr create --draft"'])(
-    "does not count inactive creation text as a command: %s",
-    (inactiveText) => {
-      expect(() =>
-        validateManagedUpdateWorkflow(
-          validUpdateWorkflow.replace("gh pr create --draft", inactiveText),
-        ),
-      ).toThrow("created as drafts");
-    },
-  );
-
-  it.each([
-    "id-token: write",
-    'id-token: "write"',
-    "id-token: 'write'",
-    "id-token: write # deploy identity",
-    "\"id-token\": 'write' # deploy identity",
-    "id-token: >-\n    write",
-    "id-token: *oidc_permission",
-    "permissions: { contents: read, id-token: write }",
-    '"id\\u002dtoken": write',
-  ])("rejects deploy identity permission form: %s", (permission) => {
-    expect(() =>
-      validateManagedUpdateWorkflow(
-        `${validUpdateWorkflow}\npermissions:\n  ${permission}`,
-      ),
-    ).toThrow("deploy identity tokens");
-  });
-
-  it("ignores disabled deploy identity permission comments", () => {
-    expect(() =>
-      validateManagedUpdateWorkflow(
-        `${validUpdateWorkflow}\npermissions:\n  # id-token: write`,
-      ),
-    ).not.toThrow();
-  });
-
-  it.each([
-    "id-token: none",
-    'id-token: "none" # explicitly disabled',
-    "permissions: { contents: read, id-token: none }",
-  ])(
-    "allows explicitly disabled deploy identity permission: %s",
-    (permission) => {
-      expect(() =>
-        validateManagedUpdateWorkflow(
-          `${validUpdateWorkflow}\npermissions:\n  ${permission}`,
-        ),
-      ).not.toThrow();
-    },
-  );
 
   it("requires pull-request validation for fly.toml-only changes", () => {
     expect(() => validatePluginWorkflow('paths:\n  - "docs/**"')).toThrow(
