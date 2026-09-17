@@ -1,24 +1,4 @@
-import { createHash, randomUUID } from "node:crypto";
-
-export function createOpaqueBillingId(): string {
-  return randomUUID();
-}
-
-export function deterministicIdempotencyKey(
-  operation: "customer" | "payment" | "subscription",
-  stableReference: string
-): string {
-  const digest = createHash("sha256")
-    .update(`leaderbot:mollie:v1:${operation}:${stableReference}`)
-    .digest("hex");
-  return `lb_${operation}_${digest}`;
-}
-
-export function createExternalBillingReference(): string {
-  return createHash("sha256")
-    .update(`leaderbot:workspace:${randomUUID()}`)
-    .digest("hex");
-}
+import { createHash } from "node:crypto";
 
 export function hashCanonicalSnapshot(value: unknown): string {
   return createHash("sha256").update(canonicalJson(value)).digest("hex");

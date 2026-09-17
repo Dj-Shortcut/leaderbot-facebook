@@ -11,17 +11,3 @@ export function parseAmountMinor(amount: MollieAmount): number {
   }
   return minor;
 }
-
-export function parseEurValueMinor(value: string): number {
-  return parseAmountMinor({ currency: "EUR", value });
-}
-
-export function sumAmountsMinor(amounts: MollieAmount[]): number {
-  return amounts.reduce((total, amount) => {
-    const next = total + parseAmountMinor(amount);
-    if (!Number.isSafeInteger(next)) {
-      throw new Error("Mollie amount total is out of range");
-    }
-    return next;
-  }, 0);
-}
