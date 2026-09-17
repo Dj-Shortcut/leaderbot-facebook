@@ -410,8 +410,3 @@ export async function resolvePremiumMediaAccessWithDeps(
     videoGenerationsPerDay,
   });
 }
-
-export const STARTPILOT_RUNTIME_LIMITS = Object.freeze({
-  imageTotal: STARTPILOT_IMAGE_TOTAL_LIMIT,
-  imageDaily: STARTPILOT_IMAGE_DAILY_LIMIT,
-});
