@@ -128,20 +128,16 @@ Use this workflow for local machines, CI, servers, and hosted environments.
    - Facebook webhook verification still succeeds;
    - logs contain metadata, not raw customer messages or secrets.
 
-## Automated Update PR
+## Update ownership
 
-The scheduled/manual GitHub workflow `.github/workflows/update-openclaw.yml`
-uses the same supported update script:
+Routine OpenClaw dependency updates belong in the standalone
+[`openclaw-facebook-messenger`](https://github.com/Dj-Shortcut/openclaw-facebook-messenger)
+repository. This repository has no scheduled or manually dispatched OpenClaw
+update workflow. The manual `npm run openclaw:update -- <version>` helper remains
+available for explicitly reviewed maintenance of the retained gateway.
 
-```bash
-npm run openclaw:update -- <version>
-```
-
-It creates new update PRs as drafts with production approval still pending. It
-does not deploy, request deploy identity, or read Fly secrets. The static
-`npm run gateway:deployment-safety` gate enforces this boundary and the reviewed
-Fly model/memory/public-route settings. If the update workflow needs new version
-editing behavior, add it to `scripts/update-openclaw.mjs` and document it here.
+`npm run gateway:deployment-safety` continues to validate the reviewed Fly
+model, memory, public-route settings, source CI, and protected recovery handoff.
 
 ## Rollback Workflow
 

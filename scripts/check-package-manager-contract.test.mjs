@@ -19,7 +19,6 @@ const requiredFiles = [
   ".github/workflows/image-gen-fallow.yml",
   ".github/workflows/clawhub-plugin-publish.yml",
   ".github/workflows/main.yml",
-  ".github/workflows/update-openclaw.yml",
   "README.md",
   "docs/monorepo.md",
   "deploy/fly-gateway/README.md",

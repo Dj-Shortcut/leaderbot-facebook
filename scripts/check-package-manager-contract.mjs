@@ -351,34 +351,11 @@ export function validatePackageManagerContract(repoRoot = process.cwd()) {
         ".github/workflows/image-gen-fallow.yml",
         "apps/image-gen/README.md",
         "apps/image-gen/scripts/run-fallow-report.mjs",
-        ".github/workflows/update-openclaw.yml",
       ]) {
         if (!source.includes(`- "${trigger}"`)) {
           failures.push(`${mainWorkflowPath}: paths must include ${trigger}`);
         }
       }
-    }
-  }
-
-  const updateWorkflowPath = ".github/workflows/update-openclaw.yml";
-  const updateWorkflow = path.join(repoRoot, updateWorkflowPath);
-  if (!fs.existsSync(updateWorkflow)) {
-    failures.push(`${updateWorkflowPath}: required file is missing`);
-  } else {
-    const source = fs.readFileSync(updateWorkflow, "utf8");
-    const versions = pnpmSetupVersions(source);
-    if (versions.length !== 1 || versions[0] !== "10.28.1") {
-      failures.push(
-        `${updateWorkflowPath}: compatibility lock must use pnpm 10.28.1`,
-      );
-    }
-    if (
-      !source.includes("npm install --package-lock-only") ||
-      !source.includes("pnpm install --lockfile-only")
-    ) {
-      failures.push(
-        `${updateWorkflowPath}: must regenerate both root compatibility locks`,
-      );
     }
   }
 
