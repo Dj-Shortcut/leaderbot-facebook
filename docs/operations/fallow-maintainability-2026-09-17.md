@@ -70,6 +70,14 @@ Extracted one private pure `resolveActionPrompt` helper. Legacy state-text fallb
 - One further clone group removed in each scope; 38 fewer duplicated lines counted. Adapter cyclomatic total 40 → 38, cognitive 25 → 22, scored lines 167 → 156, maintainability unchanged at 87.3.
 - The added tests alone did not increase clone counts or threshold findings. App-full estimated maximum CRAP 49.5 → 21.8; production maximum 182 → 72, but production functions above CRAP threshold 3 → 4 after extraction. This is an estimated-coverage metric tradeoff, not a new measured coverage deficit; the helper is exercised through the public response senders. No abstraction or suppression was added to manipulate that score.
 
+### 4. Webhook ingress privacy cycle (`68b3fc2`)
+
+Moved the Redis privacy-erasure operation and subject-key helpers into the neutral `meta/webhookIngressPrivacy.ts` module. `dataDeletionService.ts` now imports that neutral module directly; `webhookIngressQueue.ts` retains a compatibility re-export for existing callers. This removes the queue edge from the consent → deletion → queue cycle without changing Redis keys, Lua scripts, tombstone ordering, or retry semantics.
+
+- App full Fallow: 331 → 327 issues; circular dependencies 4 → 0; clone groups and maintainability remained 710 and 89.8.
+- App production Fallow: 563 → 560 issues; circular dependencies 4 → 0; clone groups 207 and maintainability 85.3.
+- Privacy/deletion regression tests: 29 passed, 12 skipped; full app suite: 2,996 passed, 175 skipped; direct TypeScript check passed. The regular `pnpm` typecheck command also attempted a workspace prepare install and was blocked by the repository's ignored-build policy, so verification used the installed `tsc` binary directly.
+
 ## Final Fallow delta
 
 | Scope | Issues | Unused exports | Clone groups | Duplicated lines | Mean maintainability |
@@ -89,3 +97,5 @@ Unused-file/type counts, circular dependencies, and numbers of functions exceedi
 - Raw full/production reports and per-stage logs are retained in the task evidence archive. The original baseline, post-install baseline, each batch, and test-only checkpoint are separate snapshots.
 - Next small candidates: review unnecessary internal exports individually, with compatibility and test-consumer checks. Do not remove their locally used bodies.
 - Larger candidates are intentionally deferred: erasure stages, completion/accounting state transitions, migration grant validation, and consent/ingress cycles. Before any such change, map retries, partial failures, privacy epochs, lock/transaction order, and provider-attempt boundaries. No broad refactor was attempted.
+
+The remaining webhook cycle finding is cleared in the app scan. The next pasted target, `portalWorkspace.ts`, belongs to an uncommitted client checkout outside this clean branch; five zero-reference functions were removed there locally while the five functions used by `PortalHandoff.tsx` were preserved. The broader portal checkout still has unrelated missing-dependency/type errors and was not committed or pushed.
