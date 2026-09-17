@@ -40,17 +40,6 @@ export interface MollieAccountingReader {
   }): Promise<MollieAccountingPage>;
 }
 
-export class FakeMollieAccountingReader implements MollieAccountingReader {
-  private index = 0;
-  constructor(private readonly pages: readonly MollieAccountingPage[]) {}
-
-  listEvents(): Promise<MollieAccountingPage> {
-    return Promise.resolve(
-      this.pages[this.index++] ?? { events: [], nextCursor: null }
-    );
-  }
-}
-
 /**
  * Imports account-wide provider metadata. Tenant ownership is derived only
  * through the exact payment routing index; callers cannot nominate a tenant.
