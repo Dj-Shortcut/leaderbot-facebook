@@ -66,7 +66,7 @@ function requireHttps(url: URL, name: string): void {
   }
 }
 
-export function getBillingSupportEmail(): string {
+function getBillingSupportEmail(): string {
   const billingSupportEmail = required("BILLING_SUPPORT_EMAIL");
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(billingSupportEmail)) {
     throw new Error("BILLING_SUPPORT_EMAIL must be a valid email address");
