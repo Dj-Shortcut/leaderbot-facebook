@@ -112,7 +112,7 @@ export function buildFreeQuotaReachedResponse(
   return buildQuotaReachedResponse(text);
 }
 
-export function formatImageQuotaBalance(
+function formatImageQuotaBalance(
   lang: Lang,
   status: ImageQuotaBalance
 ): string {
