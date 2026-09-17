@@ -117,6 +117,143 @@ function hasEditableImage(state: MessengerUserState | null): boolean {
   );
 }
 
+async function tryHandleCreditBalanceCommand(
+  ctx: HandlerContext,
+  input: MessageEventInput,
+  message: NonNullable<FacebookWebhookEvent["message"]>
+): Promise<boolean> {
+  const creditCommand = message.quick_reply?.payload
+    ? decodeMessengerActionInput(message.quick_reply.payload)
+    : message.text;
+  if (
+    message.attachments?.length ||
+    !creditCommand ||
+    !isCreditBalanceCommand(creditCommand)
+  ) {
+    return false;
+  }
+
+  await handleTextMessage(ctx, {
+    psid: input.psid,
+    userId: input.userId,
+    reqId: input.reqId,
+    lang: input.lang,
+    text: creditCommand,
+    timestamp: input.event.timestamp ?? Date.now(),
+  });
+  return true;
+}
+
+async function tryHandleQuickReplyPayload(
+  ctx: HandlerContext,
+  input: MessageEventInput,
+  message: NonNullable<FacebookWebhookEvent["message"]>
+): Promise<boolean> {
+  const quickPayload = message.quick_reply?.payload;
+  if (!quickPayload) return false;
+
+  const actionInput = decodeMessengerActionInput(quickPayload);
+  if (actionInput) {
+    await handleTextMessage(ctx, {
+      psid: input.psid,
+      userId: input.userId,
+      reqId: input.reqId,
+      lang: input.lang,
+      text: actionInput,
+      replyToMessageId: message.reply_to?.mid,
+      timestamp: input.event.timestamp ?? Date.now(),
+    });
+    return true;
+  }
+
+  await handlePayload(ctx, {
+    psid: input.psid,
+    userId: input.userId,
+    payload: quickPayload,
+    reqId: input.reqId,
+    lang: input.lang,
+  });
+  return true;
+}
+
+async function tryRouteImageAttachment(
+  ctx: HandlerContext,
+  input: MessageEventInput,
+  message: NonNullable<FacebookWebhookEvent["message"]>,
+  normalizedAttachments: MessengerNormalizedAttachment[],
+  trimmedText: string | undefined,
+  attachmentRoute: MessengerAttachmentRouteDecision | null,
+  stateBeforeRoute: MessengerUserState | null
+): Promise<boolean> {
+  if (
+    attachmentRoute?.route !== "image" ||
+    !hasImageAttachment(normalizedAttachments) ||
+    !hasReadableImageAttachment(normalizedAttachments)
+  ) {
+    return false;
+  }
+
+  const imageHandled = await tryHandleImageMessage(ctx, {
+    psid: input.psid,
+    userId: input.userId,
+    reqId: input.reqId,
+    lang: input.lang,
+    attachments: message.attachments ?? [],
+    text: message.text,
+    timestamp: input.event.timestamp ?? Date.now(),
+  });
+  if (!imageHandled) return false;
+
+  const stateAfter = await getOrCreateState(input.psid);
+  logMessengerImageRouted(
+    ctx,
+    input,
+    normalizedAttachments,
+    trimmedText,
+    "image",
+    stateBeforeRoute,
+    stateAfter
+  );
+  return true;
+}
+
+async function tryRouteAudioAttachment(
+  ctx: HandlerContext,
+  input: MessageEventInput,
+  message: NonNullable<FacebookWebhookEvent["message"]>,
+  normalizedAttachments: MessengerNormalizedAttachment[],
+  trimmedText: string | undefined,
+  attachmentRoute: MessengerAttachmentRouteDecision | null,
+  stateBeforeRoute: MessengerUserState | null
+): Promise<boolean> {
+  if (attachmentRoute?.route !== "audio") return false;
+
+  const audioHandled = await tryHandleAudioMessage(ctx, {
+    psid: input.psid,
+    userId: input.userId,
+    reqId: input.reqId,
+    lang: input.lang,
+    attachments: message.attachments ?? [],
+    text: message.text,
+    timestamp: input.event.timestamp ?? Date.now(),
+  });
+  if (!audioHandled) return false;
+
+  const stateAfter = await getOrCreateState(input.psid);
+  logMessengerAttachmentRouted(
+    ctx,
+    input,
+    normalizedAttachments,
+    trimmedText,
+    "audio",
+    "handled",
+    stateBeforeRoute,
+    stateAfter,
+    hasAttachmentUrl(normalizedAttachments)
+  );
+  return true;
+}
+
 /** Handles a non-echo Messenger message event and dispatches payload, image, or text flows. */
 export async function handleMessageEvent(
   ctx: HandlerContext,
@@ -131,24 +268,7 @@ export async function handleMessageEvent(
     return;
   }
 
-  const creditCommand = message.quick_reply?.payload
-    ? decodeMessengerActionInput(message.quick_reply.payload)
-    : message.text;
-  if (
-    !message.attachments?.length &&
-    creditCommand &&
-    isCreditBalanceCommand(creditCommand)
-  ) {
-    await handleTextMessage(ctx, {
-      psid: input.psid,
-      userId: input.userId,
-      reqId: input.reqId,
-      lang: input.lang,
-      text: creditCommand,
-      timestamp: input.event.timestamp ?? Date.now(),
-    });
-    return;
-  }
+  if (await tryHandleCreditBalanceCommand(ctx, input, message)) return;
 
   if (
     (await ctx.maybeSendInFlightMessage(input.psid, input.reqId, input.lang))
@@ -157,31 +277,7 @@ export async function handleMessageEvent(
     return;
   }
 
-  const quickPayload = message.quick_reply?.payload;
-  if (quickPayload) {
-    const actionInput = decodeMessengerActionInput(quickPayload);
-    if (actionInput) {
-      await handleTextMessage(ctx, {
-        psid: input.psid,
-        userId: input.userId,
-        reqId: input.reqId,
-        lang: input.lang,
-        text: actionInput,
-        replyToMessageId: message.reply_to?.mid,
-        timestamp: input.event.timestamp ?? Date.now(),
-      });
-      return;
-    }
-
-    await handlePayload(ctx, {
-      psid: input.psid,
-      userId: input.userId,
-      payload: quickPayload,
-      reqId: input.reqId,
-      lang: input.lang,
-    });
-    return;
-  }
+  if (await tryHandleQuickReplyPayload(ctx, input, message)) return;
 
   const normalizedInbound = normalizeMessengerInboundMessage(message);
   const normalizedAttachments = normalizedInbound.attachments;
@@ -199,59 +295,31 @@ export async function handleMessageEvent(
   }
 
   if (
-    attachmentRoute?.route === "image" &&
-    hasImageAttachment(normalizedAttachments) &&
-    hasReadableImageAttachment(normalizedAttachments)
+    await tryRouteImageAttachment(
+      ctx,
+      input,
+      message,
+      normalizedAttachments,
+      trimmedText,
+      attachmentRoute,
+      stateBeforeRoute
+    )
   ) {
-    const imageHandled = await tryHandleImageMessage(ctx, {
-      psid: input.psid,
-      userId: input.userId,
-      reqId: input.reqId,
-      lang: input.lang,
-      attachments: message.attachments ?? [],
-      text: message.text,
-      timestamp: input.event.timestamp ?? Date.now(),
-    });
-    if (imageHandled) {
-      const stateAfter = await getOrCreateState(input.psid);
-      logMessengerImageRouted(
-        ctx,
-        input,
-        normalizedAttachments,
-        trimmedText,
-        "image",
-        stateBeforeRoute,
-        stateAfter
-      );
-      return;
-    }
+    return;
   }
 
-  if (attachmentRoute?.route === "audio") {
-    const audioHandled = await tryHandleAudioMessage(ctx, {
-      psid: input.psid,
-      userId: input.userId,
-      reqId: input.reqId,
-      lang: input.lang,
-      attachments: message.attachments ?? [],
-      text: message.text,
-      timestamp: input.event.timestamp ?? Date.now(),
-    });
-    if (audioHandled) {
-      const stateAfter = await getOrCreateState(input.psid);
-      logMessengerAttachmentRouted(
-        ctx,
-        input,
-        normalizedAttachments,
-        trimmedText,
-        "audio",
-        "handled",
-        stateBeforeRoute,
-        stateAfter,
-        hasAttachmentUrl(normalizedAttachments)
-      );
-      return;
-    }
+  if (
+    await tryRouteAudioAttachment(
+      ctx,
+      input,
+      message,
+      normalizedAttachments,
+      trimmedText,
+      attachmentRoute,
+      stateBeforeRoute
+    )
+  ) {
+    return;
   }
 
   if (attachmentRoute) {
