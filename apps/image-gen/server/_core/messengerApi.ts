@@ -488,11 +488,14 @@ async function handleErrorResponse(input: {
   await waitBeforeRetry(input.attempt, input.retry.retryBaseMs, input.response);
 }
 
-async function sendMessage(
+type MessengerSendAdmission =
+  | { kind: "allowed" }
+  | { kind: "skipped"; outcome: MessengerSendOutcome };
+
+async function resolveMessengerSendAdmission(
   psid: string,
-  message: Record<string, unknown>,
   options?: SendMessageOptions
-): Promise<MessengerSendOutcome> {
+): Promise<MessengerSendAdmission> {
   const deliveryFence = resolveDeliveryPrivacy(options);
   if (deliveryFence) {
     const actualUserKey = Buffer.from(toUserKey(psid), "utf8");
@@ -522,7 +525,23 @@ async function sendMessage(
   );
   if (!withinResponseWindow) {
     safeLog("messenger_send_skipped", { reason: "response_window_closed" });
-    return { sent: false, reason: "response_window_closed" };
+    return {
+      kind: "skipped",
+      outcome: { sent: false, reason: "response_window_closed" },
+    };
+  }
+
+  return { kind: "allowed" };
+}
+
+async function sendMessage(
+  psid: string,
+  message: Record<string, unknown>,
+  options?: SendMessageOptions
+): Promise<MessengerSendOutcome> {
+  const admission = await resolveMessengerSendAdmission(psid, options);
+  if (admission.kind === "skipped") {
+    return admission.outcome;
   }
 
   const retry = resolveRetryOptions(options);
