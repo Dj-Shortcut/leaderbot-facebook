@@ -110,9 +110,9 @@ vi.mock("./_core/messengerStatePersistence", async importOriginal => {
   };
 });
 
-vi.mock("./_core/meta/webhookIngressQueue", async importOriginal => {
+vi.mock("./_core/meta/webhookIngressPrivacy", async importOriginal => {
   const actual =
-    await importOriginal<typeof import("./_core/meta/webhookIngressQueue")>();
+    await importOriginal<typeof import("./_core/meta/webhookIngressPrivacy")>();
   return {
     ...actual,
     eraseWebhookIngressDeliveriesForSubject: eraseWebhookIngressMock,

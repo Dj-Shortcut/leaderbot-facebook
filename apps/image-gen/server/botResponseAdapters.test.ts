@@ -376,6 +376,116 @@ describe("botResponseAdapters", () => {
     expect(sendText).toHaveBeenCalledWith("What next?\nRestyle photo\nTry again");
   });
 
+  it.each(["legacy", "neutral"] as const)(
+    "keeps inferred actions before explicit actions for %s responses",
+    async format => {
+      const sendText = vi.fn(async () => {});
+      const sendActionPrompt = vi.fn(async () => {});
+      const text = "Choose:\n1. New image\n2. Different background";
+      const actions = [{ id: "privacy", label: "Privacy" }];
+
+      await sendMessengerBotResponse(
+        { ...(format === "legacy" ? { kind: "text" as const } : {}), text, actions },
+        { sendText, sendActionPrompt }
+      );
+
+      expect(sendActionPrompt).toHaveBeenCalledExactlyOnceWith("Choose:", [
+        { id: "choice_1", label: "New image", inputText: "new_image" },
+        { id: "choice_2", label: "Different background", inputText: "change_background" },
+        ...actions,
+      ]);
+      expect(actions).toEqual([{ id: "privacy", label: "Privacy" }]);
+      expect(sendText).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each(["legacy", "neutral"] as const)(
+    "preserves the %s fallback when the action renderer is unavailable",
+    async format => {
+      const sendText = vi.fn(async () => {});
+      const sendStateText = vi.fn(async () => {});
+      const text = "Choose:\n1. New image\n2. Different background";
+
+      await sendWhatsAppBotResponse(
+        {
+          ...(format === "legacy" ? { kind: "text" as const } : {}),
+          text,
+          actions: [{ id: "privacy", label: "Privacy" }],
+        },
+        { sendText, sendStateText, replyState: "IDLE" }
+      );
+
+      if (format === "legacy") {
+        expect(sendStateText).toHaveBeenCalledExactlyOnceWith("IDLE", text);
+        expect(sendText).not.toHaveBeenCalled();
+      } else {
+        expect(sendText).toHaveBeenCalledExactlyOnceWith(`${text}\nPrivacy`);
+        expect(sendStateText).not.toHaveBeenCalled();
+      }
+    }
+  );
+
+  it.each(["legacy", "neutral"] as const)(
+    "preserves empty-text action handling for %s responses",
+    async format => {
+      const sendText = vi.fn(async () => {});
+      const sendActionPrompt = vi.fn(async () => {});
+      const actions = [{ id: "privacy", label: "Privacy" }];
+
+      await sendMessengerBotResponse(
+        { ...(format === "legacy" ? { kind: "text" as const } : {}), text: "", actions },
+        { sendText, sendActionPrompt }
+      );
+
+      if (format === "legacy") {
+        expect(sendActionPrompt).toHaveBeenCalledExactlyOnceWith("", actions);
+        expect(sendText).not.toHaveBeenCalled();
+      } else {
+        expect(sendText).toHaveBeenCalledExactlyOnceWith("Privacy");
+        expect(sendActionPrompt).not.toHaveBeenCalled();
+      }
+    }
+  );
+
+  it.each(["legacy", "neutral"] as const)(
+    "propagates action delivery failure without a second send for %s responses",
+    async format => {
+      const failure = new Error("action delivery failed");
+      const sendText = vi.fn(async () => {});
+      const sendActionPrompt = vi.fn(async () => { throw failure; });
+
+      await expect(sendMessengerBotResponse(
+        {
+          ...(format === "legacy" ? { kind: "text" as const } : {}),
+          text: "Choose:",
+          actions: [{ id: "privacy", label: "Privacy" }],
+        },
+        { sendText, sendActionPrompt }
+      )).rejects.toBe(failure);
+      expect(sendActionPrompt).toHaveBeenCalledTimes(1);
+      expect(sendText).not.toHaveBeenCalled();
+    }
+  );
+
+  it("sends neutral response images before its action prompt", async () => {
+    const sent: string[] = [];
+    const sendText = vi.fn(async () => {});
+    await sendMessengerBotResponse(
+      {
+        images: [{ imageUrl: "https://example.com/result.png" }],
+        text: "Choose:",
+        actions: [{ id: "privacy", label: "Privacy" }],
+      },
+      {
+        sendText,
+        sendImage: async () => { sent.push("image"); },
+        sendActionPrompt: async () => { sent.push("actions"); },
+      }
+    );
+    expect(sent).toEqual(["image", "actions"]);
+    expect(sendText).not.toHaveBeenCalled();
+  });
+
   it("maps WhatsApp error responses to plain text", async () => {
     const sendText = vi.fn(async () => {});
 

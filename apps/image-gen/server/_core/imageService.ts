@@ -56,29 +56,7 @@ export type ProviderAttemptAdmission = Readonly<{
 }>;
 
 interface ImageGenerator {
-  generate(input: {
-    generationKind?: GenerationKind;
-    sourceImageUrl?: string;
-    sourceImageUrls?: string[];
-    trustedSourceImageUrl?: boolean;
-    sourceImageProvenance?: "storeInbound";
-    sourceImageData?: {
-      buffer: Buffer;
-      contentType: string;
-    };
-    promptHint?: string;
-    previousResponseId?: string;
-    model?: string;
-    quality?: OpenAiImageQuality;
-    onProviderAttempt?: () => Promise<ProviderAttemptAdmission | void>;
-    onProviderSuccess?: () => Promise<void>;
-    onProviderRejected?: (status: number) => Promise<void>;
-    bypassBudgetLimits?: boolean;
-    costLedgerChannel?: string;
-    costLedgerScope?: CostLedgerTenantScope;
-    userKey: string;
-    reqId: string;
-  }): Promise<{
+  generate(input: GeneratorInput): Promise<{
     imageUrl: string;
     proof: {
       incomingLen: number;

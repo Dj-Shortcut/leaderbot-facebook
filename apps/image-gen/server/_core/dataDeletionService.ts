@@ -41,7 +41,7 @@ import {
   type MessengerErasingPrivacySubject,
 } from "./messengerPrivacySubject";
 import { containMessengerProviderAttemptsForPrivacy } from "./messengerProviderAttemptFence";
-import { eraseWebhookIngressDeliveriesForSubject } from "./meta/webhookIngressQueue";
+import { eraseWebhookIngressDeliveriesForSubject } from "./meta/webhookIngressPrivacy";
 import {
   eraseMessengerGenerationJobsForSubject,
   recoverMessengerGenerationAdmissionsForSubject,
