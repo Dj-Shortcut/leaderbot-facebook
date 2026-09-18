@@ -7,7 +7,7 @@ import {
   type MessengerDailyBudgetResult,
   type MessengerEphemeralStateStore,
   type MessengerStateScope,
-} from "./messenger-state-store.js";
+} from "./messenger-state-store-contract.js";
 
 const CLAIM_SCRIPT = `
 local current = redis.call("GET", KEYS[1])
