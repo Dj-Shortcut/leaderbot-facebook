@@ -11,7 +11,7 @@
     "server/testConsentHelpers.ts",
     "server/testHttpServer.ts"
   ],
-  "ignoreDependencies": ["mysql2"],
+  "ignoreDependencies": ["mysql2", "@aws-sdk/client-s3", "helmet", "rate-limit-redis"],
   "overrides": [
     {
       "files": ["client/index.html"],
