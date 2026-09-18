@@ -1,6 +1,10 @@
 {
   "entry": [
     "client/src/pages/Legal.tsx",
+    "client/src/pages/LandingPage.tsx",
+    "client/src/pages/NotFound.tsx",
+    "client/src/pages/CreditCheckout.tsx",
+    "client/src/components/HeroOrbCanvas.tsx",
     "server/_core/facebookConnectStore.ts",
     "client/src/main.tsx",
     "storage-proxy/index.ts",
