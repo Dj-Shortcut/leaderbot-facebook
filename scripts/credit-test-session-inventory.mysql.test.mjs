@@ -82,6 +82,26 @@ suite("narrow session inventory on disposable MySQL 8.4.11", () => {
     connections.add(connection);
     return connection;
   };
+  // A client close resolves before MySQL tears down the server thread. In
+  // mysql-8.4.11 sql/conn_handler/connection_handler_per_thread.cc,
+  // handle_connection() decrements Threads_connected before it deletes the
+  // performance_schema thread row, so that row's absence marks a finished
+  // teardown. Wait for it instead of relaxing the strict inventory.
+  const closeAndAwaitTeardown = async (connection) => {
+    const [[session]] = await connection.query("SELECT CONNECTION_ID() AS id");
+    await close(connection);
+    const deadline = Date.now() + 5000;
+    for (;;) {
+      const [[thread]] = await root.query(
+        "SELECT COUNT(*) AS remaining FROM performance_schema.threads WHERE PROCESSLIST_ID=?",
+        [session.id],
+      );
+      if (Number(thread.remaining) === 0) return;
+      if (Date.now() > deadline)
+        throw new Error("closed synthetic session was not torn down");
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+  };
   let metadataDiagnostics = [];
   const session = {
     async execute(sql) {
@@ -364,15 +384,19 @@ suite("narrow session inventory on disposable MySQL 8.4.11", () => {
       verified: false,
       reason: "obsolete_sessions_present",
     });
-    await close(old);
+    await closeAndAwaitTeardown(old);
     await root.query(`DROP USER ${account(names.old)}`);
-    expect(await collect()).toMatchObject({
+    const afterOld = await collect();
+    expect(afterOld, JSON.stringify(afterOld)).toMatchObject({
       verified: true,
       obsoleteSessionCount: 0,
     });
     for (let index = 0; index < 12; index++)
-      await close(await connect(names.noise));
-    expect(await collect()).toMatchObject({ verified: true });
+      await closeAndAwaitTeardown(await connect(names.noise));
+    const afterNoise = await collect();
+    expect(afterNoise, JSON.stringify(afterNoise)).toMatchObject({
+      verified: true,
+    });
     const unauthenticated = net.createConnection({
       host: settings.host,
       port: settings.port,
@@ -426,8 +450,9 @@ suite("narrow session inventory on disposable MySQL 8.4.11", () => {
       verified: false,
       reason: "obsolete_sessions_present",
     });
-    await close(disabled);
-    expect(await collect(unmonitoredHash)).toMatchObject({
+    await closeAndAwaitTeardown(disabled);
+    const afterDisabled = await collect(unmonitoredHash);
+    expect(afterDisabled, JSON.stringify(afterDisabled)).toMatchObject({
       verified: true,
       obsoleteSessionCount: 0,
     });

@@ -1,6 +1,6 @@
 import { PUBLIC_BUSINESS_DETAILS } from "./publicBusinessDetails";
 
-export type PublicLegalLink = Readonly<{
+type PublicLegalLink = Readonly<{
   href: string;
   label: string;
   external?: boolean;

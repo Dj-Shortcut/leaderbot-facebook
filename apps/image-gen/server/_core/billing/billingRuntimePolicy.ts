@@ -1,6 +1,6 @@
 import { isMollieBillingDrainEnabled, isMollieBillingEnabled } from "./config";
 
-export type MollieRuntimePolicy = Readonly<{
+type MollieRuntimePolicy = Readonly<{
   commercialExposureEnabled: boolean;
   providerDrainEnabled: boolean;
   registerClassicWebhook: boolean;

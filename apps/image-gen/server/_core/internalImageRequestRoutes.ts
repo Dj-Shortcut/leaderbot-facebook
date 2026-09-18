@@ -97,7 +97,7 @@ function readBearerToken(header: string | undefined): string {
   return token;
 }
 
-export function timingSafeTokenEqual(
+function timingSafeTokenEqual(
   expectedToken: string,
   providedToken: string
 ): boolean {

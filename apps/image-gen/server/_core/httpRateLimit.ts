@@ -28,7 +28,7 @@ export function getHttpRateLimitWindowMs(): number {
   return DEFAULT_WINDOW_MS;
 }
 
-export function getHttpRateLimitMaxRequests(): number {
+function getHttpRateLimitMaxRequests(): number {
   const parsed = Number(process.env.HTTP_RATE_LIMIT_MAX_REQUESTS);
   if (Number.isFinite(parsed) && parsed > 0) {
     return Math.floor(parsed);

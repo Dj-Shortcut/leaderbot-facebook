@@ -18,7 +18,7 @@ export const REQUIRED_FACEBOOK_SCOPES = [
   "pages_messaging",
 ] as const;
 
-export const FACEBOOK_PAGE_CONNECT_PERMISSIONS = [
+const FACEBOOK_PAGE_CONNECT_PERMISSIONS = [
   ...REQUIRED_FACEBOOK_SCOPES,
   "business_management",
 ] as const;
@@ -573,7 +573,7 @@ function getFacebookRedirectUri() {
   return `${getPortalBaseUrl()}/api/facebook/connect/callback`;
 }
 
-export function getFacebookPageConnectConfigurationId(): string | null {
+function getFacebookPageConnectConfigurationId(): string | null {
   const configurationId = process.env.FB_PAGE_CONNECT_CONFIG_ID?.trim();
   if (!configurationId) return null;
   if (!/^[1-9]\d+$/.test(configurationId)) {

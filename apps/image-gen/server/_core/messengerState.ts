@@ -234,14 +234,6 @@ export function hasOpenPaidHandoffWindow(
   return isPromiseLike(state) ? state.then(isOpen) : isOpen(state);
 }
 
-export function setLastPaidHandoffEligibleAt(
-  psid: string,
-  timestamp = Date.now()
-): MaybePromise<void> {
-  const result = patchState(psid, { lastPaidHandoffEligibleAt: timestamp });
-  if (isPromiseLike(result)) return result.then(() => undefined);
-}
-
 export function getOrCreateState(
   psid: string
 ): MaybePromise<MessengerUserState> {
