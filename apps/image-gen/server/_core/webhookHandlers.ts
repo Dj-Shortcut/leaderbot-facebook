@@ -226,8 +226,6 @@ export function createWebhookHandlers({ defaultLang }: HandlerDeps) {
     processFacebookWebhookPayload,
     acceptInternalMessengerImageRequest:
       internalRequestHandler.acceptInternalMessengerImageRequest,
-    processInternalMessengerImageRequest:
-      internalRequestHandler.processInternalMessengerImageRequest,
     processMessengerGenerationJob: async (job: MessengerGenerationJob) =>
       job.operation === "video"
         ? await processVideoGenerationJob(job)
