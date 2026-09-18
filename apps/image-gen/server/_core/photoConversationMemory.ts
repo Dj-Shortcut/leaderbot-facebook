@@ -11,7 +11,7 @@ export type PhotoConversationImage = {
   url: string;
   kind: "uploaded" | "generated";
 };
-export type PhotoConversationTurn = {
+type PhotoConversationTurn = {
   id: string;
   role: "user" | "assistant";
   text: string;
