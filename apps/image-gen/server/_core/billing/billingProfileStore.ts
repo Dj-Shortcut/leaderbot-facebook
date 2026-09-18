@@ -15,7 +15,7 @@ import {
 } from "../../../drizzle/schema";
 import { getDatabaseOrThrow } from "../../db";
 
-export class BillingProfileEligibilityError extends Error {
+class BillingProfileEligibilityError extends Error {
   constructor(readonly code: string) {
     super(code);
     this.name = "BillingProfileEligibilityError";
