@@ -26,16 +26,12 @@ import {
   InsertWorkspace,
   InsertWorkspaceMember,
   InsertWorkspacePrivacySetting,
-  InsertWorkspacePrivacyRequest,
-  InsertWorkspaceUpgradeRequest,
   messengerPrivacySubjects,
   messengerProviderAttemptFences,
   portalHandoffTokens,
   users,
   workspaceMembers,
   workspacePrivacySettings,
-  workspacePrivacyRequests,
-  workspaceUpgradeRequests,
   workspaceEntitlements,
   workspaceEntitlementUsage,
   workspaceEntitlementUsageReservations,
@@ -663,146 +659,6 @@ function getAffectedRows(result: unknown): number {
   }
 
   return 0;
-}
-
-export async function listWorkspacePrivacyRequests(workspaceId: number) {
-  const db = await getDb();
-  if (!db) {
-    logDatabaseUnavailable("list_workspace_privacy_requests");
-    throw new Error("Database unavailable: privacy requests were not loaded");
-  }
-
-  const result = await db
-    .select()
-    .from(workspacePrivacyRequests)
-    .where(eq(workspacePrivacyRequests.workspaceId, workspaceId))
-    .orderBy(desc(workspacePrivacyRequests.id));
-
-  return result;
-}
-
-export async function createWorkspacePrivacyRequest(
-  workspaceId: number,
-  userId: number,
-  values: Pick<InsertWorkspacePrivacyRequest, "requestType" | "note">,
-  audit?: Pick<InsertAuditLog, "event" | "metadata">
-) {
-  const db = await getDb();
-  const request: InsertWorkspacePrivacyRequest = {
-    workspaceId,
-    userId,
-    requestType: values.requestType,
-    note: values.note ?? null,
-    status: "requested",
-  };
-
-  if (!db) {
-    logDatabaseUnavailable("create_workspace_privacy_request");
-    throw new Error("Database unavailable: privacy request was not persisted");
-  }
-
-  return db.transaction(async tx => {
-    const insertResult = await tx
-      .insert(workspacePrivacyRequests)
-      .values(request);
-    const insertedId = getInsertedId(insertResult, "privacy request");
-
-    if (audit) {
-      await tx.insert(auditLog).values({
-        workspaceId,
-        userId,
-        event: audit.event,
-        metadata: audit.metadata,
-      });
-    }
-
-    const created = await tx
-      .select()
-      .from(workspacePrivacyRequests)
-      .where(eq(workspacePrivacyRequests.id, insertedId))
-      .limit(1);
-
-    if (!created[0]) {
-      throw new Error("Privacy request insert succeeded but read-back failed");
-    }
-
-    return created[0];
-  });
-}
-
-export async function listWorkspaceUpgradeRequests(workspaceId: number) {
-  const db = await getDb();
-  if (!db) {
-    logDatabaseUnavailable("list_workspace_upgrade_requests");
-    throw new Error("Database unavailable: upgrade requests were not loaded");
-  }
-
-  return db
-    .select()
-    .from(workspaceUpgradeRequests)
-    .where(eq(workspaceUpgradeRequests.workspaceId, workspaceId))
-    .orderBy(desc(workspaceUpgradeRequests.id));
-}
-
-export async function createWorkspaceUpgradeRequest(
-  workspaceId: number,
-  userId: number,
-  values: Pick<
-    InsertWorkspaceUpgradeRequest,
-    | "currentPlanName"
-    | "billingStatus"
-    | "upgradeReason"
-    | "imagesRemainingToday"
-    | "blockedToday"
-    | "requestedPlanName"
-  >,
-  audit?: Pick<InsertAuditLog, "event" | "metadata">
-) {
-  const db = await getDb();
-  const request: InsertWorkspaceUpgradeRequest = {
-    workspaceId,
-    userId,
-    status: "requested",
-    currentPlanName: values.currentPlanName,
-    billingStatus: values.billingStatus,
-    upgradeReason: values.upgradeReason ?? null,
-    imagesRemainingToday: values.imagesRemainingToday,
-    blockedToday: values.blockedToday,
-    requestedPlanName: values.requestedPlanName,
-  };
-
-  if (!db) {
-    logDatabaseUnavailable("create_workspace_upgrade_request");
-    throw new Error("Database unavailable: upgrade request was not persisted");
-  }
-
-  return db.transaction(async tx => {
-    const insertResult = await tx
-      .insert(workspaceUpgradeRequests)
-      .values(request);
-    const insertedId = getInsertedId(insertResult, "upgrade request");
-
-    if (audit) {
-      await tx.insert(auditLog).values({
-        workspaceId,
-        userId,
-        event: audit.event,
-        metadata: audit.metadata,
-      });
-    }
-
-    const created = await tx
-      .select()
-      .from(workspaceUpgradeRequests)
-      .where(eq(workspaceUpgradeRequests.id, insertedId))
-      .limit(1);
-
-    if (!created[0]) {
-      throw new Error("Upgrade request insert succeeded but read-back failed");
-    }
-
-    return created[0];
-  });
 }
 
 export async function createPortalHandoffToken(
