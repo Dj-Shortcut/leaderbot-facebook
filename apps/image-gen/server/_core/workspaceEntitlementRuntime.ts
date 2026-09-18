@@ -16,7 +16,7 @@ const STARTPILOT_IMAGE_TOTAL_LIMIT = 20;
 const STARTPILOT_IMAGE_DAILY_LIMIT = 5;
 const STARTPILOT_IMAGE_MODEL = "gpt-image-2";
 
-export type StartpilotRuntimePolicy = Readonly<{
+type StartpilotRuntimePolicy = Readonly<{
   kind: "startpilot";
   workspaceId: number;
   entitlementId: number;
@@ -27,10 +27,10 @@ export type StartpilotRuntimePolicy = Readonly<{
   imageQuality: "high";
 }>;
 
-export type WorkspaceRuntimePolicy =
+type WorkspaceRuntimePolicy =
   Readonly<{ kind: "free" }> | StartpilotRuntimePolicy;
 
-export type MessengerGenerationOwnership = Readonly<{
+type MessengerGenerationOwnership = Readonly<{
   workspaceId: number;
   channelConnectionId: number;
   bindingEpoch: number;
@@ -45,7 +45,7 @@ type ActiveEntitlement = {
   quota: unknown;
 };
 
-export type WorkspaceEntitlementRuntimeDeps = {
+type WorkspaceEntitlementRuntimeDeps = {
   findWorkspaceIdsByFacebookPage(pageId: string): Promise<number[]>;
   findActiveEntitlement(
     workspaceId: number,
@@ -328,7 +328,7 @@ export async function hasPremiumMediaAccess(
   return access !== null;
 }
 
-export type PremiumMediaAccess = Readonly<{
+type PremiumMediaAccess = Readonly<{
   workspaceId: number;
   entitlementId: number;
   mode: "test" | "live";
