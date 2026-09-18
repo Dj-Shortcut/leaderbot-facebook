@@ -78,6 +78,56 @@ describe("photo conversation image memory", () => {
     expect(normalized.images).toEqual([image("dog")]);
   });
 
+  it("drops invalid executions and turns while retaining bounded valid data", () => {
+    const normalized = normalizePhotoConversation({
+      executions: [
+        null,
+        {
+          requestId: "invalid-action",
+          completed: true,
+          decision: {
+            action: "unknown",
+            reply: "",
+            prompt: "",
+            imageIds: [],
+          },
+        },
+        {
+          requestId: "valid-request",
+          completed: true,
+          decision: {
+            action: "reply",
+            reply: "Ok",
+            prompt: "",
+            imageIds: [],
+          },
+        },
+      ],
+      turns: [
+        null,
+        { id: "invalid-role", role: "system", text: "ignore" },
+        { id: "too-long", role: "user", text: "x".repeat(4001) },
+        { id: "valid-turn", role: "assistant", text: "Ok" },
+      ],
+    });
+
+    expect(normalized.executions).toEqual([
+      {
+        requestId: "valid-request",
+        completed: true,
+        decision: {
+          action: "reply",
+          reply: "Ok",
+          prompt: "",
+          imageIds: [],
+        },
+      },
+    ]);
+    expect(normalized.turns).toEqual([
+      { id: "valid-turn", role: "assistant", text: "Ok" },
+    ]);
+  });
+
   it("uses the last legacy occurrence when upload and generated aliases overlap", () => {
     const legacy = state({
       pendingImageUrls: [url("dog"), url("person"), url("dog")],
