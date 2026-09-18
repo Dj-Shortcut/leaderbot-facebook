@@ -542,22 +542,6 @@ function assertCreditPaymentInput(
   }
 }
 
-function isEnabledMollieMethod(method: MollieMethod): boolean {
-  return (
-    !method.status ||
-    method.status === "activated" ||
-    method.status === "active"
-  );
-}
-
-export async function checkMollieOneTimePaymentMethod(client: MollieClient) {
-  const methods = await client.listMethods("oneoff");
-  const bancontact = methods.some(
-    method => method.id === "bancontact" && isEnabledMollieMethod(method)
-  );
-  return { bancontact, providerChecked: true as const };
-}
-
 export function assertMollieId(
   value: string,
   prefix: "tr_" | "cst_" | "mdt_" | "sub_"
@@ -569,29 +553,4 @@ export function assertMollieId(
   ) {
     throw new Error("invalid Mollie resource ID");
   }
-}
-
-export async function checkMolliePaymentMethods(
-  client: MollieClient,
-  mode: "test" | "live"
-) {
-  const [firstMethods, recurringMethods] = await Promise.all([
-    client.listMethods("first"),
-    client.listMethods("recurring"),
-  ]);
-  const bancontact = firstMethods.some(
-    method => method.id === "bancontact" && isEnabledMollieMethod(method)
-  );
-  const sepaDirectDebit = recurringMethods.some(
-    method => method.id === "directdebit" && isEnabledMollieMethod(method)
-  );
-  return {
-    ok: mode === "live" && bancontact && sepaDirectDebit,
-    bancontact,
-    sepaDirectDebit,
-    profileActivationConfirmed:
-      mode === "live" && bancontact && sepaDirectDebit,
-    evidence:
-      mode === "live" ? "live_profile_enabled_methods" : "test_mode_not_proof",
-  };
 }

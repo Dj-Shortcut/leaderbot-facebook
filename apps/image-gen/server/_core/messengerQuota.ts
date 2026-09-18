@@ -1,5 +1,5 @@
-import { readMessengerExecutionAccess } from "./messengerCustomerTestMode";
 import { randomUUID } from "node:crypto";
+import { readMessengerExecutionAccess } from "./messengerCustomerTestMode";
 import { getDayKey } from "./messengerStateNormalization";
 import { getOrCreateState, getState, type MessengerUserState } from "./messengerState";
 import {
@@ -44,6 +44,11 @@ export class MessengerQuotaReservationCommitError extends Error {
 
 export function getFreeDailyLimit(): number {
   return getImageGenerationDailyLimit();
+}
+
+/** Always read the scoped preference, not the legacy quota-state copy. */
+async function hasQuotaBypass(psid: string, userKey: string): Promise<boolean> {
+  return (await readMessengerExecutionAccess(psid, userKey)).quotaBypass;
 }
 
 function getTranscriptionLimit(): number {
@@ -142,11 +147,6 @@ async function reserveVideoGenerationSlot(
   }
 
   return null;
-}
-
-/** Always read the scoped preference, not the legacy quota-state copy. */
-export async function hasQuotaBypass(psid: string, userKey: string): Promise<boolean> {
-  return (await readMessengerExecutionAccess(psid, userKey)).quotaBypass;
 }
 
 function withSyncedQuota(

@@ -29,16 +29,6 @@ function extractAffectedRows(result: unknown): number {
   return Number((metadata as { affectedRows?: number })?.affectedRows ?? 0);
 }
 
-export type ActiveWorkspaceEntitlement = {
-  entitlementId: number;
-  workspaceId: number;
-  mode: MollieMode;
-  planCode: string;
-  status: "active" | "grace";
-  quota: unknown;
-  validUntil: Date | null;
-};
-
 export type StartpilotImageUsageInput = {
   workspaceId: number;
   entitlementId: number;
@@ -57,43 +47,6 @@ export type StartpilotImageUsageDecision =
       alreadyReserved: boolean;
     }
   | { allowed: false; reason: "total_exhausted" | "daily_exhausted" };
-
-export async function resolveActiveWorkspaceEntitlement(
-  workspaceId: number,
-  now = new Date()
-): Promise<ActiveWorkspaceEntitlement | null> {
-  assertPositiveId(workspaceId, "workspace");
-  const mode = readEntitlementMode();
-  const database = await getDatabaseOrThrow();
-  const rows = await database
-    .select()
-    .from(workspaceEntitlements)
-    .where(
-      and(
-        eq(workspaceEntitlements.workspaceId, workspaceId),
-        eq(workspaceEntitlements.mode, mode)
-      )
-    )
-    .limit(1);
-  const entitlement = rows[0];
-  if (
-    !entitlement ||
-    (entitlement.status !== "active" && entitlement.status !== "grace") ||
-    (entitlement.validUntil &&
-      entitlement.validUntil.getTime() <= now.getTime())
-  ) {
-    return null;
-  }
-  return {
-    entitlementId: entitlement.id,
-    workspaceId: entitlement.workspaceId,
-    mode: entitlement.mode,
-    planCode: entitlement.planCode,
-    status: entitlement.status,
-    quota: entitlement.quota,
-    validUntil: entitlement.validUntil,
-  };
-}
 
 export async function reserveStartpilotImageUsage(
   input: StartpilotImageUsageInput
@@ -909,14 +862,6 @@ function requireReservedCapacity(current: number, decrement: number): number {
 export function utcDateKey(value: Date): string {
   if (Number.isNaN(value.getTime())) throw new Error("invalid usage date");
   return value.toISOString().slice(0, 10);
-}
-
-function readEntitlementMode(): MollieMode {
-  const mode = process.env.MOLLIE_MODE?.trim();
-  if (mode !== "test" && mode !== "live") {
-    throw new Error("MOLLIE_MODE must be configured for paid entitlement use");
-  }
-  return mode;
 }
 
 function assertPositiveId(value: number, label: string): void {
