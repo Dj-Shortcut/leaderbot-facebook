@@ -53,7 +53,7 @@ export type ReadinessCheck = {
   check: () => Promise<void> | void;
 };
 
-export type ReadinessPhase = "core" | "offline" | "operational";
+type ReadinessPhase = "core" | "offline" | "operational";
 
 type ReadinessCheckResult = {
   name: string;
