@@ -16,6 +16,9 @@ type PhotoConversationTurn = {
   role: "user" | "assistant";
   text: string;
 };
+type PhotoConversationExecution = NonNullable<
+  PhotoConversationMemory["executions"]
+>[number];
 export type PhotoConversationMemory = {
   images: PhotoConversationImage[];
   turns: PhotoConversationTurn[];
@@ -63,6 +66,42 @@ function normalizeImages(
   return [...byUrl.values()].slice(-MAX_SOURCE_IMAGES);
 }
 
+function isRetainableExecution(entry: PhotoConversationExecution): boolean {
+  return Boolean(
+    entry &&
+      typeof entry.requestId === "string" &&
+      entry.requestId.length <= 200 &&
+      entry.decision &&
+      ["reply", "generate", "edit"].includes(entry.decision.action) &&
+      typeof entry.decision.reply === "string" &&
+      entry.decision.reply.length <= 1800 &&
+      typeof entry.decision.prompt === "string" &&
+      entry.decision.prompt.length <= PHOTO_CONVERSATION_MAX_TEXT &&
+      Array.isArray(entry.decision.imageIds) &&
+      entry.decision.imageIds.length <= MAX_SOURCE_IMAGES &&
+      entry.decision.imageIds.every(
+        id => typeof id === "string" && /^image_[a-f0-9]{16}$/.test(id)
+      )
+  );
+}
+
+function isRetainableTurn(turn: PhotoConversationTurn): boolean {
+  return Boolean(
+    turn &&
+      typeof turn.id === "string" &&
+      turn.id.length <= 200 &&
+      (turn.role === "user" || turn.role === "assistant") &&
+      typeof turn.text === "string" &&
+      turn.text.length <= PHOTO_CONVERSATION_MAX_TEXT
+  );
+}
+
+function boundTurns(turns: PhotoConversationTurn[]): PhotoConversationTurn[] {
+  return turns
+    .slice(-PHOTO_CONVERSATION_MAX_TURNS)
+    .map(({ id, role, text }) => ({ id, role, text }));
+}
+
 export function normalizePhotoConversation(
   value: unknown
 ): PhotoConversationMemory {
@@ -72,23 +111,7 @@ export function normalizePhotoConversation(
   const executions = Array.isArray(input?.executions) ? input.executions : [];
   return {
     executions: executions
-      .filter(
-        entry =>
-          entry &&
-          typeof entry.requestId === "string" &&
-          entry.requestId.length <= 200 &&
-          entry.decision &&
-          ["reply", "generate", "edit"].includes(entry.decision.action) &&
-          typeof entry.decision.reply === "string" &&
-          entry.decision.reply.length <= 1800 &&
-          typeof entry.decision.prompt === "string" &&
-          entry.decision.prompt.length <= PHOTO_CONVERSATION_MAX_TEXT &&
-          Array.isArray(entry.decision.imageIds) &&
-          entry.decision.imageIds.length <= MAX_SOURCE_IMAGES &&
-          entry.decision.imageIds.every(
-            id => typeof id === "string" && /^image_[a-f0-9]{16}$/.test(id)
-          )
-      )
+      .filter(isRetainableExecution)
       .slice(-6)
       .map(entry => ({
         requestId: entry.requestId,
@@ -101,18 +124,7 @@ export function normalizePhotoConversation(
         },
       })),
     images: normalizeImages(images),
-    turns: turns
-      .filter(
-        turn =>
-          turn &&
-          typeof turn.id === "string" &&
-          turn.id.length <= 200 &&
-          (turn.role === "user" || turn.role === "assistant") &&
-          typeof turn.text === "string" &&
-          turn.text.length <= PHOTO_CONVERSATION_MAX_TEXT
-      )
-      .slice(-PHOTO_CONVERSATION_MAX_TURNS)
-      .map(({ id, role, text }) => ({ id, role, text })),
+    turns: boundTurns(turns.filter(isRetainableTurn)),
   };
 }
 
@@ -159,8 +171,9 @@ export function appendPhotoConversationTurn(
   return {
     ...memory,
     images: getPhotoConversationImages(state),
-    turns: [...memory.turns.filter(previous => previous.id !== turn.id), turn]
-      .slice(-PHOTO_CONVERSATION_MAX_TURNS)
-      .map(({ id, role, text }) => ({ id, role, text })),
+    turns: boundTurns([
+      ...memory.turns.filter(previous => previous.id !== turn.id),
+      turn,
+    ]),
   };
 }
