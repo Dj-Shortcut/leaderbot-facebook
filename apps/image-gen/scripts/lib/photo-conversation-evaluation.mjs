@@ -11,8 +11,8 @@ import {
   PHOTO_CONVERSATION_OUTPUT_USD_PER_TOKEN,
 } from "../../server/_core/photoConversationContract.ts";
 
-export const EVALUATION_MAX_USD = 0.5;
-export const EVALUATION_MAX_CALLS = 10;
+const EVALUATION_MAX_USD = 0.5;
+const EVALUATION_MAX_CALLS = 10;
 const ENDPOINT = "https://api.openai.com/v1/responses";
 const MAX_RESPONSE_BYTES = 64 * 1024;
 const ids = {
