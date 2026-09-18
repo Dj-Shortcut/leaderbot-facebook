@@ -9,6 +9,7 @@
     "scripts/prepare-artifact-schema-fixture.mjs",
     "scripts/generate-production-migration-manifest.mjs",
     "scripts/evaluate-conversations.mjs",
+    "scripts/lib/photo-conversation-evaluation.mjs",
     "server/testConsentHelpers.ts",
     "server/testHttpServer.ts"
   ],
