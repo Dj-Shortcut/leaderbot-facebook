@@ -1,4 +1,5 @@
 {
+  "entry": ["client/src/pages/Legal.tsx"],
   "ignoreDependencies": ["mysql2"],
   "overrides": [
     {
