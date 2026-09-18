@@ -6,7 +6,10 @@
     "storage-proxy/index.ts",
     "storage-proxy/deadline.test.ts",
     "scripts/fallow-badge.mjs",
-    "scripts/prepare-artifact-schema-fixture.mjs"
+    "scripts/prepare-artifact-schema-fixture.mjs",
+    "scripts/evaluate-conversations.mjs",
+    "server/testConsentHelpers.ts",
+    "server/testHttpServer.ts"
   ],
   "ignoreDependencies": ["mysql2"],
   "overrides": [
