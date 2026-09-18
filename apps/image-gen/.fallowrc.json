@@ -1,7 +1,12 @@
 {
   "entry": [
     "client/src/pages/Legal.tsx",
-    "server/_core/facebookConnectStore.ts"
+    "server/_core/facebookConnectStore.ts",
+    "client/src/main.tsx",
+    "storage-proxy/index.ts",
+    "storage-proxy/deadline.test.ts",
+    "scripts/fallow-badge.mjs",
+    "scripts/prepare-artifact-schema-fixture.mjs"
   ],
   "ignoreDependencies": ["mysql2"],
   "overrides": [
