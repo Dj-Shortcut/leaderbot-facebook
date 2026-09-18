@@ -34,18 +34,6 @@ export async function acceptInternalMessengerImageRequest(input: {
   return await handlers.acceptInternalMessengerImageRequest(input);
 }
 
-export async function processInternalMessengerImageRequest(input: {
-  psid: string;
-  pageId: string;
-  prompt: string;
-  reqId: string;
-  lang?: Lang;
-  timestamp?: number;
-  sourceImageUrl?: string;
-}): Promise<MessengerSendOutcome> {
-  return await handlers.processInternalMessengerImageRequest(input);
-}
-
 export async function processMessengerGenerationJob(
   input: MessengerGenerationJob
 ): Promise<void> {

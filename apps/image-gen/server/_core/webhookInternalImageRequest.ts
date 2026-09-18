@@ -21,7 +21,6 @@ import {
 } from "./imageIntent";
 import { MESSENGER_SEND_SKIPPED } from "./webhookFallback";
 import { InternalMessengerImageRequestNotQueuedError } from "./internalImageRequestErrors";
-export { InternalMessengerImageRequestNotQueuedError } from "./internalImageRequestErrors";
 import type {
   HandlerContext,
   InternalMessengerImageRequestInput,
@@ -249,7 +248,6 @@ export function createInternalMessengerImageRequestHandler(
 
   return {
     acceptInternalMessengerImageRequest,
-    processInternalMessengerImageRequest: acceptInternalMessengerImageRequest,
   };
 }
 
