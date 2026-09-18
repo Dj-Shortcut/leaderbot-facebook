@@ -5,7 +5,7 @@ const MOLLIE_ENTITLEMENT_ENFORCEMENT_ENABLED_VALUE = "true";
 
 export type MollieMode = "test" | "live";
 
-export type MollieReadinessPhase = "core" | "offline" | "operational";
+type MollieReadinessPhase = "core" | "offline" | "operational";
 
 export type MollieConfig = Readonly<{
   apiKey: string;
