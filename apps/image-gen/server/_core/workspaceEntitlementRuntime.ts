@@ -319,40 +319,12 @@ export async function assertMessengerGenerationOwnership(input: {
   }
 }
 
-/** Video/TTS is a paid-only capability scoped to the owning Facebook Page. */
-export async function hasPremiumMediaAccess(
-  pageId: string | undefined,
-  now = new Date()
-): Promise<boolean> {
-  const access = await resolvePremiumMediaAccess(pageId, now);
-  return access !== null;
-}
-
 type PremiumMediaAccess = Readonly<{
   workspaceId: number;
   entitlementId: number;
   mode: "test" | "live";
   videoGenerationsPerDay: number;
 }>;
-
-/** Returns the server-owned Premium media quota for the Page's active entitlement. */
-export async function resolvePremiumMediaAccess(
-  pageId: string | undefined,
-  now = new Date()
-): Promise<PremiumMediaAccess | null> {
-  if (
-    !isMollieEntitlementEnforcementEnabled() ||
-    !process.env.DATABASE_URL?.trim()
-  ) {
-    return null;
-  }
-
-  return await resolvePremiumMediaAccessWithDeps(
-    pageId,
-    databaseRuntimeDeps,
-    now
-  );
-}
 
 export async function resolvePremiumMediaAccessWithDeps(
   pageId: string | undefined,
