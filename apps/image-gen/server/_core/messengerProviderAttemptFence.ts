@@ -32,15 +32,6 @@ export type MessengerProviderAttemptFence = Readonly<{
 export type MessengerProviderAttemptOutcome =
   "known_failed" | "succeeded" | "ambiguous";
 
-export type MessengerProviderAttemptStoredStatus =
-  | "reserved"
-  | "started"
-  | "known_failed"
-  | "succeeded"
-  | "ambiguous"
-  | "contained"
-  | "abandoned";
-
 export type MessengerProviderAttemptClaim =
   | { kind: "owned"; fence: MessengerProviderAttemptFence }
   | { kind: "busy"; retryAt: Date }
