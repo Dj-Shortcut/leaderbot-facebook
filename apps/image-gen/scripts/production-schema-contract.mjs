@@ -68,7 +68,7 @@ export const creditWalletTableNames = Object.freeze([
   "credit_reservations",
   "credit_ledger",
 ]);
-const creditWalletMigrationTablePrivileges = Object.freeze({
+export const creditWalletMigrationTablePrivileges = Object.freeze({
   billing_intents: Object.freeze(["DELETE"]),
   credit_wallets: Object.freeze(["CREATE", "DELETE"]),
 });
