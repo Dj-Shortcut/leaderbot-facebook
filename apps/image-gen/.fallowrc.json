@@ -1,5 +1,8 @@
 {
-  "entry": ["client/src/pages/Legal.tsx"],
+  "entry": [
+    "client/src/pages/Legal.tsx",
+    "server/_core/facebookConnectStore.ts"
+  ],
   "ignoreDependencies": ["mysql2"],
   "overrides": [
     {
