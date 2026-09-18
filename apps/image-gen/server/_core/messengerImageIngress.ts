@@ -142,7 +142,7 @@ type StoredMessengerImageDecisionInput = {
   storedSourceImageUrl: string;
 };
 
-export type StoredMessengerImageDecision = {
+type StoredMessengerImageDecision = {
   action: "request_edit_prompt";
   hadPreviousPhoto: boolean;
   incomingImageUrl: string;
