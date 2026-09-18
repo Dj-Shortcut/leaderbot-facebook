@@ -75,12 +75,6 @@ export type MollieSubscription = {
   metadata?: unknown;
 };
 
-export type MollieMethod = {
-  resource: "method";
-  id: string;
-  status?: string;
-};
-
 type MollieList<T> = {
   _embedded?: Record<string, T[] | undefined>;
   _links?: {
@@ -264,16 +258,6 @@ export class MollieClient {
       `/customers/${encodeURIComponent(customerId)}/subscriptions/${encodeURIComponent(subscriptionId)}`,
       { method: "DELETE" }
     );
-  }
-
-  async listMethods(
-    sequenceType: "oneoff" | "first" | "recurring"
-  ): Promise<MollieMethod[]> {
-    const response = await this.request<MollieList<MollieMethod>>(
-      `/methods?sequenceType=${sequenceType}&locale=nl_BE`,
-      { method: "GET" }
-    );
-    return response._embedded?.methods ?? [];
   }
 
   getHostedCheckoutUrl(payment: MolliePayment): string {
