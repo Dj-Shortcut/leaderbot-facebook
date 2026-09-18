@@ -7,6 +7,7 @@
     "storage-proxy/deadline.test.ts",
     "scripts/fallow-badge.mjs",
     "scripts/prepare-artifact-schema-fixture.mjs",
+    "scripts/generate-production-migration-manifest.mjs",
     "scripts/evaluate-conversations.mjs",
     "server/testConsentHelpers.ts",
     "server/testHttpServer.ts"
