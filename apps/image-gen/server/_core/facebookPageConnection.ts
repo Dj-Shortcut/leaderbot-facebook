@@ -1,9 +1,9 @@
 import * as db from "../db";
 import {
   REQUIRED_FACEBOOK_SCOPES,
-  sealFacebookPageToken,
   type FacebookConnectPage,
 } from "./facebookConnectStore";
+import { sealFacebookPageToken } from "./facebookPageToken";
 
 export async function connectAuthorizedFacebookPage(input: {
   workspaceId: number;
