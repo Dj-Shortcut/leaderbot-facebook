@@ -141,6 +141,23 @@ The documentation uses explicit status boundaries. Read the active operational
 state first; transitional and target documents must not be treated as evidence
 that a feature is live.
 
+Use the following vocabulary consistently when adding or reviewing documentation:
+
+- **Active** means the supported production path; its evidence and gates belong
+  in the active operational backlog.
+- **Active or migration-gated** means the supported path exists, but a documented
+  migration gate still constrains its rollout; the gate must be named in the
+  table or linked runbook.
+- **Implemented, exposure-gated** means the code path exists, but deployment,
+  configuration, or launch evidence still prevents public use.
+- **Target** means planned or incomplete work; it is not evidence of a live
+  feature.
+- **Transitional**, **frozen**, or **retirement-only** means retained solely for
+  migration, compatibility, data drain, or safe removal. It must not acquire
+  new product dependencies.
+- **Not exposed** means the product deliberately does not offer the surface; it
+  is an explicit exclusion, not planned work.
+
 | Status | Documents | Meaning |
 | --- | --- | --- |
 | Active state | [Operations backlog](docs/operations/todo.md), [production readiness](docs/production-readiness.md), [deployment and rollback](docs/operations/production-deployments.md) | Current gates, evidence, and executable operational procedures. |
