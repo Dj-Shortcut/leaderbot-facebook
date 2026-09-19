@@ -64,19 +64,39 @@ function makeContext(overrides: Partial<HandlerContext> = {}): HandlerContext {
     logIncomingMessage: vi.fn(),
     logUserState: vi.fn(),
     maybeSendInFlightMessage: vi.fn(async () => ({ handled: false })),
-    runImageGeneration: vi.fn(async () => ({ sent: true, messageId: "msg-image" })),
-    sendFaceMemoryConsentPrompt: vi.fn(async () => ({ sent: true, messageId: "msg-face" })),
-    sendFlowExplanation: vi.fn(async () => ({ sent: true, messageId: "msg-flow" })),
-    sendLoggedImage: vi.fn(async () => ({ sent: true, messageId: "msg-image-output" })),
-    sendLoggedActions: vi.fn(async () => ({ sent: true, messageId: "msg-actions" })),
+    runImageGeneration: vi.fn(async () => ({
+      sent: true,
+      messageId: "msg-image",
+    })),
+    sendFaceMemoryConsentPrompt: vi.fn(async () => ({
+      sent: true,
+      messageId: "msg-face",
+    })),
+    sendFlowExplanation: vi.fn(async () => ({
+      sent: true,
+      messageId: "msg-flow",
+    })),
+    sendLoggedImage: vi.fn(async () => ({
+      sent: true,
+      messageId: "msg-image-output",
+    })),
+    sendLoggedActions: vi.fn(async () => ({
+      sent: true,
+      messageId: "msg-actions",
+    })),
     sendLoggedText: vi.fn(async () => ({ sent: true, messageId: "msg-text" })),
-    sendPhotoReceivedPrompt: vi.fn(async () => ({ sent: true, messageId: "msg-photo-prompt" })),
+    sendPhotoReceivedPrompt: vi.fn(async () => ({
+      sent: true,
+      messageId: "msg-photo-prompt",
+    })),
     ...overrides,
   };
 }
 
 function findLogEvent(eventName: string): Record<string, unknown> | undefined {
-  const entry = safeLogMock.mock.calls.find(([name]) => name === eventName)?.[1];
+  const entry = safeLogMock.mock.calls.find(
+    ([name]) => name === eventName
+  )?.[1];
   return (entry as Record<string, unknown> | undefined) ?? undefined;
 }
 
@@ -92,6 +112,35 @@ function messageWithTextAndAttachments(
 }
 
 describe("webhook message router", () => {
+  it.each([false, true])(
+    "allows Credits while an image is processing (quick reply: %s)",
+    async quickReply => {
+      const ctx = makeContext({
+        maybeSendInFlightMessage: vi.fn(async () => ({ handled: true })),
+      });
+      decodeMessengerActionInputMock.mockReturnValue("credits");
+      await handleMessageEvent(ctx, {
+        psid: "synthetic-credit-user",
+        userId: "synthetic-credit-key",
+        reqId: "synthetic-credit-request",
+        lang: "nl",
+        event: {
+          message: {
+            text: "Credits",
+            ...(quickReply
+              ? { quick_reply: { payload: "OPENCLAW_ACTION:credits" } }
+              : {}),
+          },
+        },
+      });
+      expect(handleTextMessageMock).toHaveBeenCalledWith(
+        ctx,
+        expect.objectContaining({ text: quickReply ? "credits" : "Credits" })
+      );
+      expect(ctx.maybeSendInFlightMessage).not.toHaveBeenCalled();
+      expect(ctx.runImageGeneration).not.toHaveBeenCalled();
+    }
+  );
   beforeEach(() => {
     process.env.PRIVACY_PEPPER = "test-pepper";
     safeLogMock.mockClear();
@@ -133,7 +182,9 @@ describe("webhook message router", () => {
         attachments: [
           expect.objectContaining({
             type: "image",
-            payload: expect.objectContaining({ url: "https://img.example/photo.jpg" }),
+            payload: expect.objectContaining({
+              url: "https://img.example/photo.jpg",
+            }),
           }),
         ],
         text: "maak deze cyberpunk",
@@ -188,7 +239,10 @@ describe("webhook message router", () => {
       userId: "screenshot-user-key",
       event: {
         message: messageWithTextAndAttachments("Screenshot van een bug", [
-          { type: "image", payload: { url: "https://img.example/screenshot.jpg" } },
+          {
+            type: "image",
+            payload: { url: "https://img.example/screenshot.jpg" },
+          },
         ]),
       },
       reqId: "req-screenshot",
@@ -230,6 +284,32 @@ describe("webhook message router", () => {
       })
     );
     expect(findLogEvent("shared_text_executing")).toBeUndefined();
+  });
+
+  it("keeps a real photo upload in a reply on the image path even with a thank-you caption", async () => {
+    const ctx = makeContext();
+    tryHandleImageMessageMock.mockResolvedValueOnce(true);
+    await handleMessageEvent(ctx, {
+      psid: "real-photo-reply",
+      userId: "real-photo-key",
+      reqId: "real-photo-req",
+      lang: "nl",
+      event: {
+        message: {
+          mid: "real-photo-mid",
+          reply_to: { mid: "generated-photo" },
+          text: "Bedankt!",
+          attachments: [
+            {
+              type: "image",
+              payload: { url: "https://example.test/new-photo.jpg" },
+            },
+          ],
+        },
+      },
+    });
+    expect(tryHandleImageMessageMock).toHaveBeenCalledOnce();
+    expect(ctx.sendLoggedText).not.toHaveBeenCalled();
   });
 
   const unsupportedCases: Array<{
@@ -279,7 +359,9 @@ describe("webhook message router", () => {
         psid: `${type}-unsupported-user`,
         userId: `${type}-unsupported-user-key`,
         event: {
-          message: messageWithTextAndAttachments("maak deze cyberpunk", [attachment]),
+          message: messageWithTextAndAttachments("maak deze cyberpunk", [
+            attachment,
+          ]),
         },
         reqId: `req-${type}-unsupported`,
         lang: "nl",
@@ -302,7 +384,10 @@ describe("webhook message router", () => {
       userId: "video-video-guard-user-key",
       event: {
         message: messageWithTextAndAttachments("laat hem dansen", [
-          { type: "video", payload: { url: "https://media.example/video.mp4" } },
+          {
+            type: "video",
+            payload: { url: "https://media.example/video.mp4" },
+          },
         ]),
       },
       reqId: "req-video-media-guard",
@@ -333,7 +418,10 @@ describe("webhook message router", () => {
       userId: `${psid}-key`,
       event: {
         message: messageWithTextAndAttachments("laat hem dansen", [
-          { type: "video", payload: { url: "https://media.example/video.mp4" } },
+          {
+            type: "video",
+            payload: { url: "https://media.example/video.mp4" },
+          },
         ]),
       },
       reqId: "req-video-unsupported-photo",
@@ -355,7 +443,10 @@ describe("webhook message router", () => {
       userId: "audio-caption-user-key",
       event: {
         message: messageWithTextAndAttachments("maak deze cyberpunk", [
-          { type: "audio", payload: { url: "https://media.example/audio.mp3" } },
+          {
+            type: "audio",
+            payload: { url: "https://media.example/audio.mp3" },
+          },
         ]),
       },
       reqId: "req-audio-caption-unsupported",
@@ -379,7 +470,10 @@ describe("webhook message router", () => {
       userId: "audio-user-key",
       event: {
         message: messageWithTextAndAttachments("", [
-          { type: "audio", payload: { url: "https://media.example/audio.mp3" } },
+          {
+            type: "audio",
+            payload: { url: "https://media.example/audio.mp3" },
+          },
         ]),
       },
       reqId: "req-audio-supported",
@@ -436,4 +530,4 @@ describe("webhook message router", () => {
       route: "image",
     });
   });
-}); 
+});

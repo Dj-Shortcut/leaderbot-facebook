@@ -1,6 +1,21 @@
 import { MySqlDialect } from "drizzle-orm/mysql-core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import {
+  billingExecutionControls,
+  billingIntents,
+  billingOutbox,
+  billingProviderOperations,
+  billingSchedulerTenants,
+  billingWebhookRoutes,
+  channelConnections,
+  creditLedger,
+  creditWallets,
+  messengerPrivacySubjects,
+  paymentLedger,
+  webhookDeliveries,
+} from "../../../drizzle/schema";
+
 const { getDatabaseOrThrowMock } = vi.hoisted(() => ({
   getDatabaseOrThrowMock: vi.fn(),
 }));
@@ -14,6 +29,8 @@ import { PREMIUM_IMAGE_CREDIT_OFFER_ID } from "./creditCatalog";
 import {
   classifyCreditPaymentFinancialAdjustmentState,
   classifyCreditPaymentAdjustment,
+  finishCreditPaymentAdjustment,
+  finishCreditPaymentGrant,
   hasCreditPaymentFinancialAdjustment,
   isCreditPaymentGrantComplete,
   persistCreditPaymentWebhookSnapshot,
@@ -44,6 +61,186 @@ const basePayment = {
 
 beforeEach(() => {
   getDatabaseOrThrowMock.mockReset();
+});
+
+describe("credit payment completion with SELECT-only wallet privileges", () => {
+  const scope = {
+    workspaceId: 11,
+    mode: "test" as const,
+    channelConnectionId: 7,
+    bindingEpoch: 2,
+    privacyEpoch: 3,
+    userKey: "a".repeat(64),
+    walletId: "11111111-1111-4111-8111-111111111111",
+    financialSubjectRef: "b".repeat(64),
+    intentId: "22222222-2222-4222-8222-222222222222",
+    authorizationEpoch: 1,
+    providerPaymentId: "tr_credit1",
+    evidenceHash: "c".repeat(64),
+    webhookPaymentId: "tr_credit1",
+    deliverySnapshotHash: "c".repeat(64),
+  };
+  const rootGrantEntryId = "33333333-3333-4333-8333-333333333333";
+
+  function completionDatabase() {
+    const protectedTables = new Set<object>([creditWallets, creditLedger]);
+    const locks: Array<{ table: object; mode: string }> = [];
+    const updates: object[] = [];
+    let ledgerReads = 0;
+    const intent = {
+      intentId: scope.intentId,
+      workspaceId: scope.workspaceId,
+      mode: scope.mode,
+      kind: "credit_purchase",
+      planCode: PREMIUM_IMAGE_CREDIT_OFFER_ID,
+      expectedAmount: "4.99",
+      currency: "EUR",
+      interval: "oneoff",
+      entitlements: {},
+      mollieDescription: "Leaderbot - 8 premium beeldcredits",
+      creditCount: 8,
+      billingProfileVersion: 0,
+      authorizationEpoch: scope.authorizationEpoch,
+      molliePaymentId: scope.providerPaymentId,
+      messengerChannelConnectionId: scope.channelConnectionId,
+      messengerBindingEpoch: scope.bindingEpoch,
+      messengerPrivacyEpoch: scope.privacyEpoch,
+      messengerSenderUserKey: scope.userKey,
+      creditWalletId: scope.walletId,
+      creditFinancialSubjectRef: scope.financialSubjectRef,
+      creditMetadataHash: "d".repeat(64),
+    };
+    function rows(table: object): Record<string, unknown>[] {
+      if (table === billingWebhookRoutes) {
+        return [{ workspaceId: scope.workspaceId, intentId: scope.intentId }];
+      }
+      if (table === billingIntents) return [intent];
+      if (table === billingExecutionControls) {
+        return [{ commercialEnabled: true, authorizationEpoch: 1 }];
+      }
+      if (table === channelConnections) {
+        return [
+          {
+            channel: "facebook_messenger",
+            status: "connected",
+            bindingEpoch: 2,
+          },
+        ];
+      }
+      if (table === messengerPrivacySubjects) {
+        return [{ status: "active", privacyEpoch: 3 }];
+      }
+      if (table === creditWallets) {
+        return [
+          {
+            walletId: scope.walletId,
+            channelConnectionId: scope.channelConnectionId,
+            bindingEpoch: scope.bindingEpoch,
+            privacyEpoch: scope.privacyEpoch,
+            currentUserKeyHash: scope.userKey,
+            financialSubjectRef: scope.financialSubjectRef,
+            refundAdjustmentEntryId: null,
+            status: "active",
+          },
+        ];
+      }
+      if (table === billingSchedulerTenants)
+        return [{ enabled: true, executionEpoch: 1 }];
+      if (table === billingProviderOperations) return [];
+      if (table === webhookDeliveries) {
+        return [
+          { processedAt: null, processingResult: "credit_grant_pending" },
+        ];
+      }
+      if (table === paymentLedger) {
+        return [
+          {
+            id: 1,
+            workspaceId: scope.workspaceId,
+            status: "paid",
+            paidEffectApplied: 1,
+            paymentEffectOwnerKind: "credit_grant",
+            paymentEffectOwnerRef: scope.intentId,
+            observedSnapshotHash: scope.evidenceHash,
+          },
+        ];
+      }
+      if (table === creditLedger) {
+        return ledgerReads++ === 0 ? [{ entryId: rootGrantEntryId }] : [];
+      }
+      throw new Error("Unexpected completion table");
+    }
+    const query = (table: object) => ({
+      where: () => ({
+        limit: () => ({
+          then: (resolve: (value: Record<string, unknown>[]) => unknown) =>
+            Promise.resolve(rows(table)).then(resolve),
+          for: async (mode: string) => {
+            if (protectedTables.has(table) && mode !== "share") {
+              throw new Error("ER_TABLEACCESS_DENIED_ERROR: UPDATE denied");
+            }
+            locks.push({ table, mode });
+            return rows(table);
+          },
+        }),
+      }),
+    });
+    const tx = {
+      select: () => ({ from: query }),
+      update: (table: object) => {
+        if (protectedTables.has(table))
+          throw new Error("Direct wallet write denied");
+        updates.push(table);
+        return { set: () => ({ where: async () => [{ affectedRows: 1 }] }) };
+      },
+      insert: (table: object) => {
+        if (table !== billingOutbox)
+          throw new Error("Unexpected completion insert");
+        return {
+          values: () => ({ onDuplicateKeyUpdate: async () => undefined }),
+        };
+      },
+    };
+    getDatabaseOrThrowMock.mockResolvedValue({
+      select: tx.select,
+      transaction: async (run: (transaction: typeof tx) => unknown) => run(tx),
+    });
+    return { locks, updates };
+  }
+
+  it("finishes an authoritative paid grant without requesting wallet UPDATE access", async () => {
+    const database = completionDatabase();
+    await expect(finishCreditPaymentGrant(scope)).resolves.toBeUndefined();
+    expect(database.locks.slice(0, 4)).toEqual([
+      { table: billingExecutionControls, mode: "update" },
+      { table: channelConnections, mode: "update" },
+      { table: messengerPrivacySubjects, mode: "update" },
+      { table: creditWallets, mode: "share" },
+    ]);
+    expect(database.updates).toEqual([webhookDeliveries]);
+  });
+
+  it("reads immutable adjustment evidence with SELECT-only ledger access", async () => {
+    const database = completionDatabase();
+    await expect(
+      finishCreditPaymentAdjustment({
+        adjustment: {
+          ...scope,
+          kind: "refund_debit",
+          paymentLedgerId: 1,
+          rootGrantEntryId,
+          providerEffectIds: ["re_refund1"],
+        },
+        entryId: "44444444-4444-4444-8444-444444444444",
+        outcome: "manual_review",
+      })
+    ).resolves.toBeUndefined();
+    expect(database.locks.filter(lock => lock.table === creditLedger)).toEqual([
+      { table: creditLedger, mode: "share" },
+      { table: creditLedger, mode: "share" },
+    ]);
+    expect(database.updates).toEqual([billingIntents, webhookDeliveries]);
+  });
 });
 
 describe("credit payment webhook timestamp policy", () => {

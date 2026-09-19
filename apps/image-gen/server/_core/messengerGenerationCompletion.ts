@@ -114,6 +114,9 @@ export type MessengerGenerationDeliveryAcceptance =
   "receipt_pending" | "delivered";
 
 const WRITE_COMPLETION_SCRIPT = `
+-- Redis-compatible runtimes may expose ARGV as a read-only table. Keep the
+-- retained completion expiry local when updating indexes after a transition.
+local completionExpiresAt = ARGV[3]
 local erasedEpoch = tonumber(redis.call('get', KEYS[3]) or '0')
 local incomingEpoch = tonumber(ARGV[7])
 if not incomingEpoch or incomingEpoch <= 0 then
@@ -134,7 +137,7 @@ elseif ARGV[4] == 'deliver' then
     decoded.deliveredAt = incoming.deliveredAt
     redis.call('set', KEYS[1], cjson.encode(decoded), 'PXAT', decoded.expiresAt)
   end
-  ARGV[3] = tostring(decoded.expiresAt)
+  completionExpiresAt = tostring(decoded.expiresAt)
 elseif ARGV[4] == 'delivery_start' then
   if not existing then return {'missing'} end
   local decoded = cjson.decode(existing)
@@ -152,7 +155,7 @@ elseif ARGV[4] == 'delivery_start' then
   decoded.deliveryStatus = 'transport_started'
   decoded.deliveryStartedAt = incoming.deliveryStartedAt
   redis.call('set', KEYS[1], cjson.encode(decoded), 'PXAT', decoded.expiresAt)
-  ARGV[3] = tostring(decoded.expiresAt)
+  completionExpiresAt = tostring(decoded.expiresAt)
 elseif ARGV[4] == 'delivery_accept' then
   if not existing then return {'missing'} end
   local decoded = cjson.decode(existing)
@@ -171,7 +174,7 @@ elseif ARGV[4] == 'delivery_accept' then
   decoded.messengerAcceptedAt = decoded.messengerAcceptedAt or incoming.messengerAcceptedAt
   decoded.messengerMessageIdHash = incoming.messengerMessageIdHash
   redis.call('set', KEYS[1], cjson.encode(decoded), 'PXAT', decoded.expiresAt)
-  ARGV[3] = tostring(decoded.expiresAt)
+  completionExpiresAt = tostring(decoded.expiresAt)
 elseif ARGV[4] == 'receipt_confirm' then
   if not existing then return {'missing'} end
   local decoded = cjson.decode(existing)
@@ -194,7 +197,7 @@ elseif ARGV[4] == 'receipt_confirm' then
   decoded.deliveryProof = 'meta_delivery_receipt_v1'
   decoded.receiptConfirmedAt = incoming.receiptConfirmedAt
   redis.call('set', KEYS[1], cjson.encode(decoded), 'PXAT', decoded.expiresAt)
-  ARGV[3] = tostring(decoded.expiresAt)
+  completionExpiresAt = tostring(decoded.expiresAt)
 elseif ARGV[4] == 'delivery_retry' then
   if not existing then return {'missing'} end
   local decoded = cjson.decode(existing)
@@ -209,7 +212,7 @@ elseif ARGV[4] == 'delivery_retry' then
   decoded.deliveryStatus = 'pending'
   decoded.deliveryStartedAt = nil
   redis.call('set', KEYS[1], cjson.encode(decoded), 'PXAT', decoded.expiresAt)
-  ARGV[3] = tostring(decoded.expiresAt)
+  completionExpiresAt = tostring(decoded.expiresAt)
 elseif ARGV[4] == 'quota' then
   if not existing then return {'missing'} end
   local decoded = cjson.decode(existing)
@@ -219,7 +222,7 @@ elseif ARGV[4] == 'quota' then
   decoded.quotaCommittedAt = decoded.quotaCommittedAt or incoming.quotaCommittedAt
   decoded.successNoticeStatus = decoded.successNoticeStatus or 'pending'
   redis.call('set', KEYS[1], cjson.encode(decoded), 'PXAT', decoded.expiresAt)
-  ARGV[3] = tostring(decoded.expiresAt)
+  completionExpiresAt = tostring(decoded.expiresAt)
 elseif ARGV[4] == 'notice' then
   if not existing then return {'missing'} end
   local decoded = cjson.decode(existing)
@@ -228,16 +231,16 @@ elseif ARGV[4] == 'notice' then
   decoded.successNoticeStatus = 'sent'
   decoded.successNoticeSentAt = incoming.successNoticeSentAt
   redis.call('set', KEYS[1], cjson.encode(decoded), 'PXAT', decoded.expiresAt)
-  ARGV[3] = tostring(decoded.expiresAt)
+  completionExpiresAt = tostring(decoded.expiresAt)
 else
   return redis.error_reply('invalid completion write mode')
 end
 redis.call('sadd', KEYS[2], KEYS[1])
 local indexTtl = redis.call('pttl', KEYS[2])
 if indexTtl < 0 then
-  redis.call('pexpireat', KEYS[2], ARGV[3])
+  redis.call('pexpireat', KEYS[2], completionExpiresAt)
 else
-  redis.call('pexpireat', KEYS[2], ARGV[3], 'GT')
+  redis.call('pexpireat', KEYS[2], completionExpiresAt, 'GT')
 end
 if ARGV[5] ~= '' then
   redis.call('sadd', KEYS[4], ARGV[5])

@@ -1,11 +1,23 @@
 import { createHash, randomUUID } from "node:crypto";
+import { createServer } from "node:http";
+
+import express from "express";
+import { drizzle } from "drizzle-orm/mysql2";
 
 import mysql, {
   type Connection,
   type ResultSetHeader,
   type RowDataPacket,
 } from "mysql2/promise";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 
 import { disableBillingSchedulerTenant } from "./_core/billing/billingSchedulerStore";
 import {
@@ -46,9 +58,12 @@ import {
 import { runBillingOutboxOnce } from "./_core/billing/outboxWorker";
 import type { MollieConfig } from "./_core/billing/config";
 import { confirmCreditCheckoutPayment } from "./_core/billing/creditCheckoutPaymentService";
-import type { MollieClient, MolliePayment } from "./_core/billing/mollieClient";
+import { MollieClient, type MolliePayment } from "./_core/billing/mollieClient";
 import { handleMollieWebhook } from "./_core/billing/webhookRoutes";
+import { registerCreditCheckoutRoutes } from "./_core/billing/creditCheckoutRoutes";
+import { getCreditCheckoutPilotConfig } from "./_core/billing/creditCheckoutConfig";
 import { beginMessengerPrivacyErasure } from "./_core/messengerPrivacySubject";
+import * as databaseModule from "./db";
 
 const suite = describe.runIf(
   process.env.RUN_MYSQL_INTEGRATION === "1" && Boolean(process.env.DATABASE_URL)
@@ -99,6 +114,20 @@ function sha256(value: string): string {
 
 function paymentId(): string {
   return `tr_${randomUUID().replaceAll("-", "")}`;
+}
+
+function isDisposableRuntimeGrantDatabase(): boolean {
+  try {
+    const target = new URL(process.env.DATABASE_URL ?? "");
+    return (
+      ["localhost", "127.0.0.1", "[::1]"].includes(target.hostname) &&
+      /^\/(?:codex_checkout_confirm_[a-z0-9_]+|test_image_gen[a-z0-9_]*)$/.test(
+        target.pathname
+      )
+    );
+  } catch {
+    return false;
+  }
 }
 
 suite("credit payment MySQL 8.4.11 end-to-end boundary", () => {
@@ -163,6 +192,8 @@ suite("credit payment MySQL 8.4.11 end-to-end boundary", () => {
       else process.env[name] = value;
     }
   });
+
+  afterEach(() => vi.restoreAllMocks());
 
   async function createOwnerScope(userKey = USER_A): Promise<OwnerScope> {
     const suffix = randomUUID();
@@ -478,6 +509,150 @@ suite("credit payment MySQL 8.4.11 end-to-end boundary", () => {
     return wallet;
   }
 
+  it.runIf(isDisposableRuntimeGrantDatabase())(
+    "claims checkout with SELECT-only wallet grants while its shared lock blocks a wallet mutation",
+    async () => {
+      // Account DDL is allowed only for an explicitly named disposable database
+      // on loopback. Never create or grant an account for a remote/shared target.
+      expect(isDisposableRuntimeGrantDatabase()).toBe(true);
+      const owner = await createOwnerScope();
+      const fixture = await reserveAndConsumeCheckout(owner, "runtime-grants");
+      const target = new URL(process.env.DATABASE_URL!);
+      const databaseName = target.pathname.slice(1);
+      const username = `checkout_${randomUUID().replaceAll("-", "").slice(0, 20)}`;
+      const password = randomUUID() + randomUUID();
+      // The CI service sees the runner through its container network rather
+      // than as localhost; this random account exists only for this test.
+      const account = `${connection.escape(username)}@'%'`;
+      const schemaName = connection.escapeId(databaseName);
+      let accountCreated = false;
+      let restricted: Connection | undefined;
+      let writer: Connection | undefined;
+      let pendingClaim:
+        ReturnType<typeof claimCreditPaymentCreation> | undefined;
+      let pendingMutation: Promise<unknown> | undefined;
+      let restoreDatabase: (() => void) | undefined;
+      let releaseTransaction: () => void = () => {};
+      try {
+        await connection.query(
+          `CREATE USER ${account} IDENTIFIED BY ${connection.escape(password)}`
+        );
+        accountCreated = true;
+        // The production contract grants SELECT only on credit_wallets.
+        // Checkout's other boundary rows may be locked/updated by runtime.
+        for (const table of [
+          "billing_execution_controls",
+          "channelConnections",
+          "messenger_privacy_subjects",
+          "billing_intents",
+          "billing_scheduler_tenants",
+        ]) {
+          await connection.query(
+            `GRANT SELECT, UPDATE ON ${schemaName}.${connection.escapeId(table)} TO ${account}`
+          );
+        }
+        await connection.query(
+          `GRANT SELECT, INSERT, UPDATE ON ${schemaName}.\`billing_provider_operations\` TO ${account}`
+        );
+        await connection.query(
+          `GRANT SELECT ON ${schemaName}.\`credit_wallets\` TO ${account}`
+        );
+
+        target.username = username;
+        target.password = password;
+        restricted = await mysql.createConnection(target.toString());
+        await restricted.query(
+          "SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED"
+        );
+        await restricted.query("SET SESSION innodb_lock_wait_timeout=5");
+        await expect(
+          restricted.query(
+            "SELECT `wallet_id` FROM `credit_wallets` WHERE `wallet_id`=? FOR UPDATE",
+            [fixture.providerScope.walletId]
+          )
+        ).rejects.toMatchObject({ errno: 1142 });
+        await expect(
+          restricted.query(
+            "UPDATE `credit_wallets` SET `status`='frozen' WHERE `wallet_id`=?",
+            [fixture.providerScope.walletId]
+          )
+        ).rejects.toMatchObject({ errno: 1142 });
+
+        const restrictedDatabase = drizzle(restricted);
+        const originalTransaction =
+          restrictedDatabase.transaction.bind(restrictedDatabase);
+        let transactionReached: () => void = () => {};
+        const transactionHeld = new Promise<void>(resolve => {
+          transactionReached = resolve;
+        });
+        const transactionReleased = new Promise<void>(resolve => {
+          releaseTransaction = resolve;
+        });
+        vi.spyOn(restrictedDatabase, "transaction").mockImplementation(
+          (run, config) =>
+            originalTransaction(async tx => {
+              const result = await run(tx);
+              transactionReached();
+              await transactionReleased;
+              return result;
+            }, config)
+        );
+        const databaseSpy = vi
+          .spyOn(databaseModule, "getDatabaseOrThrow")
+          .mockResolvedValue(
+            // Production uses a pooled client; this bounded test uses a single
+            // connection so the lock holder can be identified independently.
+            restrictedDatabase as unknown as Awaited<
+              ReturnType<typeof databaseModule.getDatabaseOrThrow>
+            >
+          );
+        restoreDatabase = () => databaseSpy.mockRestore();
+        const [[holder]] = await restricted.query<RowDataPacket[]>(
+          "SELECT CONNECTION_ID() AS connectionId"
+        );
+        pendingClaim = claimCreditPaymentCreation(fixture.providerScope);
+        await Promise.race([transactionHeld, pendingClaim]);
+
+        writer = await openPeer();
+        const [[writerIdentity]] = await writer.query<RowDataPacket[]>(
+          "SELECT CONNECTION_ID() AS connectionId"
+        );
+        pendingMutation = writer.query(
+          "UPDATE `credit_wallets` SET `status`='frozen' WHERE `wallet_id`=?",
+          [fixture.providerScope.walletId]
+        );
+        // Attach rejection handling before observing the lock wait, including
+        // failure cleanup when the expected barrier cannot be established.
+        void pendingMutation.catch(() => undefined);
+        await expect(
+          waitForLockWait(
+            connection,
+            Number(holder.connectionId),
+            Number(writerIdentity.connectionId)
+          )
+        ).resolves.toBe(Number(writerIdentity.connectionId));
+        expect((await walletState(fixture.providerScope.walletId)).status).toBe(
+          "active"
+        );
+
+        releaseTransaction();
+        await expect(pendingClaim).resolves.toMatchObject({ claimed: true });
+        await pendingMutation;
+        expect((await walletState(fixture.providerScope.walletId)).status).toBe(
+          "frozen"
+        );
+      } finally {
+        releaseTransaction();
+        await Promise.allSettled(
+          [pendingClaim, pendingMutation].filter(Boolean)
+        );
+        restoreDatabase?.();
+        await Promise.all([restricted?.end(), writer?.end()]);
+        if (accountCreated) await connection.query(`DROP USER ${account}`);
+      }
+    }
+  );
+
   async function proveAdjustmentFreezeWinsBeforeConcurrentHold(
     kind: "refund" | "chargeback"
   ): Promise<void> {
@@ -662,6 +837,344 @@ suite("credit payment MySQL 8.4.11 end-to-end boundary", () => {
       EXPECTED_CREDIT_ROUTINES
     );
   });
+
+  function unpinnedTestMode(owner: OwnerScope) {
+    process.env.MOLLIE_CREDIT_WORKSPACE_ID = String(owner.workspaceId);
+    for (const name of [
+      "MOLLIE_CREDIT_TEST_CHANNEL_CONNECTION_ID",
+      "MOLLIE_CREDIT_TEST_BINDING_EPOCH",
+      "MOLLIE_CREDIT_TEST_PRIVACY_EPOCH",
+      "MOLLIE_CREDIT_TEST_USER_KEY_HASH",
+    ])
+      process.env[name] = "";
+    expect(getCreditCheckoutPilotConfig()).toMatchObject({
+      mode: "test",
+      workspaceId: owner.workspaceId,
+      testPilotScope: null,
+      checkoutEnabled: true,
+      paidCreditsEnabled: true,
+    });
+  }
+
+  async function withCheckoutRoutes(run: (baseUrl: string) => Promise<void>) {
+    const app = express();
+    // Use the production route, session, configuration and provider stores.
+    registerCreditCheckoutRoutes(app, {
+      confirm: session => confirmCreditCheckoutPayment(session),
+    });
+    const server = createServer(app);
+    await new Promise<void>((resolve, reject) => {
+      server.once("error", reject);
+      server.listen(0, "127.0.0.1", resolve);
+    });
+    try {
+      const address = server.address();
+      if (!address || typeof address === "string")
+        throw new Error("bind failed");
+      await run(`http://127.0.0.1:${address.port}`);
+    } finally {
+      await new Promise<void>((resolve, reject) =>
+        server.close(error => (error ? reject(error) : resolve()))
+      );
+    }
+  }
+
+  it("routes a second canonical unpinned Test user through Mollie and duplicate paid webhooks to exactly eight credits", async () => {
+    const owner = await createOwnerScope(`u2.k1.${USER_A}`);
+    const secondUser = `u2.k1.${USER_B}`;
+    await addPrivacySubject(owner, secondUser);
+    unpinnedTestMode(owner);
+    const first = await reserveMessengerCreditCheckout({
+      ...owner,
+      requestId: `first-${randomUUID()}`,
+    });
+    const firstRecord = await readCreditCheckoutSessionRecord(first.intentId);
+    const second = await reserveMessengerCreditCheckout({
+      ...owner,
+      userKey: secondUser,
+      requestId: `second-${randomUUID()}`,
+    });
+    const record = await readCreditCheckoutSessionRecord(second.intentId);
+    expect(record).toMatchObject({
+      workspaceId: owner.workspaceId,
+      mode: "test",
+      messengerSenderUserKey: secondUser,
+      messengerChannelConnectionId: owner.channelConnectionId,
+      messengerBindingEpoch: 1,
+      messengerPrivacyEpoch: 1,
+      authorizationEpoch: 2,
+      expectedAmount: "4.99",
+      currency: "EUR",
+      interval: "oneoff",
+      creditCount: 8,
+    });
+    if (
+      !record?.creditWalletId ||
+      !record.creditMetadataHash ||
+      !firstRecord?.creditWalletId
+    )
+      throw new Error("reservation missing");
+    expect(record.creditWalletId).not.toBe(firstRecord.creditWalletId);
+    const providerId = paymentId();
+    const payment: MolliePayment = {
+      resource: "payment",
+      id: providerId,
+      mode: "test",
+      status: "open",
+      amount: { currency: "EUR", value: "4.99" },
+      description: "Leaderbot - 8 premium beeldcredits",
+      sequenceType: "oneoff",
+      customerId: null,
+      mandateId: null,
+      subscriptionId: null,
+      metadata: {
+        billingIntentId: second.intentId,
+        purpose: "premium_image_credits",
+        version: 1,
+        metadataHash: record.creditMetadataHash,
+      },
+      createdAt: new Date().toISOString(),
+      _links: {
+        checkout: {
+          href: `https://www.mollie.com/checkout/select-method/${providerId}`,
+        },
+      },
+    };
+    const create = vi
+      .spyOn(MollieClient.prototype, "createCreditPayment")
+      .mockImplementation(async input => {
+        expect(input).toEqual({
+          amount: { currency: "EUR", value: "4.99" },
+          description: "Leaderbot - 8 premium beeldcredits",
+          billingIntentId: second.intentId,
+          metadataHash: record.creditMetadataHash,
+          redirectUrl: "https://app.leaderbot.live/credits/checkout/return",
+          webhookUrl: "https://app.leaderbot.live/api/webhooks/mollie/payments",
+          idempotencyKey: `credit-payment:${second.intentId}`,
+        });
+        const [[operation]] = await connection.query<RowDataPacket[]>(
+          "SELECT `state`,`authorization_epoch` AS epoch,`provider_customer_id` AS customerId FROM `billing_provider_operations` WHERE `workspace_id`=? AND `mode`='test' AND `intent_id`=?",
+          [owner.workspaceId, second.intentId]
+        );
+        expect(operation).toMatchObject({
+          state: "transport_started",
+          epoch: 2,
+          customerId: null,
+        });
+        return payment;
+      });
+    const get = vi
+      .spyOn(MollieClient.prototype, "getPayment")
+      .mockImplementation(async id => {
+        expect(id).toBe(providerId);
+        return payment;
+      });
+    const headers = {
+      "content-type": "application/json",
+      origin: "https://app.leaderbot.live",
+      "sec-fetch-site": "same-origin",
+    };
+    await withCheckoutRoutes(async base => {
+      const path = `${base}/api/credits/checkout/${second.intentId}`;
+      const capability = new URL(second.actionUrl).hash.slice(1);
+      const claim = await fetch(`${path}/claim`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ capability }),
+      });
+      expect(claim.status).toBe(200);
+      const offer = {
+        mode: "test",
+        amount: "4.99",
+        currency: "EUR",
+        creditCount: 8,
+        imageQuality: "medium",
+        expires: false,
+        automaticRenewal: false,
+        refundPolicyId: "premium_image_credit_refund",
+        refundPolicyVersion: 1,
+      };
+      expect(await claim.json()).toEqual({ offer });
+      const cookie = claim.headers.get("set-cookie")!.split(";")[0];
+      expect(cookie).toBeTruthy();
+      const session = await fetch(`${path}/session`, { headers: { cookie } });
+      expect(session.status).toBe(200);
+      expect(await session.json()).toEqual({ offer });
+      expect(create).not.toHaveBeenCalled();
+      expect(await walletState(record.creditWalletId!)).toMatchObject({
+        balance: 0,
+      });
+      const replay = await fetch(`${path}/claim`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ capability }),
+      });
+      expect(replay.status).toBe(404);
+      // Browser input cannot replace the server-owned price or credit contract.
+      const tampered = await fetch(`${path}/confirm`, {
+        method: "POST",
+        headers: { ...headers, cookie },
+        body: JSON.stringify({ amount: "0.01", creditCount: 800 }),
+      });
+      expect(tampered.status).toBe(404);
+      expect(create).not.toHaveBeenCalled();
+      const confirmed = await fetch(`${path}/confirm`, {
+        method: "POST",
+        headers: { ...headers, cookie },
+        body: "{}",
+      });
+      expect(confirmed.status).toBe(200);
+      expect(await confirmed.json()).toEqual({
+        checkoutUrl: payment._links!.checkout!.href,
+      });
+      // The active provider lease fences an immediate duplicate confirmation.
+      const repeated = await fetch(`${path}/confirm`, {
+        method: "POST",
+        headers: { ...headers, cookie },
+        body: "{}",
+      });
+      expect(repeated.status).toBe(404);
+      expect(create).toHaveBeenCalledTimes(1);
+      expect(await walletState(record.creditWalletId!)).toMatchObject({
+        balance: 0,
+      });
+      const [[operation]] = await connection.query<RowDataPacket[]>(
+        "SELECT `state`,`provider_resource_id` AS paymentId,`provider_customer_id` AS customerId FROM `billing_provider_operations` WHERE `workspace_id`=? AND `mode`='test' AND `intent_id`=?",
+        [owner.workspaceId, second.intentId]
+      );
+      expect(operation).toMatchObject({
+        state: "succeeded",
+        paymentId: providerId,
+        customerId: null,
+      });
+      const finalized = await readCreditCheckoutSessionRecord(second.intentId);
+      expect(finalized?.urlExposedAt).toBeInstanceOf(Date);
+      expect(finalized).toMatchObject({
+        expectedAmount: "4.99",
+        currency: "EUR",
+        interval: "oneoff",
+        creditCount: 8,
+        creditMetadataHash: record.creditMetadataHash,
+      });
+      payment.status = "paid";
+      payment.method = "bancontact";
+      payment.paidAt = new Date().toISOString();
+      // Real trusted webhook persistence -> grantCreditPurchase worker/routine
+      // boundary -> completion. A redirect alone never grants credits.
+      await expect(handleMollieWebhook({ id: providerId })).resolves.toBe(
+        "processed"
+      );
+      await expect(handleMollieWebhook({ id: providerId })).resolves.toBe(
+        "duplicate"
+      );
+      await expect(handleMollieWebhook({ id: providerId })).resolves.toBe(
+        "duplicate"
+      );
+      const returned = await fetch(
+        `${base}/api/credits/checkout/return-status`,
+        { headers: { cookie } }
+      );
+      expect(await returned.json()).toEqual({ status: "paid" });
+    });
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(get).toHaveBeenCalledTimes(3); // each webhook is verified with Mollie
+    expect(await walletState(record.creditWalletId)).toMatchObject({
+      status: "active",
+      balance: 8,
+      reserved: 0,
+    });
+    expect(await walletState(firstRecord.creditWalletId)).toMatchObject({
+      balance: 0,
+      reserved: 0,
+    });
+    const [[effects]] = await connection.query<RowDataPacket[]>(
+      `SELECT
+        (SELECT COUNT(*) FROM credit_ledger WHERE wallet_id=? AND entry_kind='purchase_grant') AS grants,
+        (SELECT COUNT(*) FROM billing_customers WHERE workspace_id=?) AS customers,
+        (SELECT COUNT(*) FROM billing_subscriptions WHERE workspace_id=?) AS subscriptions,
+        (SELECT COUNT(*) FROM billing_provider_operations WHERE workspace_id=? AND mode='test') AS operations`,
+      [
+        record.creditWalletId,
+        owner.workspaceId,
+        owner.workspaceId,
+        owner.workspaceId,
+      ]
+    );
+    expect(
+      [
+        effects.grants,
+        effects.customers,
+        effects.subscriptions,
+        effects.operations,
+      ].map(Number)
+    ).toEqual([1, 0, 0, 1]);
+  });
+
+  it.each(["missing", "disabled", "stale"] as const)(
+    "issues no CTA for a %s outbox scheduler and never calls Mollie",
+    async state => {
+      const owner = await createOwnerScope(`u2.k1.${USER_A}`);
+      const secondUser = `u2.k1.${USER_B}`;
+      await addPrivacySubject(owner, secondUser);
+      unpinnedTestMode(owner);
+      // Fixture mutations are confined to this disposable MySQL database.
+      if (state === "missing")
+        await connection.query(
+          "DELETE FROM billing_scheduler_tenants WHERE workspace_id=? AND mode='test' AND kind='outbox'",
+          [owner.workspaceId]
+        );
+      else
+        await connection.query(
+          `UPDATE billing_scheduler_tenants SET ${state === "disabled" ? "enabled=false" : "execution_epoch=1"} WHERE workspace_id=? AND mode='test' AND kind='outbox'`,
+          [owner.workspaceId]
+        );
+      // An enabled row of another kind/workspace/mode must not authorize the CTA.
+      await createOwnerScope();
+      await connection.query(
+        "INSERT INTO billing_scheduler_tenants (workspace_id,mode,kind,enabled,execution_epoch) VALUES (?,'live','outbox',true,2)",
+        [owner.workspaceId]
+      );
+      const [[control]] = await connection.query<RowDataPacket[]>(
+        "SELECT commercial_enabled AS enabled,authorization_epoch AS epoch FROM billing_execution_controls WHERE workspace_id=? AND mode='test'",
+        [owner.workspaceId]
+      );
+      expect(control).toMatchObject({ enabled: 1, epoch: 2 });
+      const create = vi
+        .spyOn(MollieClient.prototype, "createCreditPayment")
+        .mockRejectedValue(new Error("Mollie must not be reached"));
+      await withCheckoutRoutes(async base => {
+        await expect(
+          reserveMessengerCreditCheckout({
+            ...owner,
+            userKey: secondUser,
+            requestId: `blocked-${randomUUID()}`,
+          })
+        ).rejects.toThrow("Credit checkout is unavailable");
+        const confirm = await fetch(
+          `${base}/api/credits/checkout/${randomUUID()}/confirm`,
+          {
+            method: "POST",
+            headers: {
+              "content-type": "application/json",
+              origin: "https://app.leaderbot.live",
+            },
+            body: "{}",
+          }
+        );
+        expect(confirm.status).toBe(404);
+      });
+      const [[effects]] = await connection.query<RowDataPacket[]>(
+        `SELECT (SELECT COUNT(*) FROM billing_intents WHERE workspace_id=?) AS intents,
+        (SELECT COUNT(*) FROM credit_wallets WHERE workspace_id=?) AS wallets,
+        (SELECT COUNT(*) FROM billing_provider_operations WHERE workspace_id=?) AS operations`,
+        [owner.workspaceId, owner.workspaceId, owner.workspaceId]
+      );
+      expect(
+        [effects.intents, effects.wallets, effects.operations].map(Number)
+      ).toEqual([0, 0, 0]);
+      expect(create).not.toHaveBeenCalled();
+    }
+  );
 
   it("consumes one browser capability and grants exactly eight customerless one-off credits once", async () => {
     const owner = await createOwnerScope();

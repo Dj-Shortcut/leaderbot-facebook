@@ -41,8 +41,26 @@ export type CreditCheckoutPaymentSession = Readonly<{
   offer: CreditCheckoutPublicOffer;
 }>;
 
+export const CREDIT_CHECKOUT_PAYMENT_STAGES = [
+  "unknown",
+  "configuration",
+  "scope",
+  "client",
+  "claim",
+  "transport_start",
+  "provider_request",
+  "provider_recovery",
+  "failure_recording",
+  "payment_response",
+  "finalization",
+  "exposure",
+] as const;
+
+export type CreditCheckoutPaymentStage =
+  (typeof CREDIT_CHECKOUT_PAYMENT_STAGES)[number];
+
 export class CreditCheckoutPaymentError extends Error {
-  constructor() {
+  constructor(readonly stage: CreditCheckoutPaymentStage = "unknown") {
     super("Credit checkout payment is unavailable");
     this.name = "CreditCheckoutPaymentError";
   }
@@ -73,8 +91,8 @@ const defaultDependencies: Dependencies = Object.freeze({
   expose: exposeCreditPaymentCheckout,
 });
 
-function fail(): never {
-  throw new CreditCheckoutPaymentError();
+function fail(stage: CreditCheckoutPaymentStage = "unknown"): never {
+  throw new CreditCheckoutPaymentError(stage);
 }
 
 /**
@@ -85,14 +103,39 @@ export async function confirmCreditCheckoutPayment(
   session: CreditCheckoutPaymentSession,
   dependencies: Dependencies = defaultDependencies
 ): Promise<Readonly<{ checkoutUrl: string }>> {
+  let stage: CreditCheckoutPaymentStage = "configuration";
+  try {
+    return await confirmPayment(session, dependencies, next => {
+      stage = next;
+    });
+  } catch (error) {
+    // Preserve only a code-owned stage, never database SQL, provider payloads,
+    // credentials, or the original error as a cause.
+    throw new CreditCheckoutPaymentError(
+      error instanceof CreditCheckoutPaymentError && error.stage !== "unknown"
+        ? error.stage
+        : stage
+    );
+  }
+}
+
+async function confirmPayment(
+  session: CreditCheckoutPaymentSession,
+  dependencies: Dependencies,
+  setStage: (stage: CreditCheckoutPaymentStage) => void
+): Promise<Readonly<{ checkoutUrl: string }>> {
   const pilot = dependencies.pilotConfig();
+  setStage("scope");
   const scope = requireProviderScope(session, pilot);
+  setStage("configuration");
   const mollieConfig = dependencies.mollieConfig();
   if (mollieConfig.mode !== scope.mode) fail();
 
   const offer = getCreditOffer(scope.offerId, scope.offerVersion);
   if (!offer) fail();
+  setStage("client");
   const client = dependencies.createClient(mollieConfig);
+  setStage("claim");
   const claim = await dependencies.claim(scope);
   if (!claim.claimed) fail();
 
@@ -102,14 +145,20 @@ export async function confirmCreditCheckoutPayment(
     leaseToken: claim.leaseToken,
   });
   let transportStarted = false;
+  let requestStage: CreditCheckoutPaymentStage = "transport_start";
   let payment: MolliePayment;
   try {
     if (claim.recoveryPaymentId) {
+      requestStage = "provider_recovery";
+      setStage(requestStage);
       payment = await client.getPayment(claim.recoveryPaymentId);
       if (payment.id !== claim.recoveryPaymentId) fail();
     } else {
+      setStage("transport_start");
       if (!(await dependencies.markTransportStarted(operation))) fail();
       transportStarted = true;
+      requestStage = "provider_request";
+      setStage(requestStage);
       payment = await client.createCreditPayment({
         amount: offer.amount,
         description: offer.mollieDescription,
@@ -125,11 +174,13 @@ export async function confirmCreditCheckoutPayment(
     }
   } catch (error) {
     if (transportStarted) {
+      setStage("failure_recording");
       await persistFailedTransport(dependencies, operation, error);
     }
-    return fail();
+    return fail(requestStage);
   }
 
+  setStage("payment_response");
   const contract = validateCreditPaymentContract(
     payment,
     {
@@ -154,6 +205,7 @@ export async function confirmCreditCheckoutPayment(
     contract.exact && !!checkoutUrl
   );
   if (!claim.recoveryPaymentId) {
+    setStage("finalization");
     const finalized = await dependencies.finalize({
       ...operation,
       outcome,
@@ -165,9 +217,10 @@ export async function confirmCreditCheckoutPayment(
     !checkoutUrl ||
     (claim.recoveryPaymentId && outcome.paymentId !== claim.recoveryPaymentId)
   ) {
-    fail();
+    fail("payment_response");
   }
 
+  setStage("exposure");
   const exposed = await dependencies.expose({
     ...operation,
     paymentId: outcome.paymentId,

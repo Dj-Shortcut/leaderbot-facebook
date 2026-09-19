@@ -29,9 +29,49 @@ mix it into the owner-bot review or subscription behavior.
 
 ## Current Messenger capabilities
 
-### Bounded Test exposure — processing active, deployment pending
+### Credits quick reply (deployed; reply adjustment pending)
 
-The desired configuration enables the existing one-time credit flow in Mollie
+Messenger photo menus include a **Credits** quick reply. Its encoded `credits`
+input, or typed `credits` / `/credits` / `saldo`, reads the current consented
+Page/user/privacy scope and displays free daily/monthly availability and premium
+credits after existing reservations. It remains available during image work and
+preserves the pending photo/edit context. Unavailable balances are reported as
+unavailable, never as zero. This starts no provider work, reserves no credits,
+and changes no payment, consent or entitlement. Existing Meta messaging
+permissions suffice; consent/deletion controls and checkout buttons are unchanged.
+
+Pending follow-up: balance replies, including unavailable-balance replies, send
+plain text without another **Credits** quick reply. This stops the button from
+reappearing after each balance request. The entry in ordinary photo menus and
+typed balance commands remain available. Verify this behavior in Messenger after
+deployment; it does not introduce prompt suggestions or new permissions.
+
+Photo-conversation budget admission failures now explain the unavailable bot
+budget and retained credits, without suggesting that an immediate retry fixes it.
+The owner-requested configuration disables the extra global daily/monthly and
+per-user daily USD limits; the owner manages dollar budgets at the API provider.
+Free allowances and paid-credit admission remain enforced. Protected deployment
+[35133964382](https://github.com/Dj-Shortcut/leaderbot-facebook/actions/runs/35133964382)
+passed; independent readback confirmed the corrected runtime on all four started
+Machines and healthy endpoints. The owner confirmed the Credits button returns
+the balance. Paid-image admission and the pending reply adjustment still need
+their respective live checks.
+
+### Owner customer-test control (deployed; user journey pending)
+
+An existing Messenger administrator can use `/testklant aan|uit|status` after
+consent to test the ordinary quota/credit/budget path while retaining admin
+rights. This only changes metadata in that exact Page/user/privacy scope.
+It grants no credits and requires Mollie Test Mode when enabling. Ordinary
+users cannot operate it. No additional Meta permission is requested. Protected
+[deployment 35073398659/1](https://github.com/Dj-Shortcut/leaderbot-facebook/actions/runs/35073398659)
+and independent all-Machine/read-only activation checks passed on 2026-09-16.
+See [operator instructions](owner-customer-test-mode.md). The actual checkout,
+verified paid webhook, credit grant and delivered image remain a separate gate.
+
+### Bounded Test exposure — deployed, user journey pending
+
+The deployed configuration enables the existing one-time credit flow in Mollie
 Test Mode for every eligible Messenger user, without a tester registry, personal
 approval or customer login. The offer remains EUR 4.99 for eight non-expiring
 medium-quality image credits. Consent, the user-initiated response window,
@@ -41,9 +81,10 @@ apply; no new Meta permission or customer portal is introduced.
 Protected operator run
 [34581138362/2](https://github.com/Dj-Shortcut/openclaw-facebook/actions/runs/34581138362/attempts/2)
 committed the initial Test processing activation at epoch 2 and verified cleanup.
-Actual Fly Machines still remain on the checkout-off predecessor until the
-separate protected deployment completes. The operator made no payment or grant.
-A merged configuration is not exposure or delivery evidence. The signed
+Independent readback after deployment `35073398659/1` confirmed all four Fly
+Machines on the reviewed runtime, Test-only flags, empty retired tester pins,
+and commercial/outbox authorization at the same epoch 2. The original operator
+activation was retained; this release made no payment or grant. The signed
 `app.leaderbot.live` browser handoff, explicit confirmation, trusted Test payment,
 exactly-once grant and delivered paid edit still require the demo evidence below.
 No successful end-to-end Test payment or live-money enablement is claimed.
@@ -68,6 +109,46 @@ and payment safety prerequisites afresh.
 | Generated video output              | Flagged owner-bot beta: after consent, a user can ask in natural language to animate the latest uploaded or generated photo. The bot queues one bounded photo-to-video attempt and returns a generated MP4. Uploaded Messenger videos remain unsupported input. No subscription or purchased-image credit is required or consumed.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | Keep disabled until the exact server-owned provider/model/size/duration policy, per-user quota, global attempt cap, priced spend caps, durable scoped URL, deletion race, timeout, retry, Graph delivery failure, and localized copy are demonstrated.                                                                                                                                                                                                                                                   | No extra permission beyond Page messaging is expected; the input photo is an existing Messenger attachment and the output is sent as a Messenger video attachment.       |
 | Delivered-image failure suppression | No new user-facing feature. Once Messenger has durably delivered a generated image, a later failure in post-delivery bookkeeping no longer produces a generation-failure reply for that request; the conversation settles like a normal success. A send that Messenger only accepted (message ID recorded, delivery receipt still pending) and every failure before delivery keep the localized failure copy: with its `Nieuwe afbeelding` retry action in the conversation, and as plain text without an action when a queued job is dead-lettered after exhausting retries.                                                                                                                                                                                                                                                                                                                                                                                                                                                    | Demo a delivered image whose post-delivery bookkeeping fails: exactly one image, no failure copy after it, no second generation, and no extra credit or quota consumption. Then demo a paid send with only a pending delivery receipt and a provider failure before delivery, and confirm the localized failure copy still arrives with its retry action in the conversation, and as plain text from a dead-lettered job.                                                                                | No additional Meta permission or webhook field; uses the existing Page messaging surface and the Messenger delivery receipt already consumed as paid delivery proof.     |
 | Delete my data                      | User can send `delete my data` or `verwijder mijn data`; deletion also remains available by email.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | Demo cost ledger, generated assets, retained source images, face-memory state, and completion marker deletion in production-equivalent state.                                                                                                                                                                                                                                                                                                                                                            | Supports Meta data-deletion expectations; Meta-controlled Messenger history remains managed by Meta.                                                                     |
+
+## Emoji, sticker replies and courtesy (prepared locally)
+
+- Standalone emoji and short Dutch/English thanks receive a brief social reply.
+  Negative emoji invite a correction; no social reply starts generation or uses credits.
+- Messenger likes may arrive as image attachments with a message-level `sticker_id`.
+  These and explicit stickers are acknowledgements, including replies to generated
+  photos. `reply_to` alone never reclassifies a genuine photo upload.
+- Clicked `reaction` events use their own deduplication identity, preserve the
+  existing image, and reply only with prior processing consent and an already
+  open response window. Removal events stay silent. Reactions never grant
+  consent, reopen a response window, or select a paid action.
+- While waiting for initial processing consent, Messenger holds only the text
+  and up to four photo references for a fixed 15 minutes (32 KB text maximum).
+  It tells the user about this temporary hold. Photos are not downloaded or
+  analysed before consent. After consent, the input is atomically claimed once
+  and passed through the normal image, face-memory, quota and delivery paths.
+  A separate owner/Page/privacy-epoch-scoped Redis key has a fixed absolute
+  expiry; regular conversation state never contains this raw pending input.
+  Refusal and pending erasure commit together; scoped erasure also deletes it.
+  State normalization strips the old embedded representation before any rewrite.
+  Its TTL also expires abandoned input
+  after a rollback because older state writers never touch this separate key.
+  Routing claims keep the input until success. A failed attempt releases its
+  claim and asks the user to click Agree again before the original expiry;
+  abandoned claims expire after five minutes, keeping the same operation ID.
+  Expired claims accept photos on a repeated typed agreement. If routing succeeds
+  but its completion write fails, the claim stays held until its lease expires.
+  A concurrent consent grant routes the incoming event normally. Photos attached
+  to typed agreement join earlier input; the agreement caption is not a prompt.
+  Optional hold/accept notices cannot prevent the actual consent/resume path.
+  Oversized requests get explicit guidance rather than silent truncation.
+- Before release, verify the Page subscription includes `message_reactions` and
+  demonstrate both actual clicked reactions and Messenger like stickers on a
+  generated photo. This local change does not prove subscription or deployment.
+- Roll back through the protected release path to the reviewed predecessor.
+  The separate pending-input keys retain their original maximum 15-minute TTL;
+  no data migration is needed. Do not release the original PR #541 state-embedded
+  storage: the consent-input recovery fix is required before the combined release.
+  No schema, credit policy, provider model, or secret changes are needed.
 
 ## Review demo checklist
 
@@ -139,3 +220,33 @@ For every new Messenger capability:
   and legal/privacy copy are ready.
 - Preserve webhook verification, request signatures, response-window behavior,
   quota enforcement, GDPR deletion, and privacy-safe observability.
+
+## Metadata-only conversation evaluation (candidate)
+
+The proposed operator evaluator adds no Messenger permissions or customer-facing
+flow. After existing consent it applies a few rules to the currently processed
+message and records only categories, outcome flags and request IDs. It does not
+retain conversation text or media and does not initiate messages or generation.
+Technical collection and coverage limits are documented in
+[Conversation evaluation](conversation-evaluation.md). Runtime activation still
+requires the protected production release and consented smoke verification.
+
+
+## Contextual photo assistant (not yet enabled)
+
+The optional contextual layer allows ordinary replies, creative discussion and
+clarification using recent messages and up to four images within the same
+consented Page/user conversation. It keeps a prior generated image available
+when the user uploads another image. No additional Meta permissions or profile
+access are requested. Credits and commercial messages remain server-controlled.
+
+Demonstrate: generated animal + uploaded person + “voeg samen”; criticism without
+a new generation; descriptive captions and later references; a creative question;
+missing-source clarification; new-image reset; and delete-my-data including
+retained image cleanup. Use synthetic photos or explicitly consented test media.
+The bounded history/retention, provider-cost and rollout contract is documented
+in [Photo conversation](photo-conversation.md). Do not claim this experience is
+live based on mocked tests alone. The [2026-09-16 synthetic model evaluation](photo-conversation-evaluation-2026-09-16.md)
+passed 20 authored text/vision scenarios with separate semantic review. This
+closes that bounded interpretation check; it does not replace the protected
+activation/readback or Messenger delivery and rendered-image demonstrations above.

@@ -29,17 +29,6 @@ export type PortalHandoffTokenResult = {
   expiresAt: Date;
 };
 
-export type PortalHandoffContext = {
-  workspaceId: number;
-  facebookPageId: string | null;
-  messengerSenderUserKey: string | null;
-  messengerChannelConnectionId: number | null;
-  messengerPrivacyEpoch: number | null;
-  claimedByUserId: number | null;
-  status: "pending" | "consumed" | "expired" | "revoked";
-  expiresAt: Date;
-};
-
 export type ConsumePortalHandoffResult =
   | {
       ok: true;
@@ -192,32 +181,6 @@ export async function consumePortalHandoffToken(
     workspaceId: stored.workspaceId,
     purpose: stored.purpose,
     messengerSenderUserKey: stored.messengerSenderUserKey,
-  };
-}
-
-export async function getPortalHandoffContext(
-  token: string,
-  now = new Date()
-): Promise<PortalHandoffContext | null> {
-  const stored = await db.getPortalHandoffTokenByHash(
-    hashPortalHandoffToken(token)
-  );
-  if (!stored) return null;
-
-  const status =
-    stored.status === "pending" && stored.expiresAt.getTime() <= now.getTime()
-      ? "expired"
-      : stored.status;
-
-  return {
-    workspaceId: stored.workspaceId,
-    facebookPageId: stored.facebookPageId ?? null,
-    messengerSenderUserKey: stored.messengerSenderUserKey ?? null,
-    messengerChannelConnectionId: stored.messengerChannelConnectionId ?? null,
-    messengerPrivacyEpoch: stored.messengerPrivacyEpoch ?? null,
-    claimedByUserId: stored.claimedByUserId ?? null,
-    status,
-    expiresAt: stored.expiresAt,
   };
 }
 

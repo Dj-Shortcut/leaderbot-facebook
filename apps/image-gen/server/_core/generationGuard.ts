@@ -94,7 +94,10 @@ export class MessengerDailyAudioTranscriptionBudgetExceededError extends Error {
 }
 
 export class MessengerSpendBudgetExceededError extends Error {
-  constructor(message = "Messenger spend budget reached") {
+  constructor(
+    message = "Messenger spend budget reached",
+    readonly limit?: "user_daily" | "daily" | "monthly"
+  ) {
     super(message);
     this.name = "MessengerSpendBudgetExceededError";
   }
@@ -453,6 +456,69 @@ export function getMessengerUserDailySpendBudgetConfig(): MessengerUserDailySpen
   };
 }
 
+type SpendReservationKeys = {
+  keys: string[];
+  ttlSeconds: number;
+};
+
+function buildSpendReservationKeys(input: {
+  attemptId: string;
+  tenantScope?: CostLedgerTenantScope;
+  userKey: string;
+  now: Date;
+}): SpendReservationKeys {
+  const day = getUtcDayKey(input.now);
+  const month = getUtcMonthKey(input.now);
+  const tag = `{messenger-spend:${month}}`;
+  const attemptKey = createHash("sha256")
+    .update(input.attemptId)
+    .digest("hex")
+    .slice(0, 32);
+  const userKey = createHash("sha256")
+    .update(
+      input.tenantScope
+        ? [
+            input.tenantScope.workspaceId,
+            input.tenantScope.channelConnectionId,
+            input.tenantScope.bindingEpoch,
+            input.tenantScope.privacyEpoch,
+            input.userKey,
+          ].join("\0")
+        : input.userKey
+    )
+    .digest("hex")
+    .slice(0, 32);
+
+  return {
+    keys: [
+      `${tag}:attempt:${attemptKey}`,
+      `${tag}:daily:${day}`,
+      `${tag}:monthly`,
+      `${tag}:user:${userKey}:${day}`,
+    ],
+    ttlSeconds: secondsUntilSpendCounterExpiry(input.now),
+  };
+}
+
+function spendRejectionLogReason(
+  result: number
+): "duplicate_attempt" | "daily_cap" | "monthly_cap" | "user_daily_cap" | "store_result_invalid" {
+  if (result === 2) return "duplicate_attempt";
+  if (result === -1) return "daily_cap";
+  if (result === -2) return "monthly_cap";
+  if (result === -3) return "user_daily_cap";
+  return "store_result_invalid";
+}
+
+function spendRejectionLimit(
+  result: number
+): MessengerSpendBudgetExceededError["limit"] {
+  if (result === -3) return "user_daily";
+  if (result === -1) return "daily";
+  if (result === -2) return "monthly";
+  return undefined;
+}
+
 /**
  * Serializes the spend-cap decision with the durable attempt-ledger write.
  * Provider code must not start the external request until `recordAttempt`
@@ -517,6 +583,12 @@ export async function admitMessengerProviderSpend<T>(input: {
     throw new MessengerSpendBudgetExceededError();
   }
 
+  const { keys, ttlSeconds } = buildSpendReservationKeys({
+    attemptId: input.attemptId,
+    tenantScope: input.tenantScope,
+    userKey: input.userKey,
+    now,
+  });
   const day = getUtcDayKey(now);
   const month = getUtcMonthKey(now);
   const [dailySummary, monthlySummary, userSummary] = await Promise.all([
@@ -526,32 +598,6 @@ export async function admitMessengerProviderSpend<T>(input: {
       ? summarizeCostLedgerPeriodForUser(day, input.tenantScope)
       : Promise.resolve({ estimatedCostUsd: 0 }),
   ]);
-  const tag = `{messenger-spend:${month}}`;
-  const attemptKey = createHash("sha256")
-    .update(input.attemptId)
-    .digest("hex")
-    .slice(0, 32);
-  const userKey = createHash("sha256")
-    .update(
-      input.tenantScope
-        ? [
-            input.tenantScope.workspaceId,
-            input.tenantScope.channelConnectionId,
-            input.tenantScope.bindingEpoch,
-            input.tenantScope.privacyEpoch,
-            input.userKey,
-          ].join("\0")
-        : input.userKey
-    )
-    .digest("hex")
-    .slice(0, 32);
-  const keys = [
-    `${tag}:attempt:${attemptKey}`,
-    `${tag}:daily:${day}`,
-    `${tag}:monthly`,
-    `${tag}:user:${userKey}:${day}`,
-  ];
-  const ttlSeconds = secondsUntilSpendCounterExpiry(now);
   const redis = await getRedisClient();
   const result = Number(
     await redis.eval(
@@ -572,18 +618,12 @@ export async function admitMessengerProviderSpend<T>(input: {
     safeLog("messenger_spend_admission_rejected", {
       level: "warn",
       reqId: hashRequestId(input.reqId),
-      reason:
-        result === 2
-          ? "duplicate_attempt"
-          : result === -1
-            ? "daily_cap"
-            : result === -2
-              ? "monthly_cap"
-              : result === -3
-                ? "user_daily_cap"
-                : "store_result_invalid",
+      reason: spendRejectionLogReason(result),
     });
-    throw new MessengerSpendBudgetExceededError();
+    throw new MessengerSpendBudgetExceededError(
+      undefined,
+      spendRejectionLimit(result)
+    );
   }
 
   try {

@@ -89,6 +89,12 @@ The Messenger adapter parses inbound events and renders text, images, and
 actions. A checkout action becomes a Messenger URL button pointing to a
 short-lived signed web handoff.
 
+The opt-in [contextual photo assistant](operations/photo-conversation.md) uses
+bounded private history and scoped image references to choose a reply, a new
+image request, or an edit of exact sources. The model supplies no financial or
+provider-policy parameters; execution remains in the existing admission and
+worker stores. It is not a general-purpose tool agent.
+
 ## Free quota
 
 Free quota is an abuse- and cost-control allowance, not a monetary wallet.
@@ -142,8 +148,12 @@ Quality is selected from a server-owned offer snapshot. A paid bundle may map
 to a higher-quality provider mode than the free path, but the mapping is
 versioned so existing purchases retain their promised value.
 
-Provider cost varies by model, size, quality, edits, and input images. Global
-and per-user spending caps remain active even when the wallet contains credits.
+Provider cost varies by model, size, quality, edits, and input images. The owner
+manages dollar budgets at the API provider and rejected additional bot-level
+USD caps: the desired configuration explicitly disables global daily/monthly and
+per-user daily caps. Free quotas and atomic paid-credit admission still govern
+image entitlement, and provider cost estimates remain recorded. Deployment of
+this policy change is tracked in the operations backlog.
 Changing quality or model requires updated unit economics and failure-path
 tests.
 

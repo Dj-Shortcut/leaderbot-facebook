@@ -96,9 +96,9 @@ vi.mock("./_core/messengerStatePersistence", async importOriginal => {
     beginMessengerStatePrivacyErasure: beginStatePrivacyErasureMock,
   };
 });
-vi.mock("./_core/meta/webhookIngressQueue", async importOriginal => {
+vi.mock("./_core/meta/webhookIngressPrivacy", async importOriginal => {
   const actual =
-    await importOriginal<typeof import("./_core/meta/webhookIngressQueue")>();
+    await importOriginal<typeof import("./_core/meta/webhookIngressPrivacy")>();
   return {
     ...actual,
     eraseWebhookIngressDeliveriesForSubject: eraseWebhookIngressMock,
@@ -173,7 +173,10 @@ import {
   writeState,
 } from "./_core/stateStore";
 import { buildMessengerStorageObjectKey } from "./_core/messengerStorageObject";
-import { deletePersistedStateForErasure } from "./_core/messengerStatePersistence";
+import {
+  deletePersistedStateForErasure,
+  patchState,
+} from "./_core/messengerStatePersistence";
 
 describe("data deletion service", () => {
   const originalRedisUrl = process.env.REDIS_URL;
@@ -654,6 +657,40 @@ describe("data deletion service", () => {
     expect(storageDeleteMock).toHaveBeenCalledWith(
       "inbound-source/late-erasure-race.jpg"
     );
+  });
+
+  it("erases images retained only in photo conversation and clears its text on retry", async () => {
+    const psid = "conversation-erasure-user";
+    await getOrCreateState(psid);
+    await patchState(psid, {
+      photoConversation: {
+        images: [
+          {
+            id: "synthetic",
+            url: "https://assets.example/generated/images/older-context.png",
+            kind: "generated",
+          },
+        ],
+        turns: [
+          { id: "turn", role: "user", text: "synthetic private conversation" },
+        ],
+      },
+    });
+    storageDeleteMock.mockRejectedValueOnce(
+      new Error("temporary deletion failure")
+    );
+    await expect(deleteUserData(psid)).resolves.toEqual({ status: "pending" });
+    expect(storageDeleteMock).toHaveBeenCalledWith(
+      "generated/images/older-context.png"
+    );
+    expect((await getState(psid))?.photoConversation).toBeUndefined();
+    expect((await getState(psid))?.pendingSourceImageDeleteUrls).toContain(
+      "https://assets.example/generated/images/older-context.png"
+    );
+    await expect(deleteUserData(psid)).resolves.toEqual({
+      status: "completed",
+    });
+    expect(await getState(psid)).toBeNull();
   });
 
   it("deletes Messenger generation completion markers during user erasure", async () => {

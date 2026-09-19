@@ -644,7 +644,7 @@ function encodeWhatsAppEvent(event: WhatsAppIngressEventV2): object {
   };
 }
 
-export function encodeMetaConversationPayloadV2(
+function encodeMetaConversationPayloadV2(
   payload: MetaConversationIngressPayloadV2
 ): string {
   const encoded =

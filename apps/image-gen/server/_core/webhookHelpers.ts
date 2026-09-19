@@ -9,10 +9,17 @@ export type FacebookWebhookEvent = {
   message?: {
     mid?: string;
     is_echo?: boolean;
+    sticker_id?: string | number;
     text?: string;
     quick_reply?: { payload?: string };
     attachments?: FacebookWebhookAttachment[];
     reply_to?: { mid?: string };
+  };
+  reaction?: {
+    mid?: string;
+    action?: "react" | "unreact";
+    emoji?: string;
+    reaction?: string;
   };
   postback?: {
     title?: string;
@@ -366,6 +373,24 @@ export function getEventDedupeKey(
   userKey: string,
   entryId?: string
 ): string | undefined {
+  if (event.reaction) {
+    const reaction = event.reaction;
+    if (!reaction.mid || !Number.isFinite(event.timestamp)) return undefined;
+    const fingerprint = createHash("sha256")
+      .update(
+        JSON.stringify([
+          entryId,
+          userKey,
+          reaction.mid,
+          event.timestamp,
+          reaction.action,
+          reaction.emoji,
+          reaction.reaction,
+        ])
+      )
+      .digest("hex");
+    return `reaction:${fingerprint}`;
+  }
   const messageId = event.message?.mid?.trim();
   if (messageId) {
     return `mid:${messageId}`;

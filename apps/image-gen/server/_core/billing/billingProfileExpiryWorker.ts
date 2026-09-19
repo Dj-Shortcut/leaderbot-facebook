@@ -38,7 +38,7 @@ async function runSafely(): Promise<void> {
   }
 }
 
-export async function runBillingProfileExpirySchedulerOnce(
+async function runBillingProfileExpirySchedulerOnce(
   limit = 25,
   now = new Date()
 ): Promise<number> {

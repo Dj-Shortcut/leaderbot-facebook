@@ -6,6 +6,13 @@ import {
 } from "./consentService";
 import { GDPR_DELETE_CONFIRM } from "./consentActionIds";
 import { safeLog } from "./logger";
+import {
+  finishPendingConsentInput,
+  holdPendingConsentInput,
+  takePendingConsentInput,
+} from "./pendingConsentInput";
+import { getMessengerReactionReply } from "./messengerSocialReply";
+import { hasOpenMessengerResponseWindow } from "./messengerState";
 import { setPreferredLang } from "./messengerState";
 import { normalizeLang } from "./i18n";
 import { toLogUser, toUserKey } from "./privacy";
@@ -106,64 +113,70 @@ async function handleEvent(
   const eventContext = await createTrackedEventContext(ctx, event, entryId);
   if (!eventContext) return;
 
-  const { psid, userId, reqId, state, trackedCtx } = eventContext;
-
-  logMessengerWebhookTrace("webhook_received", {
-    reqId,
-    user: toLogUser(userId),
-    hasReceivingPageContext: Boolean(entryId?.trim()),
-    hasMessage: Boolean(event.message),
-    hasPostback: Boolean(event.postback),
-    isEcho: Boolean(event.message?.is_echo),
-  });
-
+  let evaluationFailed = false;
   try {
-    trackedCtx.logIncomingMessage(psid, userId, event, reqId);
-    trackedCtx.logUserState(psid, userId, state, reqId, "handle_event");
+    const { psid, userId, reqId, state, trackedCtx } = eventContext;
 
-    if (eventContext.senderLocale) {
-      if (
-        eventContext.lang !== state.preferredLang ||
-        state.preferredLangSource !== "sender_locale"
-      ) {
-        await setPreferredLang(psid, eventContext.lang, "sender_locale");
-      }
-    } else if (
-      state.preferredLangSource !== "sender_locale" &&
-      (eventContext.lang !== state.preferredLang ||
-        state.preferredLangSource !== "account_default")
-    ) {
-      await setPreferredLang(psid, eventContext.lang, "account_default");
-    }
-
-    await routeTrackedEvent(eventContext, event);
-  } catch (error) {
-    logMessengerWebhookTrace("top_level_catch", {
+    logMessengerWebhookTrace("webhook_received", {
       reqId,
       user: toLogUser(userId),
-      errorCode:
-        error instanceof Error ? error.constructor.name : "UnknownError",
+      hasReceivingPageContext: Boolean(entryId?.trim()),
+      hasMessage: Boolean(event.message),
+      hasPostback: Boolean(event.postback),
+      isEcho: Boolean(event.message?.is_echo),
     });
-    captureException(error, {
-      reqId,
-      area: "webhook",
-      eventType: event.postback
-        ? "postback"
-        : event.message
-          ? "message"
-          : "unknown",
-      hasImage: Boolean(
-        event.message?.attachments?.some(
-          attachment => attachment.type === "image"
-        )
-      ),
-      hasText: Boolean(event.message?.text),
-    });
-    await eventContext.sendFallbackIfNeeded();
-    throw error;
-  }
 
-  await eventContext.sendFallbackIfNeeded();
+    try {
+      trackedCtx.logIncomingMessage(psid, userId, event, reqId);
+      trackedCtx.logUserState(psid, userId, state, reqId, "handle_event");
+
+      if (eventContext.senderLocale) {
+        if (
+          eventContext.lang !== state.preferredLang ||
+          state.preferredLangSource !== "sender_locale"
+        ) {
+          await setPreferredLang(psid, eventContext.lang, "sender_locale");
+        }
+      } else if (
+        state.preferredLangSource !== "sender_locale" &&
+        (eventContext.lang !== state.preferredLang ||
+          state.preferredLangSource !== "account_default")
+      ) {
+        await setPreferredLang(psid, eventContext.lang, "account_default");
+      }
+
+      await routeTrackedEvent(eventContext, event);
+    } catch (error) {
+      evaluationFailed = true;
+      logMessengerWebhookTrace("top_level_catch", {
+        reqId,
+        user: toLogUser(userId),
+        errorCode:
+          error instanceof Error ? error.constructor.name : "UnknownError",
+      });
+      captureException(error, {
+        reqId,
+        area: "webhook",
+        eventType: event.postback
+          ? "postback"
+          : event.message
+            ? "message"
+            : "unknown",
+        hasImage: Boolean(
+          event.message?.attachments?.some(
+            attachment => attachment.type === "image"
+          )
+        ),
+        hasText: Boolean(event.message?.text),
+      });
+      await eventContext.sendFallbackIfNeeded();
+      throw error;
+    }
+
+    await eventContext.sendFallbackIfNeeded();
+  } finally {
+    eventContext.finishEvaluation?.(evaluationFailed);
+  }
 }
 
 async function handleMessengerDeliveryReceipt(
@@ -314,6 +327,18 @@ export async function routeTrackedEvent(
   event: FacebookWebhookEvent
 ): Promise<void> {
   const { psid, userId, reqId, lang, trackedCtx } = context;
+  if (event.reaction && !event.message && !event.postback) {
+    if (!Number.isFinite(event.timestamp)) return;
+    // Reactions neither grant consent nor reopen the user messaging window.
+    if (
+      context.state.consentGiven !== true ||
+      !(await hasOpenMessengerResponseWindow(psid))
+    )
+      return;
+    const reply = getMessengerReactionReply(event.reaction, lang);
+    if (reply) await trackedCtx.sendLoggedText(psid, reply, reqId);
+    return;
+  }
   if (await routeConsentGate(context, event)) return;
   await recordInboundUserActivity(psid, event, context.classification);
 
@@ -350,6 +375,98 @@ async function routeConsentGate(
     text: event.message?.text,
     payload: classification.eventPayload,
     state,
+    holdPendingInput: async () => {
+      const outcome = await holdPendingConsentInput(psid, event.message);
+      if (outcome === "consented") return "consented";
+      try {
+        if (outcome === "held") {
+          await trackedCtx.sendLoggedText(
+            psid,
+            lang === "en"
+              ? "Your photos and request will stay ready for up to 15 minutes while you decide. After you agree, I’ll continue automatically. I won’t process them before then."
+              : "Je foto’s en opdracht blijven maximaal 15 minuten klaarstaan terwijl je beslist. Na je akkoord ga ik automatisch verder. Tot dan verwerk ik ze nog niet.",
+            reqId
+          );
+        } else if (outcome === "limit") {
+          await trackedCtx.sendLoggedText(
+            psid,
+            lang === "en"
+              ? "This request is too large to hold while waiting for consent (maximum 4 photos and 32 KB of text). Please give permission first, then send a smaller request."
+              : "Deze opdracht is te groot om op toestemming te wachten (maximaal 4 foto’s en 32 KB tekst). Geef eerst toestemming en stuur daarna een kleinere opdracht.",
+            reqId
+          );
+        }
+      } catch (error) {
+        safeLog("messenger_pending_consent_notice_failed", {
+          reqId,
+          errorCode:
+            error instanceof Error ? error.constructor.name : "UnknownError",
+        });
+      }
+    },
+    resumePendingInput: async () => {
+      // A typed consent caption is control text; its attached photos are input.
+      const currentInput = await holdPendingConsentInput(
+        psid,
+        event.message
+          ? {
+              attachments: event.message.attachments,
+              sticker_id: event.message.sticker_id,
+            }
+          : undefined,
+        Date.now(),
+        true
+      );
+      if (currentInput === "limit") {
+        await trackedCtx.sendLoggedText(
+          psid,
+          lang === "en"
+            ? "This request exceeds 4 photos or 32 KB of text. Please send a smaller request."
+            : "Deze opdracht bevat meer dan 4 foto’s of 32 KB tekst. Stuur een kleinere opdracht.",
+          reqId
+        );
+        return true;
+      }
+      const pending = await takePendingConsentInput(psid);
+      if (!pending) return false;
+      try {
+        setMessengerRequestOperationId(pending.operationId);
+        await handleMessageEvent(trackedCtx, {
+          psid,
+          userId,
+          reqId: pending.operationId,
+          lang,
+          event: {
+            timestamp: event.timestamp,
+            message: {
+              text: pending.text,
+              attachments: pending.imageUrls.map(url => ({
+                type: "image",
+                payload: { url },
+              })),
+            },
+          },
+        });
+      } catch (error) {
+        try {
+          await finishPendingConsentInput(psid, pending, false);
+          await trackedCtx.sendLoggedText(
+            psid,
+            lang === "en"
+              ? "I could not continue your saved request. Tap Agree again within 15 minutes of your first message to retry."
+              : "Ik kon je bewaarde opdracht niet hervatten. Klik opnieuw op Akkoord binnen 15 minuten na je eerste bericht om opnieuw te proberen.",
+            reqId
+          );
+        } catch {
+          safeLog("messenger_pending_consent_recovery_failed", { reqId });
+        }
+        throw error;
+      }
+      // Routing succeeded. An uncertain completion write must not release the
+      // claim and immediately route the same input again.
+      await finishPendingConsentInput(psid, pending, true);
+      return true;
+    },
     sendText: async text => {
       const outcome = await trackedCtx.sendLoggedText(psid, text, reqId);
       return outcome?.sent === true;

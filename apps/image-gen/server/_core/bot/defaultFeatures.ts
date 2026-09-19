@@ -1,3 +1,4 @@
+import { photoConversationFeature } from "./features/photoConversationFeature";
 import { hasBotFeature, registerBotFeature } from "./features";
 import { rateLimitFeature } from "./features/rateLimitFeature";
 import { conversationalEditingFeature } from "./features/conversationalEditingFeature";
@@ -5,10 +6,15 @@ import { freeformTransformFeature } from "./features/freeformTransformFeature";
 import { imageRequestFeature } from "./features/imageRequestFeature";
 import { assistantCommandsFeature } from "./features/assistantCommandsFeature";
 import { statsFeature } from "./features/statsFeature";
+import { customerTestModeFeature } from "./features/customerTestModeFeature";
+import { creditsFeature } from "./features/creditsFeature";
 
 export function ensureDefaultBotFeaturesRegistered(): void {
   const defaults = [
     rateLimitFeature,
+    customerTestModeFeature,
+    creditsFeature,
+    photoConversationFeature,
     freeformTransformFeature,
     imageRequestFeature,
     conversationalEditingFeature,

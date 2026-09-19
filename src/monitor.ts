@@ -1628,6 +1628,31 @@ export async function processMessengerEvent(params: {
     const attachments = extractMessengerAttachmentUrls(params.event);
     const rawAttachmentCount = params.event.message?.attachments?.length ?? 0;
     const leaderbotBridgeEnabled = isLeaderbotBridgeEnabled(params.account);
+    const forwardImageRequestOrSendFallback = async (): Promise<void> => {
+      if (
+        await forwardLeaderbotMessengerEvent({
+          event: params.event,
+          trace: params.trace,
+          leaderbotBridgeEnabled,
+          defaultLang: lang,
+          logStage: logMessengerStage,
+        })
+      ) {
+        return;
+      }
+      await sendMessengerText(
+        senderId,
+        tMessenger(lang, "imageGeneratorUnavailable"),
+        {
+          cfg: params.cfg,
+          accountId: params.account.accountId,
+        },
+      ).catch((err: unknown) => {
+        params.runtime.error?.(
+          danger(`messenger image generator fallback failed: ${String(err)}`),
+        );
+      });
+    };
     if (rawAttachmentCount > 0 && attachments.length === 0 && !text.trim()) {
       logMessengerStage(params.trace, "messenger_event_forward_skipped", {
         reason: "attachments_missing_payload_url",
@@ -1674,29 +1699,7 @@ export async function processMessengerEvent(params: {
       logMessengerStage(params.trace, "messenger_event_forward_started", {
         reason: "unknown_sender_leaderbot_free_tier",
       });
-      if (
-        await forwardLeaderbotMessengerEvent({
-          event: params.event,
-          trace: params.trace,
-          leaderbotBridgeEnabled,
-          defaultLang: lang,
-          logStage: logMessengerStage,
-        })
-      ) {
-        return;
-      }
-      await sendMessengerText(
-        senderId,
-        tMessenger(lang, "imageGeneratorUnavailable"),
-        {
-          cfg: params.cfg,
-          accountId: params.account.accountId,
-        },
-      ).catch((err: unknown) => {
-        params.runtime.error?.(
-          danger(`messenger image generator fallback failed: ${String(err)}`),
-        );
-      });
+      await forwardImageRequestOrSendFallback();
       return;
     }
     const sourceImageAttachment = attachments.find(
@@ -1800,29 +1803,7 @@ export async function processMessengerEvent(params: {
         sourceImage: true,
         hasPrompt: true,
       });
-      if (
-        await forwardLeaderbotMessengerEvent({
-          event: params.event,
-          trace: params.trace,
-          leaderbotBridgeEnabled,
-          defaultLang: lang,
-          logStage: logMessengerStage,
-        })
-      ) {
-        return;
-      }
-      await sendMessengerText(
-        senderId,
-        tMessenger(lang, "imageGeneratorUnavailable"),
-        {
-          cfg: params.cfg,
-          accountId: params.account.accountId,
-        },
-      ).catch((err: unknown) => {
-        params.runtime.error?.(
-          danger(`messenger image generator fallback failed: ${String(err)}`),
-        );
-      });
+      await forwardImageRequestOrSendFallback();
       return;
     } else if (
       !leaderbotBridgeEnabled &&
@@ -1845,29 +1826,7 @@ export async function processMessengerEvent(params: {
         isSourceImageEdit: false,
         hasPrompt: true,
       });
-      if (
-        await forwardLeaderbotMessengerEvent({
-          event: params.event,
-          trace: params.trace,
-          leaderbotBridgeEnabled,
-          defaultLang: lang,
-          logStage: logMessengerStage,
-        })
-      ) {
-        return;
-      }
-      await sendMessengerText(
-        senderId,
-        tMessenger(lang, "imageGeneratorUnavailable"),
-        {
-          cfg: params.cfg,
-          accountId: params.account.accountId,
-        },
-      ).catch((err: unknown) => {
-        params.runtime.error?.(
-          danger(`messenger image generator fallback failed: ${String(err)}`),
-        );
-      });
+      await forwardImageRequestOrSendFallback();
       return;
     } else if (
       !leaderbotBridgeEnabled &&

@@ -249,7 +249,7 @@ export function assertProductionSchemaContractManifest(contract, migrations) {
   }
 }
 
-export function assertPartial0017Contract(partial) {
+function assertPartial0017Contract(partial) {
   if (
     partial?.statementCount !== 54 ||
     !Array.isArray(partial.statementSha256) ||
@@ -325,7 +325,7 @@ export function assertPartial0017Contract(partial) {
   }
 }
 
-export function assert0017StatementHashes(partial, sql) {
+function assert0017StatementHashes(partial, sql) {
   const statements = String(sql ?? "")
     .split("--> statement-breakpoint")
     .map(statement => statement.trim())
@@ -363,7 +363,7 @@ export function assert0017PreDdlStatementOrder(statements) {
   }
 }
 
-export function assertPartial0018Contract(partial) {
+function assertPartial0018Contract(partial) {
   if (
     partial?.statementCount !== 5 ||
     !Array.isArray(partial.statementSha256) ||
@@ -396,7 +396,7 @@ export function assertPartial0018Contract(partial) {
   }
 }
 
-export function assert0018StatementHashes(partial, sql) {
+function assert0018StatementHashes(partial, sql) {
   const statements = String(sql ?? "")
     .split("--> statement-breakpoint")
     .map(statement => statement.trim())
@@ -447,7 +447,7 @@ function assertContentHash(content, expectedHash, label) {
   }
 }
 
-export function assertAppliedMigrationPrefix(appliedRows, manifest) {
+function assertAppliedMigrationPrefix(appliedRows, manifest) {
   if (appliedRows.length > manifest.length) {
     throw new Error("database contains unknown applied migrations");
   }

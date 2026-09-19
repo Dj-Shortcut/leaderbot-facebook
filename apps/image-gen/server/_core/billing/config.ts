@@ -5,7 +5,7 @@ const MOLLIE_ENTITLEMENT_ENFORCEMENT_ENABLED_VALUE = "true";
 
 export type MollieMode = "test" | "live";
 
-export type MollieReadinessPhase = "core" | "offline" | "operational";
+type MollieReadinessPhase = "core" | "offline" | "operational";
 
 export type MollieConfig = Readonly<{
   apiKey: string;
@@ -66,7 +66,7 @@ function requireHttps(url: URL, name: string): void {
   }
 }
 
-export function getBillingSupportEmail(): string {
+function getBillingSupportEmail(): string {
   const billingSupportEmail = required("BILLING_SUPPORT_EMAIL");
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(billingSupportEmail)) {
     throw new Error("BILLING_SUPPORT_EMAIL must be a valid email address");
@@ -351,8 +351,10 @@ export function assertMollieNonSecretLaunchConfig(
     "MESSENGER_USER_DAILY_SPEND_CAP_USD",
   ] as const) {
     const value = Number(required(name));
-    if (!Number.isFinite(value) || value <= 0) {
-      throw new Error(`${name} must be a positive finite amount`);
+    // The owner manages provider budgets and can explicitly disable bot caps.
+    // Match generationGuard's zero-disabled policy without accepting bad input.
+    if (!Number.isFinite(value) || value < 0) {
+      throw new Error(`${name} must be a non-negative finite amount`);
     }
   }
 }

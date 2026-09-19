@@ -86,6 +86,9 @@ function getExpiredInboundSourceUrls(
     state.lastPhotoUrl,
     state.pendingImageUrl,
     ...(state.pendingImageUrls ?? []),
+    ...(state.photoConversation?.images
+      .filter(image => image.kind === "uploaded")
+      .map(image => image.url) ?? []),
   ].map(url => {
     const inboundSourceUrl = getInboundSourceUrl(url);
     const isRetainedSource =

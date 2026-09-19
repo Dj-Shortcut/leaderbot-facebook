@@ -9,7 +9,7 @@ const INITIAL_VIDEO_MAX_REFERENCE_IMAGE_BYTES = "12582912";
 const USER_KEY_PATTERN = /^[a-f0-9]{64}$/u;
 const PAGE_BINDING_PATTERN = /^([1-9]\d*):([1-9]\d*):([1-9]\d*):([1-9]\d*)$/u;
 
-export type MessengerVideoPageBinding = Readonly<{
+type MessengerVideoPageBinding = Readonly<{
   workspaceId: number;
   channelConnectionId: number;
   bindingEpoch: number;

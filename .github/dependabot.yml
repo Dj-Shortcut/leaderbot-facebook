@@ -4,7 +4,9 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
-    open-pull-requests-limit: 5
+    # Regular root/plugin upgrades belong to Dj-Shortcut/openclaw-facebook-messenger.
+    # Keep security updates for the retained root package during retirement.
+    open-pull-requests-limit: 0
     commit-message:
       prefix: "chore"
     groups:

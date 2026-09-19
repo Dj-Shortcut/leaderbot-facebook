@@ -1,3 +1,4 @@
+import { isPhotoConversationEnabled } from "./photoConversationMemory";
 import { t, type Lang } from "./i18n";
 import type { ConversationState, MessengerUserState } from "./messengerState";
 import { safeLog } from "./messengerApi";
@@ -13,7 +14,20 @@ import {
   buildQuickStartResponse,
 } from "./conversationActions";
 
-const GREETINGS = new Set(["hi", "hello", "hey", "yo", "hola"]);
+import { getSocialReply } from "./socialReply";
+
+const GREETINGS = new Set([
+  "hi",
+  "hello",
+  "hey",
+  "yo",
+  "hola",
+  "hallo",
+  "hoi",
+  "goedemorgen",
+  "goedemiddag",
+  "goedenavond",
+]);
 const SMALLTALK = new Set([
   "how are you",
   "how are you?",
@@ -208,17 +222,24 @@ export async function handleSharedTextMessage(
   const { trimmedText, normalizedText } = preparedMessage;
   logSharedTextExecution(input);
 
-  const ackResult = tryHandleAck(input, trimmedText);
-  if (ackResult) {
-    return ackResult;
-  }
+  if (!(
+    isPhotoConversationEnabled() && input.message.channel === "messenger"
+  )) {
+    const socialReply = getSocialReply(trimmedText, input.lang);
+    if (socialReply) return { response: { text: socialReply } };
 
-  const greetingResult = await tryHandleGreetingOrSmalltalk(
-    input,
-    normalizedText
-  );
-  if (greetingResult) {
-    return greetingResult;
+    const ackResult = tryHandleAck(input, trimmedText);
+    if (ackResult) {
+      return ackResult;
+    }
+
+    const greetingResult = await tryHandleGreetingOrSmalltalk(
+      input,
+      normalizedText
+    );
+    if (greetingResult) {
+      return greetingResult;
+    }
   }
 
   const state = await input.getState();

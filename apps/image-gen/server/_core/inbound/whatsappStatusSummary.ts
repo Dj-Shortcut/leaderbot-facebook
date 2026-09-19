@@ -9,7 +9,7 @@ type WhatsAppStatusErrorSummary = {
   title: string | null;
 };
 
-export type WhatsAppStatusSummary = {
+type WhatsAppStatusSummary = {
   statusCount?: number;
   statuses?: Record<string, number>;
   errors?: WhatsAppStatusErrorSummary[];

@@ -21,6 +21,12 @@ import {
   type MessengerStateFence,
 } from "./messengerStatePersistence";
 
+import {
+  isPhotoConversationEnabled,
+  rememberPhotoConversationImages,
+  type PhotoConversationMemory,
+} from "./photoConversationMemory";
+
 export type ConversationState =
   | "IDLE"
   | "AWAITING_PHOTO"
@@ -70,6 +76,10 @@ export type MessengerUserState = {
   preferredLang?: Lang;
   preferredLangSource?: "account_default" | "sender_locale";
   consentGiven: boolean;
+  /** Owner opt-in to ordinary admission; scoped and erased with this state. */
+  customerTestMode?: boolean;
+  /** Bounded private conversation; erased with this exact Page/user state. */
+  photoConversation?: PhotoConversationMemory;
   consentTimestamp?: number;
   /** Distinguishes an explicit refusal from legacy/unanswered false state. */
   consentDeclinedAt?: number;
@@ -222,14 +232,6 @@ export function hasOpenPaidHandoffWindow(
       now - current.lastPaidHandoffEligibleAt <= getMessengerResponseWindowMs()
     );
   return isPromiseLike(state) ? state.then(isOpen) : isOpen(state);
-}
-
-export function setLastPaidHandoffEligibleAt(
-  psid: string,
-  timestamp = Date.now()
-): MaybePromise<void> {
-  const result = patchState(psid, { lastPaidHandoffEligibleAt: timestamp });
-  if (isPromiseLike(result)) return result.then(() => undefined);
 }
 
 export function getOrCreateState(
@@ -389,7 +391,16 @@ export function setPendingImage(
 ): MaybePromise<void> {
   const result = patchState(
     psid,
-    {
+    current => ({
+      ...(isPhotoConversationEnabled()
+        ? {
+            photoConversation: rememberPhotoConversationImages(
+              current,
+              [imageUrl],
+              "uploaded"
+            ),
+          }
+        : { photoConversation: undefined }),
       lastPhotoUrl: imageUrl,
       lastPhoto: imageUrl,
       lastPhotoSource: source,
@@ -400,7 +411,7 @@ export function setPendingImage(
       pendingEditIntent: null,
       stage: "AWAITING_EDIT_PROMPT",
       state: "AWAITING_EDIT_PROMPT",
-    },
+    }),
     now
   );
 
@@ -459,7 +470,16 @@ export async function setPendingStoredImages(
       await Promise.resolve(
         patchState(
           psid,
-          {
+          current => ({
+            ...(isPhotoConversationEnabled()
+              ? {
+                  photoConversation: rememberPhotoConversationImages(
+                    current,
+                    retainedIncomingImageUrls,
+                    "uploaded"
+                  ),
+                }
+              : { photoConversation: undefined }),
             lastPhotoUrl: lastImageUrl,
             lastPhoto: lastImageUrl,
             lastPhotoSource: "stored",
@@ -471,7 +491,7 @@ export async function setPendingStoredImages(
             pendingEditIntent: null,
             stage: "AWAITING_EDIT_PROMPT",
             state: "AWAITING_EDIT_PROMPT",
-          },
+          }),
           now
         )
       );
@@ -587,6 +607,8 @@ export function clearFaceMemoryState(
       pendingSourceImageDeleteUrls: uniquePendingDeleteUrls.length
         ? uniquePendingDeleteUrls
         : null,
+      photoConversation: undefined,
+      lastPrompt: undefined,
       lastPhotoUrl: null,
       lastPhoto: null,
       lastPhotoSource: null,
@@ -657,6 +679,8 @@ export function clearPendingImageState(
   return patchState(
     psid,
     {
+      photoConversation: undefined,
+      lastPrompt: undefined,
       lastPhotoUrl: null,
       lastPhoto: null,
       lastPhotoSource: null,
@@ -785,14 +809,23 @@ export function setLastGenerated(
 ): MaybePromise<void> {
   const result = patchState(
     psid,
-    {
+    current => ({
+      ...(isPhotoConversationEnabled()
+        ? {
+            photoConversation: rememberPhotoConversationImages(
+              current,
+              [resultImageUrl],
+              "generated"
+            ),
+          }
+        : { photoConversation: undefined }),
       lastImageUrl: resultImageUrl,
       lastGeneratedUrl: resultImageUrl,
       lastGeneratedAt: now,
       pendingEditIntent: null,
       stage: "RESULT_READY",
       state: "RESULT_READY",
-    },
+    }),
     now
   );
 

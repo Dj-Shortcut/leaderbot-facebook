@@ -1,0 +1,45 @@
+{"kind":"bundle","bundleSha256":"fbc3c44f31837e4fb296fa243e35f77fa2afe389849fb3fbe95340cf11c880ca","suite":"regression","inputs":["server/_core/openai/responseText.ts","server/_core/image-generation/generationTypes.ts","server/_core/photoConversationMemory.ts","server/_core/photoConversationContract.ts","scripts/lib/photo-conversation-evaluation.mjs","photo-evaluation-entry.mjs"]}
+{"kind":"runtime","app":"leaderbot-fb-image-gen","machineId":"d895355a1e6178","image":"registry.fly.io/leaderbot-fb-image-gen@sha256:532e974166413faf86917800bbd83831d031ee23c71542bb24d411c5f9e9ea93"}
+{"kind":"plan","model":"gpt-5.4-mini-2026-03-17","calls":10,"maxUsd":0.5,"reservedUsd":0.2120325,"suiteSha256":"04319d9deb3eadf25d773949fbc2e362c5f016f58a88ef42a8afe4a1d7ed2d3c","cases":[{"id":"combine_two","tokenBound":15940,"reservedUsd":0.021171000000000002,"expectedAction":"edit"},{"id":"complaint","tokenBound":16011,"reservedUsd":0.02122425,"expectedAction":"reply"},{"id":"repair_with_distractor","tokenBound":19414,"reservedUsd":0.0237765,"expectedAction":"edit"},{"id":"creative_question","tokenBound":15979,"reservedUsd":0.02120025,"expectedAction":"reply"},{"id":"thanks","tokenBound":16017,"reservedUsd":0.02122875,"expectedAction":"reply"},{"id":"ambiguous_three","tokenBound":19139,"reservedUsd":0.02357025,"expectedAction":"reply"},{"id":"clarification_answer","tokenBound":19291,"reservedUsd":0.02368425,"expectedAction":"edit"},{"id":"missing_source","tokenBound":12774,"reservedUsd":0.0187965,"expectedAction":"reply"},{"id":"new_image","tokenBound":9301,"reservedUsd":0.01619175,"expectedAction":"generate"},{"id":"playful_comment","tokenBound":15964,"reservedUsd":0.021189,"expectedAction":"reply"}]}
+{"kind":"attempt","caseId":"combine_two"}
+{"kind":"response","caseId":"combine_two","httpStatus":200}
+{"kind":"usage","caseId":"combine_two","inputTokens":2236,"outputTokens":147}
+{"kind":"case","caseId":"combine_two","passed":true,"decision":{"action":"edit","reply":"","prompt":"Voeg de hond en de man samen in één afbeelding. Behoud het oorspronkelijke uiterlijk, de houding en alle details van beide onderwerpen, en zet ze samen in dezelfde grasachtige buitenomgeving.","imageIds":["image_b6d749ac8fe02315","image_291ea05f83dc764b"]},"inputTokens":2236,"outputTokens":147,"elapsedMs":2096}
+{"kind":"attempt","caseId":"complaint"}
+{"kind":"response","caseId":"complaint","httpStatus":200}
+{"kind":"usage","caseId":"complaint","inputTokens":2246,"outputTokens":321}
+{"kind":"case","caseId":"complaint","passed":true,"decision":{"action":"reply","reply":"Ik snap het: je wilde de hond en de persoon samen in één afbeelding. Wat moest er anders aan de samenvoeging—de positie, de achtergrond of iets anders?","prompt":"","imageIds":[]},"inputTokens":2246,"outputTokens":321,"elapsedMs":3204}
+{"kind":"attempt","caseId":"repair_with_distractor"}
+{"kind":"response","caseId":"repair_with_distractor","httpStatus":200}
+{"kind":"usage","caseId":"repair_with_distractor","inputTokens":2618,"outputTokens":111}
+{"kind":"case","caseId":"repair_with_distractor","passed":true,"decision":{"action":"edit","reply":"","prompt":"Voeg de hond en mijn maat samen in één afbeelding. Behoud van beide hun oorspronkelijke uiterlijk, kleding, houding en alle details, en verander alleen de compositie zodat ze samen in dezelfde scène staan.","imageIds":["image_b6d749ac8fe02315","image_291ea05f83dc764b"]},"inputTokens":2618,"outputTokens":111,"elapsedMs":1662}
+{"kind":"attempt","caseId":"creative_question"}
+{"kind":"response","caseId":"creative_question","httpStatus":200}
+{"kind":"usage","caseId":"creative_question","inputTokens":2243,"outputTokens":120}
+{"kind":"case","caseId":"creative_question","passed":true,"decision":{"action":"reply","reply":"Een zonnig park of een picknickveld zou leuk zijn: groen gras, een paar bomen en misschien een bal of bankje op de achtergrond. Dat geeft meteen een vrolijke, speelse sfeer voor allebei.","prompt":"","imageIds":[]},"inputTokens":2243,"outputTokens":120,"elapsedMs":1682}
+{"kind":"attempt","caseId":"thanks"}
+{"kind":"response","caseId":"thanks","httpStatus":200}
+{"kind":"usage","caseId":"thanks","inputTokens":2247,"outputTokens":58}
+{"kind":"case","caseId":"thanks","passed":true,"decision":{"action":"reply","reply":"Haha, graag gedaan!","prompt":"","imageIds":[]},"inputTokens":2247,"outputTokens":58,"elapsedMs":1279}
+{"kind":"attempt","caseId":"ambiguous_three"}
+{"kind":"response","caseId":"ambiguous_three","httpStatus":200}
+{"kind":"usage","caseId":"ambiguous_three","inputTokens":2563,"outputTokens":105}
+{"kind":"case","caseId":"ambiguous_three","passed":true,"decision":{"action":"reply","reply":"Welke twee wil je samenvoegen: de kat en de man, of een andere combinatie?","prompt":"","imageIds":[]},"inputTokens":2563,"outputTokens":105,"elapsedMs":1465}
+{"kind":"attempt","caseId":"clarification_answer"}
+{"kind":"response","caseId":"clarification_answer","httpStatus":200}
+{"kind":"usage","caseId":"clarification_answer","inputTokens":2597,"outputTokens":100}
+{"kind":"case","caseId":"clarification_answer","passed":true,"decision":{"action":"edit","reply":"","prompt":"Voeg de hond en de persoon met de blauwe trui samen in één compositie. Behoud de oorspronkelijke houdingen, uitstraling, kleding en alle andere details van beide onderwerpen.","imageIds":["image_b6d749ac8fe02315","image_291ea05f83dc764b"]},"inputTokens":2597,"outputTokens":100,"elapsedMs":1439}
+{"kind":"attempt","caseId":"missing_source"}
+{"kind":"response","caseId":"missing_source","httpStatus":200}
+{"kind":"usage","caseId":"missing_source","inputTokens":1933,"outputTokens":150}
+{"kind":"case","caseId":"missing_source","passed":true,"decision":{"action":"reply","reply":"Ik kan je maat wel samenvoegen met de hond, maar de hond-afbeelding is hier niet beschikbaar. Upload die hond nog eens, dan maak ik er één foto van.","prompt":"","imageIds":[]},"inputTokens":1933,"outputTokens":150,"elapsedMs":2312}
+{"kind":"attempt","caseId":"new_image"}
+{"kind":"response","caseId":"new_image","httpStatus":200}
+{"kind":"usage","caseId":"new_image","inputTokens":1544,"outputTokens":65}
+{"kind":"case","caseId":"new_image","passed":true,"decision":{"action":"generate","reply":"","prompt":"Een speelse papegaai die op een fiets rijdt, vrolijke kleurrijke scène, duidelijke vogelsdetails, realistische belichting, levendige en creatieve compositie.","imageIds":[]},"inputTokens":1544,"outputTokens":65,"elapsedMs":1577}
+{"kind":"attempt","caseId":"playful_comment"}
+{"kind":"response","caseId":"playful_comment","httpStatus":200}
+{"kind":"usage","caseId":"playful_comment","inputTokens":2238,"outputTokens":54}
+{"kind":"case","caseId":"playful_comment","passed":true,"decision":{"action":"reply","reply":"Haha, zeker — hij heeft echt een sterrentrio aan uitstraling. 🐶✨","prompt":"","imageIds":[]},"inputTokens":2238,"outputTokens":54,"elapsedMs":1301}
+{"kind":"summary","passed":true,"calls":10,"actualUsd":0.02238825,"reservedUsd":0.2120325,"suiteSha256":"04319d9deb3eadf25d773949fbc2e362c5f016f58a88ef42a8afe4a1d7ed2d3c"}
+{"kind":"execution","completed":true,"passed":true,"bundleSha256":"fbc3c44f31837e4fb296fa243e35f77fa2afe389849fb3fbe95340cf11c880ca","automaticRetry":false}

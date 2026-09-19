@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 
 const FACEBOOK_CONNECT_STATE_TTL_MS = 10 * 60 * 1000;
 
-export type WorkspaceMembership = {
+type WorkspaceMembership = {
   workspaceId: number;
   userId: number;
 };

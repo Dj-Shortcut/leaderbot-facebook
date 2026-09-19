@@ -9,6 +9,7 @@ import {
 } from "./creditCheckoutSession";
 import type { CreditCheckoutSessionRecord } from "./creditCheckoutSessionStore";
 import { registerCreditCheckoutRoutes } from "./creditCheckoutRoutes";
+import { CreditCheckoutPaymentError } from "./creditCheckoutPaymentService";
 
 const INTENT_ID = "11111111-1111-8111-8111-111111111111";
 const OTHER_INTENT_ID = "99999999-9999-4999-8999-999999999999";
@@ -101,9 +102,21 @@ describe("credit checkout public routes", () => {
     checkoutUrl: "https://www.mollie.com/checkout/test-payment",
   }));
   const grantComplete = vi.fn(async () => true);
+  let warningLog: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
     vi.clearAllMocks();
+    warningLog = vi.spyOn(console, "warn").mockImplementation(() => {});
+    claim.mockResolvedValue({
+      cookieValue: COOKIE_VALUE,
+      intentId: INTENT_ID,
+      offer: OFFER,
+    });
+    readSession.mockImplementation(async () => session());
+    confirm.mockResolvedValue({
+      checkoutUrl: "https://www.mollie.com/checkout/test-payment",
+    });
+    grantComplete.mockResolvedValue(true);
     process.env.NODE_ENV = "test";
   });
 
@@ -111,6 +124,7 @@ describe("credit checkout public routes", () => {
     if (bound) await close(bound.server);
     bound = undefined;
     delete process.env.APP_BASE_URL;
+    warningLog.mockRestore();
   });
 
   async function start() {
@@ -259,6 +273,109 @@ describe("credit checkout public routes", () => {
     expect(confirm).toHaveBeenCalledOnce();
   });
 
+  it.each([
+    ["malformed JSON", '{"customer":"private-customer-body"'],
+    [
+      "oversized JSON",
+      JSON.stringify({ customer: "private-customer-body".repeat(200) }),
+    ],
+  ])(
+    "normalizes %s confirmation parser failures before session or provider work",
+    async (_scenario, body) => {
+      const target = await start();
+      const response = await fetch(
+        `${target.baseUrl}/api/credits/checkout/${INTENT_ID}/confirm`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Origin: target.baseUrl,
+            "Sec-Fetch-Site": "same-origin",
+            Cookie: `${CREDIT_CHECKOUT_SESSION_COOKIE}=${COOKIE_VALUE}`,
+          },
+          body,
+        }
+      );
+
+      expect(response.status).toBe(404);
+      expect(await response.json()).toEqual({ error: "checkout unavailable" });
+      expect(response.headers.get("cache-control")).toContain("no-store");
+      expect(response.headers.get("referrer-policy")).toBe("no-referrer");
+      expect(claim).not.toHaveBeenCalled();
+      expect(readSession).not.toHaveBeenCalled();
+      expect(confirm).not.toHaveBeenCalled();
+      expect(warningLog).toHaveBeenCalledExactlyOnceWith(
+        JSON.stringify({
+          level: "warn",
+          event: "credit_checkout_request_failed",
+          operation: "confirm",
+          stage: "body_validation",
+          category: "request_rejected",
+        })
+      );
+    }
+  );
+
+  it.each([
+    ["cross-site origin", "origin_validation"],
+    ["missing origin", "origin_validation"],
+    ["cross-site fetch metadata", "origin_validation"],
+    ["unexpected body field", "body_validation"],
+    ["invalid intent", "intent_validation"],
+    ["missing cookie", "session_missing"],
+    ["different session intent", "session_intent_mismatch"],
+  ] as const)(
+    "reports %s confirmation rejection without storing request data",
+    async (scenario, stage) => {
+      const target = await start();
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        Origin: target.baseUrl,
+        Cookie: `${CREDIT_CHECKOUT_SESSION_COOKIE}=${COOKIE_VALUE}`,
+        "Sec-Fetch-Site": "same-origin",
+      };
+      let body = "{}";
+      let intentId = INTENT_ID;
+      if (scenario === "cross-site origin") {
+        headers.Origin = "https://private-customer-origin.invalid";
+      }
+      if (scenario === "missing origin") delete headers.Origin;
+      if (scenario === "cross-site fetch metadata") {
+        headers["Sec-Fetch-Site"] = "cross-site";
+      }
+      if (scenario === "unexpected body field") {
+        body = JSON.stringify({ customer: "private-customer-body" });
+      }
+      if (scenario === "invalid intent") intentId = "private-invalid-intent";
+      if (scenario === "missing cookie") delete headers.Cookie;
+      if (scenario === "different session intent") {
+        readSession.mockResolvedValueOnce(
+          session("created", { intentId: OTHER_INTENT_ID })
+        );
+      }
+      const response = await fetch(
+        `${target.baseUrl}/api/credits/checkout/${intentId}/confirm`,
+        { method: "POST", headers, body }
+      );
+
+      expect(response.status).toBe(404);
+      expect(await response.json()).toEqual({ error: "checkout unavailable" });
+      expect(confirm).not.toHaveBeenCalled();
+      if (scenario !== "different session intent") {
+        expect(readSession).not.toHaveBeenCalled();
+      }
+      expect(warningLog).toHaveBeenCalledExactlyOnceWith(
+        JSON.stringify({
+          level: "warn",
+          event: "credit_checkout_request_failed",
+          operation: "confirm",
+          stage,
+          category: "request_rejected",
+        })
+      );
+    }
+  );
+
   it("rejects a cookie session that belongs to another visible checkout intent", async () => {
     const target = await start();
     const read = await fetch(
@@ -369,6 +486,159 @@ describe("credit checkout public routes", () => {
       }
     );
     expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({ error: "checkout unavailable" });
+    expect(warningLog).toHaveBeenCalledWith(
+      JSON.stringify({
+        level: "warn",
+        event: "credit_checkout_request_failed",
+        operation: "confirm",
+        stage: "checkout_url",
+        category: "invalid_redirect",
+      })
+    );
+  });
+
+  it.each(["claim", "session", "confirm", "return_status"] as const)(
+    "reports a bounded %s failure without error or customer data",
+    async operation => {
+      const sensitive = [
+        "psid-sensitive-customer",
+        "test_sensitivepaymentcredential",
+        "tr_sensitivepayment",
+        COOKIE_VALUE,
+        "https://provider.invalid/private-payload",
+      ].join(" ");
+      const failure = Object.assign(new Error(sensitive), {
+        code: sensitive,
+        cause: new Error(sensitive),
+        payload: { sensitive },
+      });
+      if (operation === "claim") claim.mockRejectedValueOnce(failure);
+      if (operation === "session") readSession.mockRejectedValueOnce(failure);
+      if (operation === "confirm") confirm.mockRejectedValueOnce(failure);
+      if (operation === "return_status") {
+        readSession.mockResolvedValueOnce(session("paid"));
+        grantComplete.mockRejectedValueOnce(failure);
+      }
+      const target = await start();
+      const path =
+        operation === "return_status"
+          ? "return-status"
+          : `${INTENT_ID}/${operation}`;
+      const mutation = operation === "claim" || operation === "confirm";
+      const response = await fetch(
+        `${target.baseUrl}/api/credits/checkout/${path}`,
+        {
+          method: mutation ? "POST" : "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Origin: target.baseUrl,
+            Cookie: `${CREDIT_CHECKOUT_SESSION_COOKIE}=${COOKIE_VALUE}`,
+          },
+          ...(mutation
+            ? {
+                body:
+                  operation === "claim"
+                    ? JSON.stringify({ capability: "C".repeat(43) })
+                    : "{}",
+              }
+            : {}),
+        }
+      );
+
+      expect(response.status).toBe(404);
+      expect(await response.json()).toEqual({ error: "checkout unavailable" });
+      expect(response.headers.get("cache-control")).toContain("no-store");
+      expect(warningLog).toHaveBeenCalledExactlyOnceWith(
+        JSON.stringify({
+          level: "warn",
+          event: "credit_checkout_request_failed",
+          operation,
+          stage:
+            operation === "confirm"
+              ? "payment_confirmation"
+              : operation === "return_status"
+                ? "grant_status"
+                : operation,
+          category: "dependency_failure",
+          ...(operation === "confirm" ? { paymentStage: "unknown" } : {}),
+        })
+      );
+      if (operation !== "confirm") expect(confirm).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([
+    [new CreditCheckoutPaymentError("claim"), "claim"],
+    [
+      Object.assign(new CreditCheckoutPaymentError(), {
+        stage: "private-provider-payload",
+      }),
+      "unknown",
+    ],
+    [{ name: "CreditCheckoutPaymentError", stage: "claim" }, "unknown"],
+  ] as const)(
+    "accepts payment stages only from typed failures and the fixed allowlist",
+    async (failure, paymentStage) => {
+      confirm.mockRejectedValueOnce(failure);
+      const target = await start();
+      const response = await fetch(
+        `${target.baseUrl}/api/credits/checkout/${INTENT_ID}/confirm`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Origin: target.baseUrl,
+            Cookie: `${CREDIT_CHECKOUT_SESSION_COOKIE}=${COOKIE_VALUE}`,
+          },
+          body: "{}",
+        }
+      );
+
+      expect(response.status).toBe(404);
+      expect(await response.json()).toEqual({ error: "checkout unavailable" });
+      expect(warningLog).toHaveBeenCalledExactlyOnceWith(
+        JSON.stringify({
+          level: "warn",
+          event: "credit_checkout_request_failed",
+          operation: "confirm",
+          stage: "payment_confirmation",
+          category: "dependency_failure",
+          paymentStage,
+        })
+      );
+    }
+  );
+
+  it("identifies an expired or unavailable confirm session before provider work", async () => {
+    readSession.mockRejectedValueOnce(
+      new Error("session detail must be private")
+    );
+    const target = await start();
+    const response = await fetch(
+      `${target.baseUrl}/api/credits/checkout/${INTENT_ID}/confirm`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Origin: target.baseUrl,
+          Cookie: `${CREDIT_CHECKOUT_SESSION_COOKIE}=${COOKIE_VALUE}`,
+        },
+        body: "{}",
+      }
+    );
+
+    expect(response.status).toBe(404);
+    expect(confirm).not.toHaveBeenCalled();
+    expect(warningLog).toHaveBeenCalledExactlyOnceWith(
+      JSON.stringify({
+        level: "warn",
+        event: "credit_checkout_request_failed",
+        operation: "confirm",
+        stage: "session",
+        category: "dependency_failure",
+      })
+    );
   });
 
   it("returns only the server-side payment status after redirect", async () => {

@@ -38,7 +38,7 @@ export function getMollieAccountingImportConfig(): Readonly<{
   return Object.freeze({ providerAccountId, balanceId, accessToken, mode });
 }
 
-export async function runMollieAccountingImportWorkerOnce(): Promise<void> {
+async function runMollieAccountingImportWorkerOnce(): Promise<void> {
   const config = getMollieAccountingImportConfig();
   const result = await importMollieAccountingEvents({
     providerAccountId: config.providerAccountId,

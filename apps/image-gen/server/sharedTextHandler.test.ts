@@ -72,8 +72,16 @@ describe("sharedTextHandler", () => {
       response: {
         text: t("nl", "flowExplanation"),
         actions: [
-          { id: "new_image", label: "Nieuwe afbeelding", inputText: "new_image" },
-          { id: "edit_photo", label: "Pas foto aan", inputText: "Pas foto aan" },
+          {
+            id: "new_image",
+            label: "Nieuwe afbeelding",
+            inputText: "new_image",
+          },
+          {
+            id: "edit_photo",
+            label: "Pas foto aan",
+            inputText: "Pas foto aan",
+          },
           { id: "privacy", label: "Privacy", inputText: "Privacy" },
         ],
       },
@@ -84,7 +92,9 @@ describe("sharedTextHandler", () => {
   it("keeps intro guidance prompt-first instead of style-catalog-first", () => {
     expect(t("nl", "flowExplanation")).toContain("Beschrijf wat je wilt maken");
     expect(t("nl", "flowExplanation")).not.toContain("andere stijl");
-    expect(t("en", "textWithoutPhoto")).toContain("Describe the image you want");
+    expect(t("en", "textWithoutPhoto")).toContain(
+      "Describe the image you want"
+    );
     expect(t("en", "textWithoutPhoto")).not.toContain("make a style");
   });
 
@@ -112,8 +122,16 @@ describe("sharedTextHandler", () => {
       response: {
         text: t("nl", "flowExplanation"),
         actions: [
-          { id: "new_image", label: "Nieuwe afbeelding", inputText: "new_image" },
-          { id: "edit_photo", label: "Pas foto aan", inputText: "Pas foto aan" },
+          {
+            id: "new_image",
+            label: "Nieuwe afbeelding",
+            inputText: "new_image",
+          },
+          {
+            id: "edit_photo",
+            label: "Pas foto aan",
+            inputText: "Pas foto aan",
+          },
           { id: "privacy", label: "Privacy", inputText: "Privacy" },
         ],
       },
@@ -146,8 +164,16 @@ describe("sharedTextHandler", () => {
       response: {
         text: t("nl", "flowExplanation"),
         actions: [
-          { id: "new_image", label: "Nieuwe afbeelding", inputText: "new_image" },
-          { id: "edit_photo", label: "Pas foto aan", inputText: "Pas foto aan" },
+          {
+            id: "new_image",
+            label: "Nieuwe afbeelding",
+            inputText: "new_image",
+          },
+          {
+            id: "edit_photo",
+            label: "Pas foto aan",
+            inputText: "Pas foto aan",
+          },
           { id: "privacy", label: "Privacy", inputText: "Privacy" },
         ],
       },
@@ -181,7 +207,11 @@ describe("sharedTextHandler", () => {
       response: {
         text: t("nl", "success"),
         actions: [
-          { id: "new_image", label: "Nieuwe afbeelding", inputText: "new_image" },
+          {
+            id: "new_image",
+            label: "Nieuwe afbeelding",
+            inputText: "new_image",
+          },
           { id: "edit_photo", label: "Pas aan", inputText: "Pas aan" },
           {
             id: "change_background",
@@ -390,7 +420,11 @@ describe("sharedTextHandler", () => {
             label: "Andere achtergrond",
             inputText: "change_background",
           },
-          { id: "new_image", label: "Nieuwe afbeelding", inputText: "new_image" },
+          {
+            id: "new_image",
+            label: "Nieuwe afbeelding",
+            inputText: "new_image",
+          },
           { id: "privacy", label: "Privacy", inputText: "Privacy" },
         ],
       },
@@ -435,39 +469,40 @@ describe("sharedTextHandler", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  const videoAnimationRecoveryCases: Array<{ text: string; expected: string }> = [
-    {
-      text: "laat hem dansen",
-      expected: t("nl", "unsupportedVideoOrAnimation"),
-    },
-    {
-      text: "laat hem zingen",
-      expected: t("nl", "unsupportedVideoOrAnimation"),
-    },
-    {
-      text: "laat hem bewegen",
-      expected: t("nl", "unsupportedVideoOrAnimation"),
-    },
-    {
-      text: "bewegen zoals Bruno",
-      expected: t("nl", "unsupportedVideoOrAnimation"),
-    },
-    {
-      text: "let him dance",
-      expected: t("nl", "unsupportedVideoOrAnimation"),
-    },
-    {
-      text: "let him sing",
-      expected: t("nl", "unsupportedVideoOrAnimation"),
-    },
-    {
-      text: "move like Bruno",
-      expected: t("nl", "unsupportedVideoOrAnimation"),
-    },
-  ];
+  const videoAnimationRecoveryCases: Array<{ text: string; expected: string }> =
+    [
+      {
+        text: "laat hem dansen",
+        expected: t("nl", "unsupportedVideoOrAnimation"),
+      },
+      {
+        text: "laat hem zingen",
+        expected: t("nl", "unsupportedVideoOrAnimation"),
+      },
+      {
+        text: "laat hem bewegen",
+        expected: t("nl", "unsupportedVideoOrAnimation"),
+      },
+      {
+        text: "bewegen zoals Bruno",
+        expected: t("nl", "unsupportedVideoOrAnimation"),
+      },
+      {
+        text: "let him dance",
+        expected: t("nl", "unsupportedVideoOrAnimation"),
+      },
+      {
+        text: "let him sing",
+        expected: t("nl", "unsupportedVideoOrAnimation"),
+      },
+      {
+        text: "move like Bruno",
+        expected: t("nl", "unsupportedVideoOrAnimation"),
+      },
+    ];
 
   it.each(videoAnimationRecoveryCases)(
-    "returns video-animation intent guidance for \"$text\"",
+    'returns video-animation intent guidance for "$text"',
     async ({ text, expected }) => {
       const result = await handleSharedTextMessage({
         message: {
@@ -528,7 +563,11 @@ describe("sharedTextHandler", () => {
             label: "Andere achtergrond",
             inputText: "change_background",
           },
-          { id: "new_image", label: "Nieuwe afbeelding", inputText: "new_image" },
+          {
+            id: "new_image",
+            label: "Nieuwe afbeelding",
+            inputText: "new_image",
+          },
           { id: "privacy", label: "Privacy", inputText: "Privacy" },
         ],
       },
@@ -536,7 +575,7 @@ describe("sharedTextHandler", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("treats emoji-only messages as normal text", async () => {
+  it("treats emoji-only messages as a social reaction", async () => {
     const result = await handleSharedTextMessage({
       message: {
         channel: "messenger",
@@ -556,16 +595,7 @@ describe("sharedTextHandler", () => {
       setFlowState: async () => {},
     });
 
-    expect(result).toEqual({
-      response: {
-        text: t("nl", "flowExplanation"),
-        actions: [
-          { id: "new_image", label: "Nieuwe afbeelding", inputText: "new_image" },
-          { id: "edit_photo", label: "Pas foto aan", inputText: "Pas foto aan" },
-          { id: "privacy", label: "Privacy", inputText: "Privacy" },
-        ],
-      },
-    });
+    expect(result).toEqual({ response: { text: t("nl", "socialPositive") } });
   });
 
   it("treats text with emoji as normal text", async () => {
@@ -592,16 +622,25 @@ describe("sharedTextHandler", () => {
       response: {
         text: t("nl", "flowExplanation"),
         actions: [
-          { id: "new_image", label: "Nieuwe afbeelding", inputText: "new_image" },
-          { id: "edit_photo", label: "Pas foto aan", inputText: "Pas foto aan" },
+          {
+            id: "new_image",
+            label: "Nieuwe afbeelding",
+            inputText: "new_image",
+          },
+          {
+            id: "edit_photo",
+            label: "Pas foto aan",
+            inputText: "Pas foto aan",
+          },
           { id: "privacy", label: "Privacy", inputText: "Privacy" },
         ],
       },
     });
   });
 
-  it("treats multi-codepoint emoji as normal text", async () => {
-    const multiCodepointEmoji = "\ud83d\udc69\u200d\ud83d\udc68\u200d\ud83d\udc67\ud83c\udffb";
+  it("treats multi-codepoint emoji as a social reaction", async () => {
+    const multiCodepointEmoji =
+      "\ud83d\udc69\u200d\ud83d\udc68\u200d\ud83d\udc67\ud83c\udffb";
     const result = await handleSharedTextMessage({
       message: {
         channel: "messenger",
@@ -621,18 +660,9 @@ describe("sharedTextHandler", () => {
       setFlowState: async () => {},
     });
 
-    expect(result).toEqual({
-      response: {
-        text: t("nl", "flowExplanation"),
-        actions: [
-          { id: "new_image", label: "Nieuwe afbeelding", inputText: "new_image" },
-          { id: "edit_photo", label: "Pas foto aan", inputText: "Pas foto aan" },
-          { id: "privacy", label: "Privacy", inputText: "Privacy" },
-        ],
-      },
-    });
+    expect(result).toEqual({ response: { text: t("nl", "socialReaction") } });
   });
-  it("treats flag emoji as normal text", async () => {
+  it("treats flag emoji as a social reaction", async () => {
     const result = await handleSharedTextMessage({
       message: {
         channel: "messenger",
@@ -652,15 +682,6 @@ describe("sharedTextHandler", () => {
       setFlowState: async () => {},
     });
 
-    expect(result).toEqual({
-      response: {
-        text: t("nl", "flowExplanation"),
-        actions: [
-          { id: "new_image", label: "Nieuwe afbeelding", inputText: "new_image" },
-          { id: "edit_photo", label: "Pas foto aan", inputText: "Pas foto aan" },
-          { id: "privacy", label: "Privacy", inputText: "Privacy" },
-        ],
-      },
-    });
+    expect(result).toEqual({ response: { text: t("nl", "socialReaction") } });
   });
 });

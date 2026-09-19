@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { connectAuthorizedFacebookPage } from "./_core/facebookPageConnection";
+import { unsealFacebookPageToken } from "./_core/facebookPageToken";
 
 const mocks = vi.hoisted(() => ({
   upsertChannelConnection: vi.fn(),
@@ -49,9 +50,10 @@ describe("Facebook Page connection", () => {
       }),
       { updatePolicy: "preserve_exact_facebook_binding" }
     );
-    expect(
-      mocks.upsertChannelConnection.mock.calls[0]?.[0]?.encryptedAccessToken
-    ).not.toContain("raw-page-token");
+    const encryptedAccessToken =
+      mocks.upsertChannelConnection.mock.calls[0]?.[0]?.encryptedAccessToken;
+    expect(encryptedAccessToken).not.toContain("raw-page-token");
+    expect(unsealFacebookPageToken(encryptedAccessToken)).toBe("raw-page-token");
     expect(mocks.insertAuditLog).toHaveBeenCalledWith(
       expect.objectContaining({
         workspaceId: 42,

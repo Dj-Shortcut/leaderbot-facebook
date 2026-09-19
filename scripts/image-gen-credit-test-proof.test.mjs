@@ -12,6 +12,8 @@ import {
   assertCreditTestUnlockAllowed,
   assertProtectedCreditTestRun,
   collectCreditTestProof,
+  consumeCreditTestEvidence,
+  creditTestProofPublicErrorCode,
   inspectLockedObsoletePrincipal,
   obsoletePrincipalProofQueries,
   openCreditTestProvisionerSession,
@@ -30,12 +32,13 @@ const SOURCE = "a".repeat(40);
 const OLD = "b".repeat(64);
 const NOW = Date.parse("2026-09-10T12:00:00Z");
 const env = {
-  GITHUB_REPOSITORY: "Dj-Shortcut/openclaw-facebook",
+  GITHUB_REPOSITORY: "Dj-Shortcut/leaderbot-facebook",
+  GITHUB_REPOSITORY_ID: "1238456123",
   GITHUB_REF: "refs/heads/main",
   GITHUB_EVENT_NAME: "workflow_dispatch",
   GITHUB_SHA: SOURCE,
   GITHUB_WORKFLOW_REF:
-    "Dj-Shortcut/openclaw-facebook/.github/workflows/deploy-production.yml@refs/heads/main",
+    "Dj-Shortcut/leaderbot-facebook/.github/workflows/deploy-production.yml@refs/heads/main",
   GITHUB_RUN_ID: "123",
   GITHUB_RUN_ATTEMPT: "2",
   GITHUB_TOKEN: "test-github",
@@ -48,7 +51,8 @@ const remoteRun = {
   run_attempt: 2,
   head_sha: SOURCE,
   head_branch: "main",
-  head_repository: { full_name: env.GITHUB_REPOSITORY },
+  head_repository: { full_name: env.GITHUB_REPOSITORY, id: 1238456123 },
+  repository: { full_name: env.GITHUB_REPOSITORY, id: 1238456123 },
   event: "workflow_dispatch",
   path: ".github/workflows/deploy-production.yml",
   status: "in_progress",
@@ -539,6 +543,9 @@ describe("bounded credit Test activation", () => {
     ["binding", "MOLLIE_CREDIT_TEST_BINDING_EPOCH", "0"],
     ["cost policy", "MESSENGER_PAID_IMAGE_PROVIDER_MAX_COST_USD", "0.01"],
     ["daily cap", "MESSENGER_GLOBAL_DAILY_SPEND_CAP_USD", "100.00"],
+    ["old global daily cap", "MESSENGER_GLOBAL_DAILY_SPEND_CAP_USD", "5.00"],
+    ["old user daily cap", "MESSENGER_USER_DAILY_SPEND_CAP_USD", "2.00"],
+    ["old global monthly cap", "MESSENGER_GLOBAL_MONTHLY_SPEND_CAP_USD", "25.00"],
   ])("rejects invalid %s", (_, key, value) => {
     const f = fixture();
     expect(() =>
@@ -636,9 +643,14 @@ describe("bounded credit Test activation", () => {
 describe("protected metadata proof", () => {
   it("binds the exact in-progress protected workflow attempt", async () => {
     expect(assertCreditTestRun(env).runAttempt).toBe("2");
+    const fetchImpl = fetchRun();
     await expect(
-      assertProtectedCreditTestRun(env, fetchRun()),
+      assertProtectedCreditTestRun(env, fetchImpl),
     ).resolves.toMatchObject({ sourceHead: SOURCE });
+    expect(fetchImpl).toHaveBeenCalledWith(
+      "https://api.github.com/repos/Dj-Shortcut/leaderbot-facebook/actions/runs/123/attempts/2",
+      expect.objectContaining({ redirect: "error" }),
+    );
   });
   it.each([
     { head_sha: "c".repeat(40) },
@@ -656,10 +668,52 @@ describe("protected metadata proof", () => {
     "GITHUB_REF",
     "GITHUB_WORKFLOW_REF",
     "GITHUB_REPOSITORY",
+    "GITHUB_REPOSITORY_ID",
     "GITHUB_RUN_ATTEMPT",
   ])("rejects invalid %s before API access", (key) => {
     expect(() => assertCreditTestRun({ ...env, [key]: "invalid" })).toThrow();
   });
+  it.each([
+    { GITHUB_REPOSITORY_ID: undefined },
+    { GITHUB_REPOSITORY_ID: "1238456124" },
+    { GITHUB_REPOSITORY: "Dj-Shortcut/openclaw-facebook" },
+    { GITHUB_REPOSITORY: "other/leaderbot-facebook" },
+    { GITHUB_REPOSITORY: "other/openclaw-facebook" },
+  ])(
+    "rejects renamed or recycled environment identity %j before API access",
+    async (change) => {
+      const candidate = { ...env, ...change };
+      candidate.GITHUB_WORKFLOW_REF = `${candidate.GITHUB_REPOSITORY}/.github/workflows/deploy-production.yml@refs/heads/main`;
+      const fetchImpl = fetchRun();
+      await expect(
+        assertProtectedCreditTestRun(candidate, fetchImpl),
+      ).rejects.toThrow();
+      expect(fetchImpl).not.toHaveBeenCalled();
+    },
+  );
+  describe.each(["head_repository", "repository"])(
+    "%s identity",
+    (field) => {
+      it.each([
+        { full_name: env.GITHUB_REPOSITORY },
+        { full_name: env.GITHUB_REPOSITORY, id: 1238456124 },
+        { full_name: env.GITHUB_REPOSITORY, id: "1238456123" },
+        { full_name: "Dj-Shortcut/openclaw-facebook", id: 1238456123 },
+        { full_name: "other/leaderbot-facebook", id: 1238456123 },
+        { full_name: "other/openclaw-facebook", id: 1238456123 },
+      ])(
+        "rejects foreign, recycled or mismatched repository metadata %j",
+        async (repository) => {
+          await expect(
+            assertProtectedCreditTestRun(
+              env,
+              fetchRun({ [field]: repository }),
+            ),
+          ).rejects.toThrow();
+        },
+      );
+    },
+  );
   it("only accepts a canonical hash in fixed read-only SQL", () => {
     expect(
       obsoletePrincipalProofQueries(OLD).every((q) => q.startsWith("SELECT ")),
@@ -705,6 +759,118 @@ describe("protected metadata proof", () => {
         NOW + 1000,
       ),
     ).not.toThrow();
+  });
+  it("classifies a runtime probe timeout without exposing its captured secrets or continuing", async () => {
+    const f = collectorFixture();
+    const execute = f.execute;
+    f.execute = (command, args, childEnv) => {
+      if (args[0] === "ssh")
+        throw Object.assign(new Error("mysql://secret-password/private-data"), {
+          code: "ETIMEDOUT",
+          stderr: "private customer text",
+          stdout: "secret-token",
+        });
+      return execute(command, args, childEnv);
+    };
+    const error = await collectCreditTestProof(f).catch((error) => error);
+    expect(creditTestProofPublicErrorCode(error)).toBe(
+      "runtime_trigger_probe:timeout",
+    );
+    expect(error.message).toBe("credit_test_proof_rejected");
+    expect(error.cause).toBeUndefined();
+    expect(JSON.stringify(error)).not.toMatch(/secret|password|customer|mysql/);
+    expect(f.session.initialize).not.toHaveBeenCalled();
+  });
+  it("classifies database initialization refusal and still closes the session", async () => {
+    const f = collectorFixture();
+    f.session.initialize.mockRejectedValue(new Error("secret database URL"));
+    const error = await collectCreditTestProof(f).catch((error) => error);
+    expect(creditTestProofPublicErrorCode(error)).toBe(
+      "database_identity:failed",
+    );
+    expect(f.session.close).toHaveBeenCalledOnce();
+    expect(error.cause).toBeUndefined();
+    expect(creditTestProofPublicErrorCode({ publicCode: "secret-value" })).toBe(
+      "unclassified",
+    );
+  });
+  it("recognizes the protected HTTP deadline without exposing the DOMException", async () => {
+    const f = collectorFixture();
+    f.fetchImpl = async () => {
+      throw new DOMException("secret URL", "TimeoutError");
+    };
+    const error = await collectCreditTestProof(f).catch((error) => error);
+    expect(creditTestProofPublicErrorCode(error)).toBe("protected_run:timeout");
+    expect(error.cause).toBeUndefined();
+  });
+  it("recognizes the database deadline even when a helper normalizes the error", async () => {
+    vi.useFakeTimers();
+    try {
+      const f = collectorFixture();
+      let opened;
+      const opening = new Promise((resolve) => {
+        opened = resolve;
+      });
+      f.sessionFactory = ({ signal }) =>
+        new Promise((_, reject) => {
+          signal.addEventListener(
+            "abort",
+            () => reject(new Error("normalized private error")),
+            { once: true },
+          );
+          opened();
+        });
+      const collecting = collectCreditTestProof(f).catch((error) => error);
+      await opening;
+      await vi.advanceTimersByTimeAsync(90_000);
+      expect(creditTestProofPublicErrorCode(await collecting)).toBe(
+        "database_connection:timeout",
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it("identifies missing configuration and a mismatched predecessor", async () => {
+    const f = collectorFixture();
+    const missing = await collectCreditTestProof({
+      ...f,
+      env: { ...f.env, CREDIT_TEST_IMAGE_TOKEN: "" },
+    }).catch((error) => error);
+    expect(creditTestProofPublicErrorCode(missing)).toBe(
+      "configuration:failed",
+    );
+    f.app.reviewedSettledPredecessor = undefined;
+    const mismatch = await collectCreditTestProof(f).catch((error) => error);
+    expect(creditTestProofPublicErrorCode(mismatch)).toBe(
+      "baseline_binding:failed",
+    );
+  });
+  it("identifies malformed, stale and mismatched consumed evidence", async () => {
+    const f = collectorFixture();
+    const current = {
+      ...(await collectCreditTestProof(f)),
+      checkedAt: new Date().toISOString(),
+    };
+    const evidencePath = path.join(f.rootDir, "evidence.json");
+    fs.writeFileSync(evidencePath, JSON.stringify(current));
+    await expect(
+      consumeCreditTestEvidence(evidencePath, current),
+    ).resolves.toBeUndefined();
+    for (const value of [
+      "{secret malformed JSON",
+      JSON.stringify({ ...current, checkedAt: "2000-01-01T00:00:00Z" }),
+      JSON.stringify({ ...current, runAttempt: "999" }),
+    ]) {
+      fs.writeFileSync(evidencePath, value);
+      const error = await consumeCreditTestEvidence(
+        evidencePath,
+        current,
+      ).catch((error) => error);
+      expect(creditTestProofPublicErrorCode(error)).toBe(
+        "evidence_consume:failed",
+      );
+      expect(error.cause).toBeUndefined();
+    }
   });
   it.each([
     { afterBaseline: { identity: "deploy-101-1" } },
@@ -766,8 +932,9 @@ describe("protected metadata proof", () => {
       assertCreditTestEvidence(recorded, current, NOW),
     ).not.toThrow();
     f.activation.controls[0].enabled = 0;
-    await expect(collectCreditTestProof(f)).rejects.toThrow(
-      "credit_test_activation_audit_rejected",
+    const error = await collectCreditTestProof(f).catch((error) => error);
+    expect(creditTestProofPublicErrorCode(error)).toBe(
+      "activation_audit:failed",
     );
     expect(f.session.close).toHaveBeenCalledTimes(3);
   });

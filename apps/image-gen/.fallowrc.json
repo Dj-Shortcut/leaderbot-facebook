@@ -1,5 +1,23 @@
 {
-  "ignoreDependencies": ["mysql2"],
+  "entry": [
+    "client/src/pages/Legal.tsx",
+    "client/src/pages/LandingPage.tsx",
+    "client/src/pages/NotFound.tsx",
+    "client/src/pages/CreditCheckout.tsx",
+    "client/src/components/HeroOrbCanvas.tsx",
+    "server/_core/facebookConnectStore.ts",
+    "client/src/main.tsx",
+    "storage-proxy/index.ts",
+    "storage-proxy/deadline.test.ts",
+    "scripts/fallow-badge.mjs",
+    "scripts/prepare-artifact-schema-fixture.mjs",
+    "scripts/generate-production-migration-manifest.mjs",
+    "scripts/evaluate-conversations.mjs",
+    "scripts/lib/photo-conversation-evaluation.mjs",
+    "server/testConsentHelpers.ts",
+    "server/testHttpServer.ts"
+  ],
+  "ignoreDependencies": ["mysql2", "@aws-sdk/client-s3", "helmet", "rate-limit-redis", "@typescript/native"],
   "overrides": [
     {
       "files": ["client/index.html"],

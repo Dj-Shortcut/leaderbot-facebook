@@ -56,65 +56,6 @@ function requireTomlTableMatch(
   }
 }
 
-function isInactiveShellMatch(text, matchIndex) {
-  const lineStart = Math.max(text.lastIndexOf("\n", matchIndex - 1) + 1, 0);
-  const prefix = text.slice(lineStart, matchIndex);
-  const withoutQuotedText = prefix.replace(/"(?:\\.|[^"\\])*"|'[^']*'/g, "");
-  if (/(?:^|\s)#/.test(withoutQuotedText)) {
-    return true;
-  }
-
-  const hasOpenSingleQuote = (prefix.match(/'/g) ?? []).length % 2 === 1;
-  const hasOpenDoubleQuote = (prefix.match(/(?<!\\)"/g) ?? []).length % 2 === 1;
-  return hasOpenSingleQuote || (hasOpenDoubleQuote && !prefix.includes("$("));
-}
-
-function getPullRequestCreateCommands(text) {
-  const pattern =
-    /\bgh\s+pr\s+create\b(?:(?!\bgh\s+pr\s+create\b)(?:\\\r?\n|[^\r\n]))*/g;
-  return [...text.matchAll(pattern)]
-    .filter((match) => !isInactiveShellMatch(text, match.index ?? 0))
-    .map((match) => match[0]);
-}
-
-function hasDraftFlag(command) {
-  const withoutQuotedText = command.replace(/"(?:\\.|[^"\\])*"|'[^']*'/g, "");
-  const [executableCommand] = withoutQuotedText.split(/(?:\s#|[;|&()<>])/);
-  return /(?:^|\s)--draft(?=\s|\\|$)/.test(executableCommand);
-}
-
-function normalizeYamlScalar(value) {
-  const withoutComment = value.replace(/\s+#.*$/, "").trim();
-  const quote = withoutComment[0];
-  if ((quote === '"' || quote === "'") && withoutComment.at(-1) === quote) {
-    return withoutComment.slice(1, -1).trim();
-  }
-  return withoutComment;
-}
-
-function hasUnsafeIdTokenPermission(text) {
-  return text.split(/\r?\n/).some((line) => {
-    const code = line
-      .replace(/\s+#.*$/, "")
-      .replace(/\\(?:x2d|u002d|U0000002d)/gi, "-");
-    if (!code.includes("id-token")) {
-      return false;
-    }
-
-    const assignments = [
-      ...code.matchAll(
-        /(?:^|[,{])\s*(?:id-token|"id-token"|'id-token')\s*:\s*([^,}]*)/g,
-      ),
-    ];
-    if (assignments.length === 0) {
-      return true;
-    }
-    return assignments.some(
-      (assignment) => normalizeYamlScalar(assignment[1]) !== "none",
-    );
-  });
-}
-
 export function validateFlyGatewayConfig(text) {
   if (/(?:'''|""")/.test(text)) {
     throw new Error(
@@ -190,48 +131,6 @@ export function validateFlyGatewayConfig(text) {
   };
 }
 
-export function validateManagedUpdateWorkflow(text) {
-  requireMatch(
-    text,
-    /managed-redeploy-handoff\.md/,
-    "OpenClaw update PRs must link the managed redeploy handoff",
-  );
-  requireMatch(
-    text,
-    /approval_status:\s*pending/,
-    "OpenClaw update PRs must start with pending production approval",
-  );
-  const createCommands = getPullRequestCreateCommands(text);
-  if (
-    createCommands.length === 0 ||
-    createCommands.some((command) => !hasDraftFlag(command))
-  ) {
-    throw new Error("Automated OpenClaw update PRs must be created as drafts");
-  }
-  const redraftIndex = text.indexOf('gh pr ready "$branch" --undo');
-  const forcePushIndex = text.indexOf(
-    'git push --force-with-lease origin "$branch"',
-  );
-  if (redraftIndex < 0) {
-    throw new Error(
-      "Existing automated OpenClaw update PRs must be returned to draft",
-    );
-  }
-  if (forcePushIndex < 0 || redraftIndex > forcePushIndex) {
-    throw new Error(
-      "Existing update PRs must be returned to draft before force-pushing",
-    );
-  }
-  if (/\bfly\s+deploy\b/.test(text)) {
-    throw new Error("The dependency update workflow must never deploy to Fly");
-  }
-  if (hasUnsafeIdTokenPermission(text)) {
-    throw new Error(
-      "The dependency update workflow must not request deploy identity tokens",
-    );
-  }
-}
-
 export function validatePluginWorkflow(text) {
   const lines = text.split(/\r?\n/);
   const triggerIndex = lines.findIndex((line) =>
@@ -295,10 +194,6 @@ export function validateManagedRedeployHandoff(text) {
 
 export function validateGatewayDeploymentSafety(rootDir = process.cwd()) {
   const flyConfig = fs.readFileSync(path.join(rootDir, "fly.toml"), "utf8");
-  const updateWorkflow = fs.readFileSync(
-    path.join(rootDir, ".github/workflows/update-openclaw.yml"),
-    "utf8",
-  );
   const pluginWorkflow = fs.readFileSync(
     path.join(rootDir, ".github/workflows/main.yml"),
     "utf8",
@@ -308,7 +203,6 @@ export function validateGatewayDeploymentSafety(rootDir = process.cwd()) {
     "utf8",
   );
   const result = validateFlyGatewayConfig(flyConfig);
-  validateManagedUpdateWorkflow(updateWorkflow);
   validatePluginWorkflow(pluginWorkflow);
   validateManagedRedeployHandoff(managedRedeployHandoff);
   return result;

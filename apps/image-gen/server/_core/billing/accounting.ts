@@ -18,23 +18,6 @@ export function sumActiveChargebacks(value: unknown): string {
   );
 }
 
-export function assertCanonicalEurAmount(
-  value: unknown,
-  currency: unknown
-): void {
-  if (currency !== "EUR" || typeof value !== "string") {
-    throw new Error("billing_accounting_data_quality");
-  }
-  try {
-    const minor = parseAmountMinor({ currency, value });
-    if (formatAmountMinor(minor) !== value) {
-      throw new Error("noncanonical");
-    }
-  } catch {
-    throw new Error("billing_accounting_data_quality");
-  }
-}
-
 /** Accounting adjustments may be signed; payment amounts remain non-negative. */
 export function assertCanonicalSignedEurAmount(
   value: unknown,

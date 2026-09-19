@@ -16,7 +16,7 @@ const STARTPILOT_IMAGE_TOTAL_LIMIT = 20;
 const STARTPILOT_IMAGE_DAILY_LIMIT = 5;
 const STARTPILOT_IMAGE_MODEL = "gpt-image-2";
 
-export type StartpilotRuntimePolicy = Readonly<{
+type StartpilotRuntimePolicy = Readonly<{
   kind: "startpilot";
   workspaceId: number;
   entitlementId: number;
@@ -27,10 +27,10 @@ export type StartpilotRuntimePolicy = Readonly<{
   imageQuality: "high";
 }>;
 
-export type WorkspaceRuntimePolicy =
+type WorkspaceRuntimePolicy =
   Readonly<{ kind: "free" }> | StartpilotRuntimePolicy;
 
-export type MessengerGenerationOwnership = Readonly<{
+type MessengerGenerationOwnership = Readonly<{
   workspaceId: number;
   channelConnectionId: number;
   bindingEpoch: number;
@@ -45,7 +45,7 @@ type ActiveEntitlement = {
   quota: unknown;
 };
 
-export type WorkspaceEntitlementRuntimeDeps = {
+type WorkspaceEntitlementRuntimeDeps = {
   findWorkspaceIdsByFacebookPage(pageId: string): Promise<number[]>;
   findActiveEntitlement(
     workspaceId: number,
@@ -319,40 +319,12 @@ export async function assertMessengerGenerationOwnership(input: {
   }
 }
 
-/** Video/TTS is a paid-only capability scoped to the owning Facebook Page. */
-export async function hasPremiumMediaAccess(
-  pageId: string | undefined,
-  now = new Date()
-): Promise<boolean> {
-  const access = await resolvePremiumMediaAccess(pageId, now);
-  return access !== null;
-}
-
-export type PremiumMediaAccess = Readonly<{
+type PremiumMediaAccess = Readonly<{
   workspaceId: number;
   entitlementId: number;
   mode: "test" | "live";
   videoGenerationsPerDay: number;
 }>;
-
-/** Returns the server-owned Premium media quota for the Page's active entitlement. */
-export async function resolvePremiumMediaAccess(
-  pageId: string | undefined,
-  now = new Date()
-): Promise<PremiumMediaAccess | null> {
-  if (
-    !isMollieEntitlementEnforcementEnabled() ||
-    !process.env.DATABASE_URL?.trim()
-  ) {
-    return null;
-  }
-
-  return await resolvePremiumMediaAccessWithDeps(
-    pageId,
-    databaseRuntimeDeps,
-    now
-  );
-}
 
 export async function resolvePremiumMediaAccessWithDeps(
   pageId: string | undefined,
@@ -410,8 +382,3 @@ export async function resolvePremiumMediaAccessWithDeps(
     videoGenerationsPerDay,
   });
 }
-
-export const STARTPILOT_RUNTIME_LIMITS = Object.freeze({
-  imageTotal: STARTPILOT_IMAGE_TOTAL_LIMIT,
-  imageDaily: STARTPILOT_IMAGE_DAILY_LIMIT,
-});

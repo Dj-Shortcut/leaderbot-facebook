@@ -5,8 +5,171 @@ not an incident archive: completed deployment transcripts belong in Git history
 or a dedicated incident record and should be summarized here only when they
 change an open gate.
 
-Last reviewed: **2026-09-19**.
+Last reviewed: **2026-09-16** (fresh Test checkout and one eight-credit grant
+verified; photo assistant and paid-image repair deployed; old-output recovery pending).
 Last state reset: **2026-08-27**.
+
+## Messenger bot and evaluator release gate
+
+Owner authorization (2026-09-15): merge and deploy the bot improvements and
+simple evaluator. The combined runtime is deployed; user-journey verification
+and sampled-monitor coverage remain open.
+
+- [x] Protected [deployment 34969598237/1](https://github.com/Dj-Shortcut/openclaw-facebook/actions/runs/34969598237)
+  passed from `bbdfb77c978dae186dff9a6856b2f5d9ec1c94f6`. At that release,
+  production was independently verified as `deploy-34969598237-1`, Fly release 386, with image
+  `registry.fly.io/leaderbot-fb-image-gen@sha256:4b211aa3d68a7599bd3f18f4d166b9223f442332ff02528a99daa180b7d9afbd`.
+  Runtime source is `afb6c8cd48e7e795ee05eba0283d2ba165d15881`, built by
+  [34960072965](https://github.com/Dj-Shortcut/openclaw-facebook/actions/runs/34960072965)
+  with [provenance 47594509](https://github.com/Dj-Shortcut/openclaw-facebook/attestations/47594509).
+  Exact source CI, bounded Test proof and recheck, drift, health and readiness
+  passed. The retained release artifact contains the exact prior image and
+  reviewed rollback config.
+- [x] Meta callback validation, including required `message_reactions`, passed.
+  This verifies subscription configuration; the clicked-reaction journey below
+  still requires a real Messenger interaction.
+- [ ] Complete a consented Messenger smoke: prompt-first generation, source-photo
+  edit, emoji/like sticker, clicked reaction, courtesy, pre-consent input and
+  typed-consent photo. Confirm accepted-response signals, no false missing reply,
+  no extra provider work/credits and metadata-only logs. Health checks alone do
+  not prove these user journeys.
+- The owner stopped the hourly conversation monitor on 2026-09-16 after it
+  missed an ignored image request. The app automation is paused; do not restart
+  it without a new request.
+
+Executable procedure: [Conversation evaluation](conversation-evaluation.md).
+Only diagnostic metadata is retained; no transcript or photo collection.
+
+## Contextual photo assistant
+
+- [x] Implement bounded private conversation and visual source selection behind
+  `MESSENGER_PHOTO_CONVERSATION_ENABLED`, retaining the generated image when a new
+  source arrives. Ordinary chat/criticism does not invoke image generation.
+- [x] Complete bounded real-model synthetic evaluation with
+  `gpt-5.4-mini-2026-03-17`, low reasoning: 20/20 action/source checks and independent
+  semantic review passed on 2026-09-16. Earlier failures and the synthetic-only
+  proof boundary are retained in [the evidence record](photo-conversation-evaluation-2026-09-16.md).
+- [x] Activate the contextual photo assistant through the authorized protected
+  [deployment 35108204745/1](https://github.com/Dj-Shortcut/leaderbot-facebook/actions/runs/35108204745).
+  Independent readback at 14:30:27 UTC verified release 390, identity
+  `deploy-35108204745-1`, exact image `7165f3bac38c`, and the feature flag true
+  on both app and both worker machines with no secret override or drift.
+  Both public hosts passed health/readiness; Test billing stayed on and live
+  billing off. The activation retained an exact rollback with photo context off.
+- [ ] Complete a consented Messenger smoke for generated image + new upload,
+  natural combination, criticism, corrective follow-up and ordinary conversation.
+  Verify the rendered image, exact source selection, delivery and credit boundaries;
+  synthetic model decisions alone do not prove that user journey.
+- [ ] Give an explicit length response for photo-conversation requests over
+  4,000 characters. The current interpreter rejects them before a model call,
+  but the generic retry reply does not explain that limit; this remains relevant
+  to the reported ignored long prompts.
+
+Behavior, costs, rollback and tests: [Photo conversation](photo-conversation.md).
+
+## Test Mode checkout repair and payment proof
+
+- [x] Deploy the checkout confirmation repair from [PR #567](https://github.com/Dj-Shortcut/leaderbot-facebook/pull/567).
+  Payment-path wallet/ledger reads now use shared locks compatible with the
+  restricted runtime principal, while direct credit-table writes remain denied.
+  Safe diagnostics and distinct confirmation/status screens accompany the fix.
+- [x] Protected [deployment 35103111862/1](https://github.com/Dj-Shortcut/leaderbot-facebook/actions/runs/35103111862)
+  passed from release revision `8f6de571c14b3488140e0a53af50336f4318a51c`.
+  Independent readback at 13:43 UTC verified `deploy-35103111862-1`, Fly release
+  389, all four started machines (two app, two worker), and no drift on image
+  `sha256:7165f3bac38c168f3b5d85e3153f7371388eeef7b5477c06f8eff63d9602cb8d`,
+  runtime source `2bebfabd7e005e7dcb87c9a46cf3611c2b2a3dee`.
+  Both public hostnames returned HTTP 200 for health/readiness; bounded Test
+  proofs, attestations and rollback capture passed.
+  The protected build and deployment prove the installed runtime, not a completed
+  Mollie payment or credit grant.
+- The repair release retains `deploy-35108204745-1` / `7165f3bac38c`
+  as its exact predecessor, including active photo context and the checkout
+  repair. Its separate emergency rollback config disables checkout/paid
+  admission and photo context while retaining financial recovery. The previous
+  runtime still has the paid-image completion defect described below.
+- [x] Verify a fresh consented Test checkout and grant. The owner's checkout
+  reached Mollie; the authoritative Test payment became paid at 13:52:57 UTC on
+  2026-09-16. The webhook applied exactly one immutable eight-credit grant at
+  13:52:59 UTC. Scoped metadata after the repair at 15:15 UTC showed balance 8, reserved 2,
+  available 6, and no generation debit.
+- [x] Deploy and verify the paid-image delivery repair. Two outputs were saved,
+  but the production Redis-compatible interpreter rejected mutation of Lua
+  `ARGV` after persisting delivery intent. Recovery then mistook a paid
+  completion with an omitted JSON-null quota field for free-quota work.
+  The source correction in [PR #571](https://github.com/Dj-Shortcut/leaderbot-facebook/pull/571)
+  keeps expiry in a local variable and validates the
+  original paid reservation without requesting free quota or another hold.
+  The Redis regression models both read-only arguments and dropped null fields;
+  native Redis alone does not reproduce this production behavior.
+  The reviewed source `bd67c6f502cda26a16f2282fbe479afeb2a4fcbc` passed exact
+  main CI and [trusted build 35110414178](https://github.com/Dj-Shortcut/leaderbot-facebook/actions/runs/35110414178).
+  The deployed runtime is
+  `sha256:a1f5a73069d1e7429d8b9373ec025a0bad9a3ee0d48aa76aebe391e3f4d4a22c`,
+  with [provenance 47938967](https://github.com/Dj-Shortcut/leaderbot-facebook/attestations/47938967).
+  [Protected deployment 35113258520/1](https://github.com/Dj-Shortcut/leaderbot-facebook/actions/runs/35113258520)
+  passed from manifest revision `000c6a6855889c9d008c2f9e5134435f29efdc80`.
+  Independent readback at 15:15:26 UTC verified identity `deploy-35113258520-1`,
+  release 391 and the exact new image on both app and both worker machines.
+  All 13 runtime assertions passed, with no drift, photo context enabled,
+  unchanged payment flags and HTTP 200 health/readiness on both public hosts.
+  The retained release artifact confirms the exact prior identity/image/schema
+  and rollback-config hash `0e1d34112abbd08362361820ba585e89807ebbcce4a5a6700f1eaaa23f09714a`.
+  CodeRabbit approved source PR #571; its rate limit prevented a second review
+  of release PR #572, which passed independent review and all required CI.
+- [ ] Release the prepared emergency-dark registration for
+  `a1f5a73069d1e7429d8b9373ec025a0bad9a3ee0d48aa76aebe391e3f4d4a22c`
+  in `reviewedRollbackImages`. The pending manifest binds the exact current
+  `deploy-35113258520-1` predecessor and a dark config for that repaired runtime,
+  disabling paid admission/checkout while retaining financial recovery and
+  photo context. The independently checked predecessor still had the old caps
+  on all four started Machines at 16:27:03 UTC. Deploy through the protected
+  workflow and retain the release receipt before calling the caps removed.
+- [ ] Complete receipt-backed accounting for the two recovered outputs. The
+  owner authorized receipt of both saved images and confirmed both arrived.
+  The scoped completion-only recovery sent the original objects at 15:43:43 and
+  15:44:09 UTC on 2026-09-16, preserving original request/privacy/Meta-fence
+  identities. It created no provider generation, reservation or manual debit.
+  At 15:44:30 both completions had exact accepted Meta message-ID hashes but no
+  delivery receipts; balance remained 8, reserved 2, available 6. Do not resend
+  these images. Diagnose receipt ingress and prove one ordinary receipt-backed
+  debit per original reservation. Never manufacture a Meta receipt from the
+  owner's confirmation. A scoped balance notice was accepted at 15:48:07 UTC.
+  The Page subscription was missing `message_deliveries`; it was added and
+  independently read back at 15:59:39 UTC, preserving its three existing fields.
+  Future receipt ingress still needs a live delivery check; this does not prove
+  that Meta will replay receipts for the two earlier images.
+- [ ] Release and verify the **Credits** balance reply without a replacement
+  quick reply. Protected deployment
+  [35133964382](https://github.com/Dj-Shortcut/leaderbot-facebook/actions/runs/35133964382)
+  passed with corrected runtime `10a7607a671d...`; independent readback confirmed
+  four started Machines and healthy endpoints. The owner confirmed the button
+  returns a balance but immediately reappears. The prepared fix sends the balance
+  (or unavailable notice) as plain text, preserving the ordinary photo-menu entry
+  and pending image context. After rollout, tap **Credits** and confirm the
+  balance arrives without another **Credits** pill beneath it.
+- [ ] Deploy the owner's removal of extra bot-level USD limits. Both 15:49 UTC
+  photo-conversation attempts failed at spend admission with `user_daily_cap`.
+  Scoped readback at 15:53:45 UTC showed the configured USD 2/day user cap and
+  USD 2 in reserved estimates from seven image attempts, with final provider
+  costs unavailable; the global daily cap remains USD 5. Available purchased
+  credits did not override this cost guard. The owner explicitly rejected the
+  daily spend caps and clarified that they manage the monthly dollar ceiling at
+  the API provider too. The desired Fly configuration and exact deployment
+  contract now set global daily/monthly and per-user daily USD caps to `0`
+  (disabled), preserving the five-free-image allowance and one-credit-per-
+  delivered-image accounting. No live counters or balances were reset. Release
+  and verify paid-image use.
+- [ ] Add a scoped, idempotent Messenger payment-success confirmation. The
+  current checkout return page confirms payment; the grant handler does not
+  enqueue a chat confirmation, so silence in Messenger is not grant failure.
+- [ ] Before live billing, repair and verify remaining restricted-runtime
+  authority gaps outside the ordinary paid checkout: reconnect and reservation
+  operator reads in `server/db.ts` and `creditReservationOperatorResolution.ts`
+  still request update locks on protected credit tables; refund/chargeback
+  fencing in `creditPaymentWebhookStore.ts` attempts direct wallet writes.
+  Preserve guarded-routine authority and test these paths with the restricted
+  runtime principal instead of an administrator database connection.
 
 ## Product decision
 
@@ -30,9 +193,11 @@ The target product has:
 - purchased credits separate from the resetting free allowance;
 - premium quality selected by a server-owned offer policy.
 
-The reusable OpenClaw Facebook channel remains a separate open-source product.
-It will move out of this repository after its standalone package, channel-index,
-ClawHub, install, release, and rollback routes are proven.
+The reusable OpenClaw Facebook channel is maintained in
+[`openclaw-facebook-messenger`](https://github.com/Dj-Shortcut/openclaw-facebook-messenger),
+including its regular dependency upgrades. Retire the retained root copy after
+its standalone package, channel-index, ClawHub, install, release, and rollback
+routes are proven.
 
 ## Active order
 
@@ -52,6 +217,12 @@ Live payment enablement remains gated by the relevant P1 through P4 evidence.
       volume data under an explicit privacy/retention decision. Extract the
       generic OpenClaw channel to its standalone project before removing the
       root package and ClawHub workflows from this repository.
+  - [ ] Complete the deployed Messenger social-reply and pending-consent smoke
+        in the release gate above. Verify emoji/like stickers preserve the
+        generated photo, clicked reactions obey consent/window rules, and up
+        to four photo references plus 32 KB text wait at most 15 minutes for
+        initial consent. Prove continuation once, expiry, refusal and photos
+        attached to typed agreement in the direct Page journey.
   - [x] PR #479 removed the automatic gateway health probe at exact `main`
         merge `6f48774d9ffdb744441570ed0da619bf08be6fb7` on
         `2026-08-30T17:37:55Z`. Because the observation duration had not yet
@@ -62,15 +233,27 @@ Live payment enablement remains gated by the relevant P1 through P4 evidence.
         `c251a5e34c46bd327ffa5c015ed038f1fced545e` on
         `2026-08-30T17:44:08Z`. That exact SHA and UTC timestamp start the
         observation clock.
-  - [ ] Collect continuous metadata-only gateway ingress evidence for all 168
-        hours. The originally scheduled end,
-        `2026-09-06T17:44:08Z`, has passed and is not evidence that the window
-        completed. Record the evidence link and mark the window complete, or
-        record the first gap and approve a new reviewed start and scheduled end.
-        A green health check is not user-traffic evidence. Any evidence gap,
-        gateway probe, gateway Machine mutation, or direct Page-callback drift
-        resets the clock. Do not stop, delete, scale, or replace the gateway
-        Machine or its volumes during an active observation window.
+  - [ ] Decide and record the replacement retirement evidence. The 168-hour
+        window is void. The clock started at `2026-08-30T17:44:08Z`, and commit
+        `d080e446`, recorded at `2026-08-30T19:16:02Z`, states that Fly machine
+        `28621d2c559558` was stopped and that all four gateway machines are now
+        stopped. No exact stop time is recorded anywhere in this repository, so
+        that mutation cannot be placed before the start, and a gateway Machine
+        mutation resets the clock. A stopped app also cannot produce ingress
+        evidence: receiving nothing is quiescence, not proof that no caller
+        remains. Do not present the scheduled end `2026-09-06T17:44:08Z` as
+        reached. Choose and record exactly one path:
+        - Quiescence path (recommended): keep the machines stopped and record
+          the protected inspection showing the canonical direct Page callback
+          with an empty `temporarilyAllowedCallbacks`, the uptime workflow that
+          no longer probes the gateway, the stopped-machine read with gateway
+          `/healthz` `502`, and the exact stop time from the Fly Machine event
+          history. State plainly that this proves quiescence and callback
+          ownership, not zero historical ingress.
+        - Observation path: approve a new reviewed start and scheduled end.
+          This requires starting gateway Machines again, which reverses the
+          approved retirement step and needs its own reviewed approval,
+          rollback, and retention evidence.
 
 - [ ] **P2 - User-scoped purchased-credit ledger.** Add an append-only credit
       ledger, wallet projection, and idempotent reservation/commit/release model
@@ -87,6 +270,25 @@ Live payment enablement remains gated by the relevant P1 through P4 evidence.
       Test Mode must exercise that same signed checkout path; the temporary
       direct Mollie command has been removed. The production trigger remains
       the daily free-credit exhaustion path only.
+  - [x] Deploy the reservation outbox-epoch guard. Protected deployment
+        [35065616049/1](https://github.com/Dj-Shortcut/leaderbot-facebook/actions/runs/35065616049)
+        succeeded after PRs #560/#561. Independent readback proved all four
+        Machines on the reviewed runtime, enabled commercial/outbox epoch 2,
+        Test-only flags, empty retired pins and passing health/readiness.
+        [Release evidence](credit-checkout-scheduler-verification.md) retains
+        exact source/digest, activation provenance and rollback boundaries.
+  - [x] Deploy and verify the [owner customer-test switch](owner-customer-test-mode.md):
+        `/testklant aan|uit|status` preserves admin rights while applying ordinary
+        quota/credit/budget admission in Test Mode. Protected deployment
+        [35073398659/1](https://github.com/Dj-Shortcut/leaderbot-facebook/actions/runs/35073398659)
+        and independent all-Machine, epoch-2 activation and health/readiness
+        checks passed. Test-only flags and empty retired pins remain verified.
+        No manual balance changes; the owner enables the switch in Messenger.
+  - [ ] Complete the actual Messenger Test checkout journey with the owner in
+        customer-test mode or another eligible user: fresh CTA, explicit
+        confirmation, paid Test webhook, exactly one eight-credit grant and
+        premium image/edit delivery. Local second-user/duplicate-webhook regression
+        and successful deployment are not this production journey proof.
 
 - [ ] **P4 - Premium quality and Test Mode journey.** Bind the paid offer to a
       versioned premium provider policy and prove unit economics. In Mollie Test
@@ -456,14 +658,16 @@ release`, before any deployment or restart. The app-level Fly config
       [34588527737](https://github.com/Dj-Shortcut/openclaw-facebook/actions/runs/34588527737)
       passed from that exact source, producing runtime
       `sha256:c04c742f56de06cddb72907ca0bdc989200babd0ea7dcb73b318bf96a327b548`
-      with attestation `46823247` and exact 0018 container checks. This is the
-      desired frontend-and-Test-checkout release. Only the desired artifact
-      and source pins change; the original committed `c54c1fd0...` operator
-      anchor, `f2fa9d60...` rollback, offer, budgets and flags remain unchanged.
-      Build attempt 1 stopped before construction because the exact-source
-      migration CI was still running; attempt 2 began only after it passed.
-      The exposure deployment and payment-to-credit-to-delivered-edit evidence
-      remain pending. No additional processing-enable action is required.
+      with attestation `46823247` and exact 0018 container checks. Protected
+      deployment
+      [34590370389](https://github.com/Dj-Shortcut/openclaw-facebook/actions/runs/34590370389)
+      then recorded this c04c runtime as the settled payment-enabled
+      predecessor (`deploy-34590370389-1`). The active manifest keeps that
+      bright predecessor separate from the emergency-dark rollback profile,
+      which disables checkout and paid credits. The remaining gate is evidence,
+      not exposure: run one any-user Messenger Test Mode checkout, verify the
+      trusted webhook grant to that user, one premium edit/debit, and the
+      negative, retry, and refund paths. Live billing remains disabled.
     - The completed payment-processing preparation changed only notification, drain and
       reconciliation flags to true; checkout, paid image use, legacy sales and
       live billing remain false. It reuses the reviewed `f2fa9d60...` runtime,
@@ -496,8 +700,10 @@ release`, before any deployment or restart. The app-level Fly config
       no existing key. Its value was not logged or written to disk. The later
       reviewed deployment `34484419576/1` applied it; Fly now reports `Deployed`
       and no staged secrets. This is not evidence that checkout is active.
-      Automatic per-user checkout binding, payment drain/notification configuration and
-      real Test Mode payment-to-credit-to-delivery proof are still required.
+      The per-user checkout binding and payment drain/notification configuration
+      are now part of the reviewed release. The remaining proof is one real Test
+      Mode payment through Messenger, followed by webhook credit grant,
+      premium-image debit, and the documented negative/retry/refund checks.
 
 - [ ] **P5 - Bounded live pilot and legacy removal.** Obtain legal/accounting
       approval, enable one reviewed live offer for a bounded audience, monitor
@@ -515,10 +721,11 @@ release`, before any deployment or restart. The app-level Fly config
   168-hour observation contract at
   `c251a5e34c46bd327ffa5c015ed038f1fced545e` on
   `2026-08-30T17:44:08Z`, with conditional end
-  `2026-09-06T17:44:08Z`. P1 remains open until uninterrupted metadata-only
-  zero-ingress evidence, direct Messenger smokes, rollback/retention decisions,
-  the later reviewed gateway stop, and standalone channel publication are
-  complete.
+  `2026-09-06T17:44:08Z`. That window is void, because the approved gateway
+  stop recorded the same day is an unplaced Machine mutation inside it; see the
+  P1 item above. P1 remains open until the replacement retirement evidence is
+  decided and recorded, direct Messenger smokes, rollback/retention decisions,
+  and standalone channel publication are complete.
 
 - Storage-proxy startup ordering was fixed and merged in PR #445 at reviewed
   source commit `6a7d0431e1e02076a2db7fcf12c8358d7fbf33cd`.
@@ -693,3 +900,5 @@ administration, or undocumented manual steps.
 - Meta review: `docs/operations/meta-app-review.md`
 - Deployment and rollback: `docs/operations/production-deployments.md`
 - Security: `docs/security/SECURITY.md`
+
+- Fallow review and measured cleanup: [2026-09-17 record](fallow-maintainability-2026-09-17.md). Small internal-export candidates remain for triage; broader privacy, payment, and generation refactors require a separate contract review.

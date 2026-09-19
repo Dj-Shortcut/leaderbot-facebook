@@ -1,3 +1,4 @@
+import { normalizePhotoConversation } from "./photoConversationMemory";
 import { toUserKey } from "./privacy";
 import { MAX_SOURCE_IMAGES } from "./image-generation/generationTypes";
 import type { MessengerFlowState, MessengerUserState } from "./messengerState";
@@ -104,6 +105,13 @@ export function normalizeState(
   psid: string,
   value: PartialState | null | undefined
 ): MessengerUserState {
+  // Never re-persist pre-sidecar content with the ordinary state lifetime.
+  // This also scrubs the embedded representation on refusal after a rollback.
+  if (value && "pendingConsentInput" in value) {
+    const clean = { ...value };
+    delete clean.pendingConsentInput;
+    value = clean;
+  }
   const base = createStateNormalizationBase(psid, value);
   const legacyFields = resolveLegacyStateFields(value, base.fallback);
 
@@ -411,6 +419,10 @@ function applyNormalizedStateShape(
   return {
     ...fallback,
     ...value,
+    customerTestMode: value?.customerTestMode === true,
+    photoConversation: value?.photoConversation
+      ? normalizePhotoConversation(value.photoConversation)
+      : undefined,
     psid: resolvedPsid,
     userKey: getUserKey(value?.userKey ?? fallback.userKey),
     pageId: value?.pageId ?? fallback.pageId,

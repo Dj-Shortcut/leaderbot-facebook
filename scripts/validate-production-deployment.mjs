@@ -2481,6 +2481,17 @@ export function validateProductionWorkflow(rootDir = process.cwd()) {
       `${PRODUCTION_WORKFLOW_PATH} must require one exact immutable image input for every production target`,
     );
   }
+  for (const [target, imageVariable, count] of [
+    ["image-gen", "REVIEWED_IMAGE", 2],
+    ["image-gen", "rollback_image", 2],
+    ["storage-proxy", "REVIEWED_IMAGE", 1],
+    ["storage-proxy", "rollback_image", 1],
+  ]) {
+    const invocation = `node scripts/verify-production-artifact-attestation.mjs ${target} "$${imageVariable}"`;
+    if (workflow.split(invocation).length - 1 !== count) {
+      fail("production deploy must verify each exact desired and rollback artifact with the reviewed repository identity");
+    }
+  }
   const requirements = [
     ["workflow_dispatch:", "must be manually dispatched"],
     ['test "$GITHUB_REF" = "refs/heads/main"', "must require reviewed main"],
@@ -2611,18 +2622,12 @@ export function validateProductionWorkflow(rootDir = process.cwd()) {
       "must require green CI for the exact deployment source",
     ],
     [
-      "gh attestation verify",
+      "node scripts/verify-production-artifact-attestation.mjs",
       "must cryptographically verify exact requested and rollback artifacts",
     ],
     [
-      ".github/workflows/build-production-artifacts.yml",
-      "must bind provenance to the trusted builder workflow",
-    ],
-    ["--source-digest", "must bind provenance to the reviewed source SHA"],
-    ["--source-ref refs/heads/main", "must bind provenance to reviewed main"],
-    [
-      "--format json",
-      "must request JSON before querying bridge attestation predicates",
+      '--predicate-type "$predicate_type" | jq -er',
+      "must verify bridge provenance before querying its signed predicate",
     ],
     [
       "--reviewed-artifact-kind",
@@ -3413,7 +3418,7 @@ export function validateProductionWorkflow(rootDir = process.cwd()) {
       "must inspect every requested and rollback artifact label",
     ],
     [
-      "gh attestation verify",
+      "node scripts/verify-production-artifact-attestation.mjs",
       6,
       "must verify every trusted requested, rollback, and bridge-material attestation",
     ],
@@ -8574,9 +8579,9 @@ export function validateCreditTestActivation(app, env, rootDir) {
     BILLING_NOTIFICATION_PLANE_ENABLED: "true",
     MOLLIE_RECONCILIATION_ENABLED: "true",
     MESSENGER_PAID_IMAGE_PROVIDER_MAX_COST_USD: "1.00",
-    MESSENGER_GLOBAL_DAILY_SPEND_CAP_USD: "5.00",
-    MESSENGER_GLOBAL_MONTHLY_SPEND_CAP_USD: "25.00",
-    MESSENGER_USER_DAILY_SPEND_CAP_USD: "2.00",
+    MESSENGER_GLOBAL_DAILY_SPEND_CAP_USD: "0",
+    MESSENGER_GLOBAL_MONTHLY_SPEND_CAP_USD: "0",
+    MESSENGER_USER_DAILY_SPEND_CAP_USD: "0",
   })) {
     if (String(env[key]) !== value)
       fail(`image-gen bounded Test activation requires ${key}=${value}`);
@@ -9815,6 +9820,23 @@ export function validateProductionRepository(rootDir = process.cwd()) {
           );
         }
       }
+    }
+  }
+
+  for (const [target, app] of Object.entries(manifest.apps)) {
+    if (target === "gateway") continue;
+    const artifactRepositories = app.reviewedArtifactRepositories;
+    const trustedImages = [...new Set([app.reviewedImage, ...app.reviewedRollbackImages])]
+      .filter((image) => reviewedArtifactKindForImage(app, image) !== "legacy-bootstrap");
+    if (
+      !artifactRepositories || typeof artifactRepositories !== "object" ||
+      Array.isArray(artifactRepositories) ||
+      JSON.stringify(Object.keys(artifactRepositories).sort()) !==
+        JSON.stringify(trustedImages.sort()) ||
+      Object.values(artifactRepositories).some((repository) =>
+        !["Dj-Shortcut/leaderbot-facebook", "Dj-Shortcut/openclaw-facebook"].includes(repository))
+    ) {
+      fail(`${target} must pin the signing repository for each exact trusted artifact`);
     }
   }
 

@@ -41,7 +41,7 @@ import {
   type MessengerErasingPrivacySubject,
 } from "./messengerPrivacySubject";
 import { containMessengerProviderAttemptsForPrivacy } from "./messengerProviderAttemptFence";
-import { eraseWebhookIngressDeliveriesForSubject } from "./meta/webhookIngressQueue";
+import { eraseWebhookIngressDeliveriesForSubject } from "./meta/webhookIngressPrivacy";
 import {
   eraseMessengerGenerationJobsForSubject,
   recoverMessengerGenerationAdmissionsForSubject,
@@ -68,6 +68,7 @@ function getGeneralStateImageUrls(state: MessengerUserState): string[] {
     state.lastPhotoUrl,
     state.pendingImageUrl,
     ...(state.pendingImageUrls ?? []),
+    ...(state.photoConversation?.images.map(image => image.url) ?? []),
     state.lastGeneratedUrl,
     state.lastImageUrl,
     state.lastGeneratedVideoUrl,

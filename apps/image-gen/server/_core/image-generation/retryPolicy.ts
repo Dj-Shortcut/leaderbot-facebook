@@ -1,4 +1,4 @@
-export type RetryAttempt = {
+type RetryAttempt = {
   attempt: number;
   maxRetries: number;
   retryable: boolean;

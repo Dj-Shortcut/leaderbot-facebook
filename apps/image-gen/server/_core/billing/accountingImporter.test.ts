@@ -1,30 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  FakeMollieAccountingReader,
   planDescendingAccountingPage,
   validateAccountingEvent,
 } from "./accountingImporter";
 
-describe("credential-free Mollie accounting reader", () => {
-  it("replays deterministic GET-only pages without provider credentials", async () => {
-    const event = accountingEvent();
-    const reader = new FakeMollieAccountingReader([
-      { events: [event], nextCursor: "cursor-2" },
-      { events: [], nextCursor: null },
-    ]);
-
-    await expect(
-      reader.listEvents({ mode: "test", cursor: null })
-    ).resolves.toEqual({
-      events: [event],
-      nextCursor: "cursor-2",
-    });
-    await expect(
-      reader.listEvents({ mode: "test", cursor: "cursor-2" })
-    ).resolves.toEqual({ events: [], nextCursor: null });
-  });
-
+describe("Mollie accounting event validation", () => {
   it("accepts only canonical EUR metadata events", () => {
     expect(validateAccountingEvent(accountingEvent())).toEqual(
       accountingEvent()

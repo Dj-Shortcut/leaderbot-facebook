@@ -1,3 +1,4 @@
+import { getPendingConsentStorageScope } from "./_core/messengerStatePersistence";
 import {
   afterAll,
   afterEach,
@@ -56,6 +57,7 @@ import {
   getState,
   resetStateStore,
   setConsentState,
+  setLastUserMessageAt,
   setLastGenerated,
   setLastGenerationContext,
   setPendingImage,
@@ -81,6 +83,7 @@ import {
 import { resetMessengerGenerationQueueForTests } from "./_core/messengerGenerationQueue";
 import { runWithMessengerRequestContext } from "./_core/messengerRequestContext";
 import {
+  readScopedState,
   deleteEphemeralKey,
   setEphemeralKey,
   writeScopedState,
@@ -1028,6 +1031,75 @@ describe("messenger webhook dedupe", () => {
     );
   });
 
+  it("holds a pre-consent photo and long prompt, then resumes only after agreement", async () => {
+    const psid = "pre-consent-photo-user";
+    const fetchMock = installImageIngressFetchMock();
+    const prompt =
+      "Maak een afbeelding: " +
+      "Gedetailleerde compositie. ".repeat(200).trimEnd();
+    await processFacebookWebhookPayloadWithoutConsent({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: psid },
+              timestamp: Date.now(),
+              message: {
+                mid: "before-consent-photo",
+                text: prompt,
+                attachments: [
+                  {
+                    type: "image",
+                    payload: { url: "https://img.example/before-consent.jpg" },
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      ],
+    });
+    const before = await getTestMessengerState(psid);
+    expect(before?.lastPhotoUrl).toBeNull();
+    expect(before?.consentGiven).toBe(false);
+    expect(
+      await runWithTestMessengerPageContext(() => {
+        const scope = getPendingConsentStorageScope(psid);
+        return readScopedState(scope.scope, scope.key);
+      })
+    ).toEqual(
+      expect.objectContaining({
+        text: prompt,
+        imageUrls: ["https://img.example/before-consent.jpg"],
+      })
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(sendImageMock).not.toHaveBeenCalled();
+    sendTextMock.mockClear();
+    await processFacebookWebhookPayloadWithoutConsent({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: psid },
+              timestamp: Date.now(),
+              postback: { payload: "GDPR_CONSENT_AGREE" },
+            },
+          ],
+        },
+      ],
+    });
+    expect((await getTestMessengerState(psid))?.consentGiven).toBe(true);
+    expect(
+      await runWithTestMessengerPageContext(() => {
+        const scope = getPendingConsentStorageScope(psid);
+        return readScopedState(scope.scope, scope.key);
+      })
+    ).toBeNull();
+    expect(fetchMock).toHaveBeenCalled();
+    expect((await getTestMessengerState(psid))?.pendingImageUrl).toBeTruthy();
+  });
+
   it("opens the Messenger response window before a fresh consent prompt", async () => {
     const psid = "fresh-consent-window-user";
     const timestamp = 1730000000456;
@@ -1153,6 +1225,11 @@ describe("messenger webhook dedupe", () => {
           title: "Privacy",
           payload: "OPENCLAW_ACTION:Privacy",
         },
+        {
+          content_type: "text",
+          title: "Credits",
+          payload: "OPENCLAW_ACTION:credits",
+        },
       ]
     );
     expect(
@@ -1233,6 +1310,11 @@ describe("messenger deterministic free text", () => {
           content_type: "text",
           title: "Privacy",
           payload: "OPENCLAW_ACTION:Privacy",
+        },
+        {
+          content_type: "text",
+          title: "Credits",
+          payload: "OPENCLAW_ACTION:credits",
         },
       ]
     );
@@ -2019,6 +2101,11 @@ describe("messenger deterministic free text", () => {
           title: "Privacy",
           payload: "OPENCLAW_ACTION:Privacy",
         },
+        {
+          content_type: "text",
+          title: "Credits",
+          payload: "OPENCLAW_ACTION:credits",
+        },
       ]
     );
     expect(
@@ -2075,6 +2162,11 @@ describe("messenger greeting behavior", () => {
           content_type: "text",
           title: "Privacy",
           payload: "OPENCLAW_ACTION:Privacy",
+        },
+        {
+          content_type: "text",
+          title: "Credits",
+          payload: "OPENCLAW_ACTION:credits",
         },
       ])
     );
@@ -2240,6 +2332,11 @@ describe("messenger greeting behavior", () => {
         title: "Privacy",
         payload: "OPENCLAW_ACTION:Privacy",
       },
+      {
+        content_type: "text",
+        title: "Credits",
+        payload: "OPENCLAW_ACTION:credits",
+      },
     ]);
   });
 
@@ -2300,6 +2397,11 @@ describe("messenger greeting behavior", () => {
           title: "Nieuwe afbeelding",
           payload: "OPENCLAW_ACTION:new_image",
         },
+        {
+          content_type: "text",
+          title: "Credits",
+          payload: "OPENCLAW_ACTION:credits",
+        },
       ]
     );
   });
@@ -2343,7 +2445,7 @@ describe("acknowledgement edgecases", () => {
     expect(safeLogMock).toHaveBeenCalledWith("ack_ignored", { ack: "like" });
   });
 
-  it("treats emoji messages as normal text", async () => {
+  it("treats emoji messages as social reactions", async () => {
     await processFacebookWebhookPayload({
       entry: [
         {
@@ -2358,17 +2460,128 @@ describe("acknowledgement edgecases", () => {
     });
 
     expect(sendImageMock).not.toHaveBeenCalled();
-    expect(sendTextMock).not.toHaveBeenCalled();
-    expect(sendQuickRepliesMock).toHaveBeenCalledWith(
+    expect(sendTextMock).toHaveBeenCalledWith(
       "ack-emoji-user",
-      expect.any(String),
-      expect.any(Array)
+      t("nl", "socialPositive")
     );
-    expect(safeLogMock).not.toHaveBeenCalledWith(
-      "ack_ignored",
-      expect.objectContaining({ ack: "emoji" })
+    expect(sendQuickRepliesMock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    {
+      sticker_id: "369239263222822",
+      attachments: [
+        { type: "image", payload: { url: "https://example.test/like.png" } },
+      ],
+    },
+    {
+      attachments: [
+        {
+          type: "image",
+          payload: { sticker_id: "123", url: "https://example.test/like.png" },
+        },
+      ],
+    },
+    { attachments: [{ type: "sticker", payload: { sticker_id: "123" } }] },
+  ])(
+    "recognizes an image-shaped like replying to the generated photo",
+    async sticker => {
+      const psid = "thread-like-user";
+      await runWithTestMessengerPageContext(async () => {
+        await setLastGenerated(psid, "https://example.test/generated.jpg");
+        await setFlowState(psid, "RESULT_READY");
+      });
+      const before = await getTestMessengerState(psid);
+      await processFacebookWebhookPayload({
+        entry: [
+          {
+            messaging: [
+              {
+                sender: { id: psid },
+                message: {
+                  mid: "thread-like",
+                  reply_to: { mid: "generated-mid" },
+                  ...sticker,
+                },
+              },
+            ],
+          },
+        ],
+      });
+      expect(sendTextMock).toHaveBeenCalledWith(
+        psid,
+        t("nl", "socialReaction")
+      );
+      expect(sendImageMock).not.toHaveBeenCalled();
+      expect(sendQuickRepliesMock).not.toHaveBeenCalled();
+      const after = await getTestMessengerState(psid);
+      expect(after?.lastGeneratedUrl).toBe(before?.lastGeneratedUrl);
+      expect(after?.stage).toBe("RESULT_READY");
+      expect(after?.quota).toEqual(before?.quota);
+    }
+  );
+
+  it("handles a clicked reaction once without replacing the photo or extending the window", async () => {
+    const psid = "clicked-reaction-user";
+    const lastMessage = Date.now() - 60_000;
+    await runWithTestMessengerPageContext(async () => {
+      await setLastGenerated(psid, "https://example.test/generated.jpg");
+      await setLastUserMessageAt(psid, lastMessage);
+    });
+    const event = {
+      sender: { id: psid },
+      timestamp: Date.now(),
+      reaction: { mid: "generated-mid", action: "react", emoji: "❤️" },
+    };
+    const payload = { entry: [{ messaging: [event] }] };
+    await processFacebookWebhookPayload(payload);
+    await processFacebookWebhookPayload(payload);
+    expect(sendTextMock).toHaveBeenCalledTimes(1);
+    expect(sendTextMock).toHaveBeenCalledWith(psid, t("nl", "socialPositive"));
+    expect(sendImageMock).not.toHaveBeenCalled();
+    expect((await getTestMessengerState(psid))?.lastUserMessageAt).toBe(
+      lastMessage
+    );
+    expect((await getTestMessengerState(psid))?.lastGeneratedUrl).toBe(
+      "https://example.test/generated.jpg"
     );
   });
+
+  it.each(["unreact", "closed-window", "no-consent"])(
+    "does not reply to %s reactions",
+    async mode => {
+      const psid = "silent-reaction-user";
+      await runWithTestMessengerPageContext(async () => {
+        await setConsentState(psid, mode !== "no-consent");
+        await setLastUserMessageAt(
+          psid,
+          Date.now() - (mode === "closed-window" ? 48 * 60 * 60_000 : 60_000)
+        );
+      });
+      await processFacebookWebhookPayloadWithoutConsent({
+        entry: [
+          {
+            messaging: [
+              {
+                sender: { id: psid },
+                timestamp: Date.now(),
+                reaction: {
+                  mid: "generated-mid",
+                  action: mode === "unreact" ? "unreact" : "react",
+                  emoji: "👍",
+                },
+              },
+            ],
+          },
+        ],
+      });
+      expect(sendTextMock).not.toHaveBeenCalled();
+      expect(sendImageMock).not.toHaveBeenCalled();
+      expect(sendQuickRepliesMock).not.toHaveBeenCalled();
+      if (mode === "no-consent")
+        expect((await getTestMessengerState(psid))?.consentGiven).toBe(false);
+    }
+  );
 
   it.each([
     "laat hem dansen",
@@ -2745,6 +2958,11 @@ describe("disabled bot features stay out of the runtime flow", () => {
           content_type: "text",
           title: "Privacy",
           payload: "OPENCLAW_ACTION:Privacy",
+        },
+        {
+          content_type: "text",
+          title: "Credits",
+          payload: "OPENCLAW_ACTION:credits",
         },
       ]
     );
