@@ -5,7 +5,7 @@ not an incident archive: completed deployment transcripts belong in Git history
 or a dedicated incident record and should be summarized here only when they
 change an open gate.
 
-Last reviewed: **2026-09-11**.
+Last reviewed: **2026-09-19**.
 Last state reset: **2026-08-27**.
 
 ## Product decision

@@ -177,7 +177,10 @@ is unavailable.
 
 ## HTTP surfaces
 
-The following status labels distinguish deployed behavior from target design:
+The following status labels distinguish deployed behavior from target design.
+Use the vocabulary defined in the [README documentation status
+legend](../README.md#documentation) rather than inventing a more optimistic
+synonym:
 
 | Status | Surface | Meaning |
 | --- | --- | --- |
