@@ -10,6 +10,17 @@
   ],
   "framework": [
     {
+      "name": "root-vitest",
+      "enablers": ["vitest"],
+      "entryPointRole": "test",
+      "entryPoints": [
+        "*.test.ts",
+        "src/**/*.test.ts",
+        "scripts/**/*.test.mjs",
+        "deploy/fly-gateway/**/*.test.mjs"
+      ]
+    },
+    {
       "name": "image-gen-vitest",
       "enablers": ["vitest"],
       "entryPointRole": "test",
