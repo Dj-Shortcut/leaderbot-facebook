@@ -255,6 +255,25 @@ async function sendWhatsAppGraph(input: {
   };
 }
 
+/** A non-2xx Graph response rejects the send; the fence already recorded its outcome. */
+function throwIfWhatsAppSendRejected(
+  result: Awaited<ReturnType<typeof sendWhatsAppGraph>>,
+  failureLogEvent?: "whatsapp_send_failed" | "whatsapp_buttons_send_failed"
+): void {
+  if (result.kind === "response" && !result.response.ok) {
+    if (failureLogEvent) {
+      logger.error({
+        event: failureLogEvent,
+        status: result.response.status,
+      });
+    }
+    throw new WhatsAppDeliveryError(
+      result.failureOutcome ?? "ambiguous",
+      result.attemptKeyHash
+    );
+  }
+}
+
 function createWhatsAppGraphAttemptId(input: {
   operationId: string;
   operation: "whatsapp_graph_text" | "whatsapp_graph_buttons";
@@ -434,16 +453,7 @@ export async function sendWhatsAppErasureControlText(
       }),
     },
   });
-  if (result.kind === "response" && !result.response.ok) {
-    logger.error({
-      event: "whatsapp_send_failed",
-      status: result.response.status,
-    });
-    throw new WhatsAppDeliveryError(
-      result.failureOutcome ?? "ambiguous",
-      result.attemptKeyHash
-    );
-  }
+  throwIfWhatsAppSendRejected(result, "whatsapp_send_failed");
 }
 
 export async function sendWhatsAppText(
@@ -479,16 +489,7 @@ export async function sendWhatsAppText(
       body,
     },
   });
-  if (result.kind === "response" && !result.response.ok) {
-    logger.error({
-      event: "whatsapp_send_failed",
-      status: result.response.status,
-    });
-    throw new WhatsAppDeliveryError(
-      result.failureOutcome ?? "ambiguous",
-      result.attemptKeyHash
-    );
-  }
+  throwIfWhatsAppSendRejected(result, "whatsapp_send_failed");
 }
 
 export async function sendWhatsAppImageWithReceipt(
@@ -525,12 +526,7 @@ export async function sendWhatsAppImageWithReceipt(
       }),
     },
   });
-  if (result.kind === "response" && !result.response.ok) {
-    throw new WhatsAppDeliveryError(
-      result.failureOutcome ?? "ambiguous",
-      result.attemptKeyHash
-    );
-  }
+  throwIfWhatsAppSendRejected(result);
   return Object.freeze({
     outcome: "accepted" as const,
     attemptKeyHash: result.attemptKeyHash,
@@ -591,16 +587,7 @@ export async function sendWhatsAppButtons(
       body,
     },
   });
-  if (result.kind === "response" && !result.response.ok) {
-    logger.error({
-      event: "whatsapp_buttons_send_failed",
-      status: result.response.status,
-    });
-    throw new WhatsAppDeliveryError(
-      result.failureOutcome ?? "ambiguous",
-      result.attemptKeyHash
-    );
-  }
+  throwIfWhatsAppSendRejected(result, "whatsapp_buttons_send_failed");
 }
 
 export async function downloadWhatsAppMedia(
