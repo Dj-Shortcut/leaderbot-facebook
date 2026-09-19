@@ -91,6 +91,24 @@ async function fetchWithTimeout(
   }
 }
 
+/** Authenticated request to an existing video resource under the videos endpoint. */
+function fetchOpenAiVideoResource(
+  path: string,
+  method: "GET" | "DELETE",
+  timeoutMs: number
+): Promise<Response> {
+  return fetchWithTimeout(
+    `${OPENAI_VIDEO_ENDPOINT}/${path}`,
+    {
+      method,
+      headers: {
+        Authorization: `Bearer ${getApiKey()}`,
+      },
+    },
+    timeoutMs
+  );
+}
+
 function remainingTimeoutMs(deadline: number): number {
   return Math.max(1, deadline - Date.now());
 }
@@ -386,14 +404,9 @@ async function retrieveVideoJob(
   videoId: string,
   timeoutMs: number
 ): Promise<OpenAiVideoJob | VideoProviderFailure> {
-  const response = await fetchWithTimeout(
-    `${OPENAI_VIDEO_ENDPOINT}/${encodeURIComponent(videoId)}`,
-    {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${getApiKey()}`,
-      },
-    },
+  const response = await fetchOpenAiVideoResource(
+    encodeURIComponent(videoId),
+    "GET",
     timeoutMs
   );
 
@@ -408,14 +421,9 @@ async function downloadVideo(
   videoId: string,
   timeoutMs: number
 ): Promise<Uint8Array | VideoProviderFailure> {
-  const response = await fetchWithTimeout(
-    `${OPENAI_VIDEO_ENDPOINT}/${encodeURIComponent(videoId)}/content?variant=video`,
-    {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${getApiKey()}`,
-      },
-    },
+  const response = await fetchOpenAiVideoResource(
+    `${encodeURIComponent(videoId)}/content?variant=video`,
+    "GET",
     timeoutMs
   );
 
@@ -631,14 +639,9 @@ export class OpenAiVideoProvider implements VideoProvider {
   }
 
   async deleteVideo(providerJobId: string, reqId?: string): Promise<void> {
-    const response = await fetchWithTimeout(
-      `${OPENAI_VIDEO_ENDPOINT}/${encodeURIComponent(providerJobId)}`,
-      {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${getApiKey()}`,
-        },
-      },
+    const response = await fetchOpenAiVideoResource(
+      encodeURIComponent(providerJobId),
+      "DELETE",
       30_000
     );
 

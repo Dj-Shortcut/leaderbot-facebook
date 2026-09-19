@@ -155,6 +155,107 @@ describe("OpenAiVideoProvider", () => {
     expect(JSON.stringify(ledger)).not.toContain("https://img.example");
   });
 
+  it("polls and downloads an existing video with authenticated GET requests", async () => {
+    const originalPollInterval = process.env.OPENAI_VIDEO_POLL_INTERVAL_MS;
+    process.env.OPENAI_VIDEO_POLL_INTERVAL_MS = "1";
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        new Response(new Uint8Array([9, 8, 7]), {
+          status: 200,
+          headers: { "content-type": "image/jpeg" },
+        })
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ id: "video 2", status: "queued" }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        })
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ id: "video 2", status: "completed" }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        })
+      )
+      .mockResolvedValueOnce(
+        new Response(new Uint8Array([4, 5]), {
+          status: 200,
+          headers: { "content-type": "video/mp4" },
+        })
+      );
+    global.fetch = fetchMock;
+
+    try {
+      const result = await new OpenAiVideoProvider().generateVideo({
+        prompt: "make it wave",
+        sourceImageUrl: "https://img.example/source.jpg",
+        reqId: "req-openai-video-poll",
+        userKey: "user-key",
+        timeoutMs: 10_000,
+      });
+
+      expect(result).toMatchObject({
+        kind: "success",
+        providerJobId: "video 2",
+      });
+      expect(fetchMock).toHaveBeenCalledTimes(4);
+      const [retrieveUrl, retrieveRequest] = fetchMock.mock.calls[2] as [
+        string,
+        RequestInit,
+      ];
+      const [downloadUrl, downloadRequest] = fetchMock.mock.calls[3] as [
+        string,
+        RequestInit,
+      ];
+      expect(retrieveUrl).toBe("https://api.openai.com/v1/videos/video%202");
+      expect(downloadUrl).toBe(
+        "https://api.openai.com/v1/videos/video%202/content?variant=video"
+      );
+      for (const request of [retrieveRequest, downloadRequest]) {
+        expect(request.method).toBe("GET");
+        expect(request.headers).toEqual({
+          Authorization: "Bearer test-openai-key",
+        });
+        expect(request.signal).toBeInstanceOf(AbortSignal);
+      }
+    } finally {
+      if (originalPollInterval === undefined) {
+        delete process.env.OPENAI_VIDEO_POLL_INTERVAL_MS;
+      } else {
+        process.env.OPENAI_VIDEO_POLL_INTERVAL_MS = originalPollInterval;
+      }
+    }
+  });
+
+  it("deletes a provider video with an authenticated DELETE request", async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(new Response("gone", { status: 404 }))
+      .mockResolvedValueOnce(new Response("error", { status: 500 }));
+    global.fetch = fetchMock;
+    const provider = new OpenAiVideoProvider();
+
+    await expect(provider.deleteVideo("video 3", "req-delete")).resolves.toBe(
+      undefined
+    );
+    await expect(provider.deleteVideo("video 3")).resolves.toBe(undefined);
+    await expect(provider.deleteVideo("video 3")).rejects.toThrow(
+      "OpenAI video delete failed (500)"
+    );
+
+    const [deleteUrl, deleteRequest] = fetchMock.mock.calls[0] as [
+      string,
+      RequestInit,
+    ];
+    expect(deleteUrl).toBe("https://api.openai.com/v1/videos/video%203");
+    expect(deleteRequest.method).toBe("DELETE");
+    expect(deleteRequest.headers).toEqual({
+      Authorization: "Bearer test-openai-key",
+    });
+  });
+
   it("does not report a provider attempt when OpenAI preflight fails", async () => {
     const period = new Date().toISOString().slice(0, 10);
     delete process.env.OPENAI_API_KEY;
