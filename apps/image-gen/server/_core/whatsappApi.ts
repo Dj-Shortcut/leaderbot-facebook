@@ -406,6 +406,18 @@ async function resolveWhatsAppSendCredential(
   return { ...credential, phoneNumberId: credential.phoneNumberId };
 }
 
+/** A credential failure happens before any Graph request, so the fence closes as known-failed. */
+async function resolveWhatsAppSendCredentialForFence(
+  recipient: string,
+  fence: WhatsAppProviderAttemptFence
+): Promise<WhatsAppTransportCredential & { phoneNumberId: string }> {
+  try {
+    return await resolveWhatsAppSendCredential(recipient);
+  } catch (error) {
+    return throwWithFenceFailure(error, fence, "known_failed", "pre_transport");
+  }
+}
+
 function createErasureOutcomeAttemptId(reqId: string): string {
   return createHash("sha256")
     .update("whatsapp:erasure-outcome:v1", "utf8")
@@ -439,12 +451,7 @@ export async function sendWhatsAppErasureControlText(
   }
 
   const fence = claim.fence;
-  let credential: WhatsAppTransportCredential & { phoneNumberId: string };
-  try {
-    credential = await resolveWhatsAppSendCredential(to);
-  } catch (error) {
-    return throwWithFenceFailure(error, fence, "known_failed", "pre_transport");
-  }
+  const credential = await resolveWhatsAppSendCredentialForFence(to, fence);
   const result = await sendWhatsAppGraph({
     credential,
     fence,
@@ -486,12 +493,7 @@ export async function sendWhatsAppText(
   });
   if (claim.kind === "already_succeeded") return;
   const fence = claim.fence;
-  let credential: WhatsAppTransportCredential & { phoneNumberId: string };
-  try {
-    credential = await resolveWhatsAppSendCredential(to);
-  } catch (error) {
-    return throwWithFenceFailure(error, fence, "known_failed", "pre_transport");
-  }
+  const credential = await resolveWhatsAppSendCredentialForFence(to, fence);
   const body = JSON.stringify({
     messaging_product: "whatsapp",
     to,
@@ -538,12 +540,7 @@ export async function sendWhatsAppImageWithReceipt(
     });
   }
   const fence = claim.fence;
-  let credential: WhatsAppTransportCredential & { phoneNumberId: string };
-  try {
-    credential = await resolveWhatsAppSendCredential(to);
-  } catch (error) {
-    return throwWithFenceFailure(error, fence, "known_failed", "pre_transport");
-  }
+  const credential = await resolveWhatsAppSendCredentialForFence(to, fence);
   const result = await sendWhatsAppGraph({
     credential,
     fence,
@@ -596,12 +593,7 @@ export async function sendWhatsAppButtons(
   });
   if (claim.kind === "already_succeeded") return;
   const fence = claim.fence;
-  let credential: WhatsAppTransportCredential & { phoneNumberId: string };
-  try {
-    credential = await resolveWhatsAppSendCredential(to);
-  } catch (error) {
-    return throwWithFenceFailure(error, fence, "known_failed", "pre_transport");
-  }
+  const credential = await resolveWhatsAppSendCredentialForFence(to, fence);
   const body = JSON.stringify({
     messaging_product: "whatsapp",
     to,
