@@ -480,7 +480,8 @@ async function handleErrorResponse(input: {
 }
 
 type MessengerSendAdmission =
-  { kind: "allowed" } | { kind: "skipped"; outcome: MessengerSendOutcome };
+  | { kind: "allowed" }
+  | { kind: "skipped"; outcome: MessengerSendOutcome };
 
 async function resolveMessengerSendAdmission(
   psid: string,
