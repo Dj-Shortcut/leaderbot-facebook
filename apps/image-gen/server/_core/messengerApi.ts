@@ -1,4 +1,5 @@
 import { createHash, timingSafeEqual } from "node:crypto";
+import { runWithAbortTimeout } from "./abortTimeout";
 import { hasOpenMessengerResponseWindow } from "./messengerState";
 import { summarizeSensitiveUrl } from "./utils/urlSummarizer";
 import { safeLog } from "./logger";
@@ -249,21 +250,11 @@ async function runMessengerGraphRequest(
   request: (signal: AbortSignal) => Promise<MessengerGraphResponse>
 ): Promise<MessengerGraphResponse> {
   const timeoutMs = getGraphApiRequestTimeoutMs();
-  const controller = new AbortController();
-  let timer: ReturnType<typeof setTimeout> | null = null;
-  const timeout = new Promise<never>((_resolve, reject) => {
-    timer = setTimeout(() => {
-      const error = new MessengerGraphRequestTimeoutError(timeoutMs);
-      controller.abort(error);
-      reject(error);
-    }, timeoutMs);
-    timer.unref?.();
-  });
-  try {
-    return await Promise.race([request(controller.signal), timeout]);
-  } finally {
-    if (timer) clearTimeout(timer);
-  }
+  return runWithAbortTimeout(
+    timeoutMs,
+    () => new MessengerGraphRequestTimeoutError(timeoutMs),
+    request
+  );
 }
 
 async function delay(milliseconds: number): Promise<void> {

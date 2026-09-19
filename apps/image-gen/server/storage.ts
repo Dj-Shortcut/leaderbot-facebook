@@ -1,6 +1,7 @@
 // Preconfigured storage helpers for Manus WebDev templates
 // Uses the Biz-provided storage proxy (Authorization: Bearer <token>)
 
+import { runWithAbortTimeout } from "./_core/abortTimeout";
 import { getForgeApiBaseUrlOrThrow } from "./_core/env";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import {
@@ -38,21 +39,11 @@ async function runStorageRequest<T>(
   request: (signal: AbortSignal) => Promise<T>
 ): Promise<T> {
   const timeoutMs = getStorageRequestTimeoutMs();
-  const controller = new AbortController();
-  let timer: ReturnType<typeof setTimeout> | null = null;
-  const timeout = new Promise<never>((_resolve, reject) => {
-    timer = setTimeout(() => {
-      const error = new StorageRequestTimeoutError(operation, timeoutMs);
-      controller.abort(error);
-      reject(error);
-    }, timeoutMs);
-    timer.unref?.();
-  });
-  try {
-    return await Promise.race([request(controller.signal), timeout]);
-  } finally {
-    if (timer) clearTimeout(timer);
-  }
+  return runWithAbortTimeout(
+    timeoutMs,
+    () => new StorageRequestTimeoutError(operation, timeoutMs),
+    request
+  );
 }
 
 function getMaxStorageErrorBodyChars(): number {
