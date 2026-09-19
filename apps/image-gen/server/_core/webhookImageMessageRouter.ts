@@ -81,16 +81,7 @@ export async function tryHandleImageMessage(
   }
 
   if (!inboundImageUrls.length) {
-    if (shouldHandleImageCaptionAsConversation(input.text)) {
-      await handleTextMessage(ctx, {
-        psid: input.psid,
-        userId: input.userId,
-        reqId: input.reqId,
-        lang: input.lang,
-        text: input.text.trim(),
-        timestamp: input.timestamp,
-      });
-    }
+    await routeImageCaptionToConversation(ctx, input);
     return true;
   }
 
@@ -140,16 +131,7 @@ export async function tryHandleImageMessage(
   }
   const storedSourceImageUrl = prepared.retainedIncomingImageUrls.at(-1);
   if (!storedSourceImageUrl || !prepared.imageDecision) {
-    if (shouldHandleImageCaptionAsConversation(input.text)) {
-      await handleTextMessage(ctx, {
-        psid: input.psid,
-        userId: input.userId,
-        reqId: input.reqId,
-        lang: input.lang,
-        text: input.text.trim(),
-        timestamp: input.timestamp,
-      });
-    }
+    await routeImageCaptionToConversation(ctx, input);
     return true;
   }
   const imageDecision = prepared.imageDecision;
@@ -207,15 +189,7 @@ export async function tryHandleImageMessage(
     return true;
   }
 
-  if (shouldHandleImageCaptionAsConversation(input.text)) {
-    await handleTextMessage(ctx, {
-      psid: input.psid,
-      userId: input.userId,
-      reqId: input.reqId,
-      lang: input.lang,
-      text: input.text.trim(),
-      timestamp: input.timestamp,
-    });
+  if (await routeImageCaptionToConversation(ctx, input)) {
     return true;
   }
 
@@ -233,6 +207,25 @@ export async function tryHandleImageMessage(
 
   logImageDecision(ctx, input, state, imageDecision);
   return await handleImageDecision(ctx, input, imageDecision);
+}
+
+/** Hands a conversational image caption to the text router; returns whether it did. */
+async function routeImageCaptionToConversation(
+  ctx: HandlerContext,
+  input: ImageMessageInput
+): Promise<boolean> {
+  if (!shouldHandleImageCaptionAsConversation(input.text)) {
+    return false;
+  }
+  await handleTextMessage(ctx, {
+    psid: input.psid,
+    userId: input.userId,
+    reqId: input.reqId,
+    lang: input.lang,
+    text: input.text.trim(),
+    timestamp: input.timestamp,
+  });
+  return true;
 }
 
 function shouldHandleImageCaptionAsConversation(
