@@ -7,6 +7,7 @@ import os from "node:os";
 import { Readable } from "node:stream";
 import fs from "fs/promises";
 import path from "path";
+import { readResponseBodyWithinLimit } from "../boundedResponseBody";
 import { safeLen, sha256 } from "../imageProof";
 import { safeLog } from "../logger";
 import { canRetryAttempt } from "./retryPolicy";
@@ -638,40 +639,8 @@ async function readResponseBufferWithinLimit(
     }
   }
 
-  if (!response.body) {
-    const imageBuffer = Buffer.from(await response.arrayBuffer());
-    assertInboundImageWithinLimit(reqId, safeLen(imageBuffer));
-    return imageBuffer;
-  }
-
-  const reader = response.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let totalBytes = 0;
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) {
-      break;
-    }
-
-    if (!value) {
-      continue;
-    }
-
-    totalBytes += value.byteLength;
-    try {
-      assertInboundImageWithinLimit(reqId, totalBytes);
-    } catch (error) {
-      await reader.cancel();
-      throw error;
-    }
-    chunks.push(value);
-  }
-
-  return Buffer.concat(
-    chunks.map(chunk =>
-      Buffer.from(chunk.buffer, chunk.byteOffset, chunk.byteLength)
-    )
+  return readResponseBodyWithinLimit(response, byteLength =>
+    assertInboundImageWithinLimit(reqId, byteLength)
   );
 }
 
