@@ -155,6 +155,8 @@ Use the following vocabulary consistently when adding or reviewing documentation
 - **Transitional**, **frozen**, or **retirement-only** means retained solely for
   migration, compatibility, data drain, or safe removal. It must not acquire
   new product dependencies.
+- **Not exposed** means the product deliberately does not offer the surface; it
+  is an explicit exclusion, not planned work.
 
 | Status | Documents | Meaning |
 | --- | --- | --- |

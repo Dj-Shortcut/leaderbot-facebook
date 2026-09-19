@@ -195,9 +195,9 @@ synonym:
 | Status | Surface | Meaning |
 | --- | --- | --- |
 | Active or migration-gated | `/facebook/webhook`, `/healthz`, `/readyz`, version, metrics, legal and data-deletion pages | Direct `apps/image-gen` runtime surfaces whose production evidence is tracked in `operations/todo.md`. |
-| Implemented, exposure-gated | Signed credit checkout page and `/credits/checkout/return` | One-time checkout path in `apps/image-gen`. Mollie Test Mode exposure still awaits its protected deployment, live payment remains disabled until the launch gates close, and the browser return never grants credits. |
+| Implemented, exposure-gated | Signed credit checkout page and `/credits/checkout/return` | One-time checkout path in `apps/image-gen`. Mollie Test Mode checkout is deployed and a consented Test payment and grant are verified in `operations/todo.md`; live payment remains disabled until the launch gates close, and the browser return never grants credits. |
 | Target | Customer payment receipt | No separate receipt route or page exists; receipt proof remains open P4 work in `operations/todo.md`. |
-| Active boundary | Generated asset delivery through the reviewed storage boundary | Storage and retention controls apply regardless of payment state. |
+| Active | Generated asset delivery through the reviewed storage boundary | Storage and retention controls apply regardless of payment state. |
 | Retirement-only | OpenClaw gateway, historical portal handoff, and recurring billing surfaces | Retained only for controlled migration or data-drain work; not part of the Leaderbot customer path. |
 | Not exposed | Customer workspace portal, pairing UI, admin content browser, subscription management page, and public admin screens | The target product does not expose these surfaces. |
 
