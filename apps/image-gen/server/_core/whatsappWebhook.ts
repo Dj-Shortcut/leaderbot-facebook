@@ -45,6 +45,7 @@ import {
   WhatsAppGenerationScopeError,
   type WhatsAppGenerationOwnership,
 } from "./whatsappGenerationScope";
+import { parseWhatsAppEventOccurredAt } from "./whatsappEventOccurredAt";
 import {
   runWithMessengerErasureControlDelivery,
   runWithMessengerRequestContext,
@@ -106,17 +107,6 @@ function createNonReversibleReqId(
     .update("\0")
     .update(getStableWhatsAppEventId(event))
     .digest("hex");
-}
-
-function parseWhatsAppEventOccurredAt(value: unknown): Date {
-  if (typeof value !== "number" || !Number.isSafeInteger(value) || value <= 0) {
-    throw new WhatsAppGenerationScopeError();
-  }
-  const eventOccurredAt = new Date(value);
-  if (!Number.isSafeInteger(eventOccurredAt.getTime())) {
-    throw new WhatsAppGenerationScopeError();
-  }
-  return eventOccurredAt;
 }
 
 async function createWhatsAppEventContext(

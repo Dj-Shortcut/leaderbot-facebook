@@ -32,6 +32,7 @@ import {
   WhatsAppGenerationScopeError,
   type WhatsAppGenerationOwnership,
 } from "../whatsappGenerationScope";
+import { parseWhatsAppEventOccurredAt } from "../whatsappEventOccurredAt";
 import { resolveMessengerGenerationOwnership } from "../workspaceEntitlementRuntime";
 import {
   getWebhookIngressSubjectKey,
@@ -553,17 +554,6 @@ async function createWhatsAppIngressDeliveries(
     }
   }
   return deliveries;
-}
-
-function parseWhatsAppEventOccurredAt(value: unknown): Date {
-  if (typeof value !== "number" || !Number.isSafeInteger(value) || value <= 0) {
-    throw new WhatsAppGenerationScopeError();
-  }
-  const eventOccurredAt = new Date(value);
-  if (!Number.isSafeInteger(eventOccurredAt.getTime())) {
-    throw new WhatsAppGenerationScopeError();
-  }
-  return eventOccurredAt;
 }
 
 function parseMetaEventOccurredAt(value: unknown): Date {
