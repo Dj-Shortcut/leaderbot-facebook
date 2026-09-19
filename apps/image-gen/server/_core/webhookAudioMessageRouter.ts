@@ -358,13 +358,12 @@ function createPreparedAudioForTranscription(
   return { apiKey, sourceAudio };
 }
 
-export function prepareAudioForTranscriptionFromBuffer(
+/** Transcription is skipped, not failed, when no OpenAI key is configured. */
+function readTranscriptionApiKey(
   reqId: string,
   psid: string,
-  audioUrl: string,
-  audioBuffer: Buffer,
-  contentType?: string
-): PreparedAudioForTranscription | null {
+  audioUrl: string
+): string | null {
   const apiKey = process.env.OPENAI_API_KEY?.trim();
   if (!apiKey) {
     safeLog("messenger_audio_transcription_skipped", {
@@ -374,6 +373,20 @@ export function prepareAudioForTranscriptionFromBuffer(
       psidHash: anonymizePsid(psid).slice(0, 12),
       attachment: summarizeSensitiveUrl(audioUrl),
     });
+    return null;
+  }
+  return apiKey;
+}
+
+export function prepareAudioForTranscriptionFromBuffer(
+  reqId: string,
+  psid: string,
+  audioUrl: string,
+  audioBuffer: Buffer,
+  contentType?: string
+): PreparedAudioForTranscription | null {
+  const apiKey = readTranscriptionApiKey(reqId, psid, audioUrl);
+  if (!apiKey) {
     return null;
   }
 
@@ -389,15 +402,8 @@ async function prepareAudioForTranscription(
   psid: string,
   audioUrl: string
 ): Promise<PreparedAudioForTranscription | null> {
-  const apiKey = process.env.OPENAI_API_KEY?.trim();
+  const apiKey = readTranscriptionApiKey(reqId, psid, audioUrl);
   if (!apiKey) {
-    safeLog("messenger_audio_transcription_skipped", {
-      reqId,
-      route: "audio",
-      reason: "missing_openai_api_key",
-      psidHash: anonymizePsid(psid).slice(0, 12),
-      attachment: summarizeSensitiveUrl(audioUrl),
-    });
     return null;
   }
 
