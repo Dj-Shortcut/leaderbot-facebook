@@ -8,6 +8,30 @@
     "configured-state.ts",
     "setup-entry.ts"
   ],
+  "framework": [
+    {
+      "name": "root-vitest",
+      "enablers": ["vitest"],
+      "entryPointRole": "test",
+      "entryPoints": [
+        "*.test.ts",
+        "src/**/*.test.ts",
+        "scripts/**/*.test.mjs",
+        "deploy/fly-gateway/**/*.test.mjs"
+      ]
+    },
+    {
+      "name": "image-gen-vitest",
+      "enablers": ["vitest"],
+      "entryPointRole": "test",
+      "entryPoints": [
+        "apps/image-gen/client/**/*.test.ts",
+        "apps/image-gen/server/**/*.test.ts",
+        "apps/image-gen/server/**/*.spec.ts",
+        "apps/image-gen/scripts/**/*.test.mjs"
+      ]
+    }
+  ],
   "ignoreDependencies": ["@sentry/node", "@trpc/server"],
   "overrides": [
     {
