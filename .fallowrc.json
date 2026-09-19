@@ -8,6 +8,19 @@
     "configured-state.ts",
     "setup-entry.ts"
   ],
+  "framework": [
+    {
+      "name": "image-gen-vitest",
+      "enablers": ["vitest"],
+      "entryPointRole": "test",
+      "entryPoints": [
+        "apps/image-gen/client/**/*.test.ts",
+        "apps/image-gen/server/**/*.test.ts",
+        "apps/image-gen/server/**/*.spec.ts",
+        "apps/image-gen/scripts/**/*.test.mjs"
+      ]
+    }
+  ],
   "ignoreDependencies": ["@sentry/node", "@trpc/server"],
   "overrides": [
     {
