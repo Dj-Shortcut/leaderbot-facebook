@@ -246,13 +246,13 @@
       "allowDetachedMachines": false,
       "desiredScale": {
         "app": {
-          "count": 2,
+          "count": 1,
           "cpuKind": "shared",
           "cpus": 1,
           "memoryMb": 256
         },
         "worker": {
-          "count": 2,
+          "count": 1,
           "cpuKind": "shared",
           "cpus": 1,
           "memoryMb": 256
