@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "app": "leaderbot-openclaw-gateway",
+  "observedAt": "2026-09-29T18:20:45.689994+00:00",
+  "method": "Authenticated read-only fly machine list and fly volumes list, scoped to the gateway app",
+  "machineCount": 0,
+  "volumeCount": 0,
+  "machines": [],
+  "volumes": [],
+  "scope": "Current absence of gateway Machines and Volumes; does not assert deletion of app, registry images, addresses or retained snapshots"
+}
