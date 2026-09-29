@@ -20,6 +20,8 @@ Last state reset: **2026-08-27**.
   payment/credit idempotency smoke. Readiness alone is not user-journey proof.
 - [x] Owner-approved gateway cleanup: all four stopped gateway Machines and
   five 1 GB volumes were destroyed; fresh Fly lists returned empty.
+  [Metadata-only absence evidence](evidence/gateway-cleanup-20260929.json)
+  records the authenticated observation time and the exact app scope.
   Remaining rehearsal/repair apps have not been deleted.
 
 ## Messenger bot and evaluator release gate
