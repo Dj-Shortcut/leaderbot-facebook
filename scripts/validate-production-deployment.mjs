@@ -3053,6 +3053,17 @@ export function validateProductionWorkflow(rootDir = process.cwd()) {
   const imageGenDiagnosticUploadIndex = workflow.indexOf(
     "      - name: Upload image-gen startup diagnostics",
   );
+  const [imageGenRestoreScaleStep] = namedWorkflowStepBodies(
+    workflow,
+    "Restore captured image-gen release",
+  );
+  if (
+    !imageGenRestoreScaleStep?.includes("--reviewed-scale-plan image-gen") ||
+    !imageGenRestoreScaleStep.includes('fly scale count "$count" --process-group "$process"') ||
+    /fly scale count [0-9]+/.test(imageGenRestoreScaleStep)
+  ) {
+    fail("image-gen rollback must derive scale from the reviewed manifest");
+  }
   const imageGenRestoreIndex = workflow.indexOf(
     "      - name: Restore captured image-gen release",
   );

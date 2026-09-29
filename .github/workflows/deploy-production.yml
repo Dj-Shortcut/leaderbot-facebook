@@ -1017,10 +1017,11 @@ jobs:
             --config "$rollback_config" \
             --image-label "rollback-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
             --env "LEADERBOT_DEPLOYMENT_IDENTITY=$prior_identity"
-          fly scale count 2 --process-group app \
-            --app leaderbot-fb-image-gen --yes
-          fly scale count 2 --process-group worker \
-            --app leaderbot-fb-image-gen --yes
+          scale_plan="$(node scripts/validate-production-deployment.mjs --reviewed-scale-plan image-gen)"
+          while IFS=$'\t' read -r process count; do
+            fly scale count "$count" --process-group "$process" \
+              --app leaderbot-fb-image-gen --yes
+          done < <(jq -er '.[] | [.process, .count] | @tsv' <<<"$scale_plan")
 
       - name: Verify restored image-gen release
         if: failure() && steps.deploy.outcome != 'skipped'

@@ -9,6 +9,21 @@ Last reviewed: **2026-09-16** (fresh Test checkout and one eight-credit grant
 verified; photo assistant and paid-image repair deployed; old-output recovery pending).
 Last state reset: **2026-08-27**.
 
+## Lower-cost Fly capacity (29 September 2026)
+
+- [x] Owner approved preparing one image-gen app Machine and one generation
+  worker at the existing shared CPU / 256 MB size. Keep MySQL and storage-proxy.
+- [ ] Merge the reviewed scale manifest and manifest-derived rollback count.
+- [ ] Apply the scale change with worker SIGTERM drain; verify exact Machine
+  counts, unchanged runtime image/config identity, health, readiness and rollback.
+- [ ] Complete a consented Messenger message/image delivery and Mollie Test
+  payment/credit idempotency smoke. Readiness alone is not user-journey proof.
+- [x] Owner-approved gateway cleanup: all four stopped gateway Machines and
+  five 1 GB volumes were destroyed; fresh Fly lists returned empty.
+  [Metadata-only absence evidence](evidence/gateway-cleanup-20260929.json)
+  records the authenticated observation time and the exact app scope.
+  Remaining rehearsal/repair apps have not been deleted.
+
 ## Messenger bot and evaluator release gate
 
 Owner authorization (2026-09-15): merge and deploy the bot improvements and

@@ -128,6 +128,14 @@ function createRepositoryFixture({ boundedTest = false } = {}) {
   const manifest = JSON.parse(
     fs.readFileSync(path.join(root, "deploy/production/apps.json"), "utf8"),
   );
+  // Historical rolling/recovery scenarios model the previous two-per-group
+  // capacity independently of the current lower-cost production plan.
+  manifest.apps["image-gen"].desiredScale.app.count = 2;
+  manifest.apps["image-gen"].desiredScale.worker.count = 2;
+  fs.writeFileSync(
+    path.join(root, "deploy/production/apps.json"),
+    JSON.stringify(manifest),
+  );
   // General mutation cases start from an explicitly closed exposure fixture,
   // independent of the reviewed desired activation stage in the real config.
   if (!boundedTest) {
@@ -968,14 +976,14 @@ function imageGenFlyState(image) {
   };
 }
 
-function imageGenSettledFlyState(image, identity, root, configPath) {
+function imageGenSettledFlyState(image, identity, root, configPath, count = 2) {
   const live = imageGenLiveConfig(identity, { root, configPath });
   const machines = [
     ["10000000000001", "app"],
     ["10000000000002", "app"],
     ["10000000000003", "worker"],
     ["10000000000004", "worker"],
-  ].map(([id, processGroup]) => ({
+  ].filter(([, group], index) => index % 2 < count).map(([id, processGroup]) => ({
     id,
     state: "started",
     region: "ams",
@@ -987,10 +995,10 @@ function imageGenSettledFlyState(image, identity, root, configPath) {
     }),
   }));
   const scale = [
-    { Process: "app", Count: 2, CPUKind: "shared", CPUs: 1, Memory: 256 },
+    { Process: "app", Count: count, CPUKind: "shared", CPUs: 1, Memory: 256 },
     {
       Process: "worker",
-      Count: 2,
+      Count: count,
       CPUKind: "shared",
       CPUs: 1,
       Memory: 256,
@@ -5528,6 +5536,19 @@ describe("production deployment contract", () => {
       { encoding: "utf8" },
     );
     expect(JSON.parse(output)).toEqual([{ process: "app", count: 1 }]);
+  });
+
+  it("rejects fixed image-gen rollback counts that would recreate spare Machines", () => {
+    const root = createRepositoryFixture();
+    replaceFixtureText(
+      root,
+      ".github/workflows/deploy-production.yml",
+      'fly scale count "$count" --process-group "$process"',
+      'fly scale count 2 --process-group app',
+    );
+    expect(() => validateProductionRepository(root)).toThrow(
+      "image-gen rollback must derive scale from the reviewed manifest",
+    );
   });
 
   it("derives every recovery scale count from the validated interrupted manifest", () => {
@@ -10654,8 +10675,8 @@ describe("versioned recovery data contract", () => {
 
   it("derives exact bounded scale counts from reviewed interrupted data", () => {
     expect(getReviewedScalePlan("image-gen", repoRoot)).toEqual([
-      { process: "app", count: 2 },
-      { process: "worker", count: 2 },
+      { process: "app", count: 1 },
+      { process: "worker", count: 1 },
     ]);
     expect(getReviewedScalePlan("storage-proxy", repoRoot)).toEqual([
       { process: "app", count: 1 },
@@ -10807,6 +10828,7 @@ ${workflow.slice(start, end)}
           predecessor.identity,
           root,
           predecessor.path,
+          1,
         ),
         ...verificationOptions,
         fetchImpl: async () =>
@@ -10988,6 +11010,7 @@ ${workflow.slice(start, end)}
         predecessor.identity,
         root,
         predecessor.path,
+        1,
       );
 
       const result = await checkSettledLiveFlyDrift("image-gen", {
