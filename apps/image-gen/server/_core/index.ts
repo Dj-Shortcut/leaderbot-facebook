@@ -127,6 +127,20 @@ function getHttpRateLimiterGuardKey(req: express.Request): string {
   return `${req.method}:${clientIp ? ipKeyGenerator(clientIp) : "unknown"}`;
 }
 
+function redirectRetiredPublicHost(
+  req: express.Request,
+  res: express.Response,
+  next: express.NextFunction
+) {
+  const hostname = req.hostname.toLowerCase();
+  if (hostname !== "leaderbot.live" && hostname !== "www.leaderbot.live") {
+    next();
+    return;
+  }
+
+  res.redirect(308, `https://app.leaderbot.live${req.originalUrl}`);
+}
+
 const redisBackedHttpRateLimiterGuard = rateLimit({
   windowMs: getHttpRateLimitWindowMs(),
   max: getHttpRateLimitGuardMaxRequests,
@@ -342,6 +356,7 @@ async function startServer() {
   const server = createServer(app);
   setupGlobalErrorHandlers(server);
 
+  app.use(redirectRetiredPublicHost);
   applySecurityHeaders(app);
   app.use(attachRequestTracing());
   app.use(redisBackedHttpRateLimiterGuard, createGlobalHttpRateLimiter());
