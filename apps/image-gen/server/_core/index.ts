@@ -138,7 +138,7 @@ function redirectRetiredPublicHost(
     return;
   }
 
-  res.redirect(308, `https://app.leaderbot.live${req.originalUrl}`);
+  res.redirect(308, "https://app.leaderbot.live/");
 }
 
 const redisBackedHttpRateLimiterGuard = rateLimit({
