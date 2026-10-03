@@ -1,5 +1,7 @@
 # Leaderbot Messenger Image Bot
 
+![Rust x MW2 x Skate 3 banner](assets/rust-mw2-skate-banner.png)
+
 Leaderbot is an owner-operated commercial image bot for Facebook Messenger.
 People create and edit images through natural-language messages. Each user gets
 a bounded free daily allowance; the commercial experiment will offer optional
