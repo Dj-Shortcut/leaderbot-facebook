@@ -9,7 +9,10 @@ export const redirectRetiredPublicHost: RequestHandler = (req, res, next) => {
 
   let originalPath = "/";
   try {
-    const parsedUrl = new URL(req.originalUrl, "https://app.leaderbot.live");
+    const relativePath = req.originalUrl.startsWith("/")
+      ? `.${req.originalUrl}`
+      : "/";
+    const parsedUrl = new URL(relativePath, "https://app.leaderbot.live");
     originalPath = `${parsedUrl.pathname}${parsedUrl.search}`;
   } catch {
     originalPath = "/";

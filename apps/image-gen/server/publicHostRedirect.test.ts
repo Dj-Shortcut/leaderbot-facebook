@@ -68,6 +68,15 @@ describe("retired public host redirect", () => {
     });
   });
 
+  it("does not accept an authority from an absolute request target", async () => {
+    expect(
+      await get("leaderbot.live", "https://external.example/path")
+    ).toEqual({
+      status: 308,
+      location: "https://app.leaderbot.live/",
+    });
+  });
+
   it.each(["app.leaderbot.live", "webhook.leaderbot.live", "example.com"])(
     "leaves requests for %s to the application",
     async host => {
