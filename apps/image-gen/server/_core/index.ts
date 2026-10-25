@@ -19,6 +19,7 @@ import { serveStatic } from "./vite";
 import { assertPrivacyConfig } from "./privacy";
 import { assertConversationIdentityConfig } from "./conversationIdentityConfig";
 import { applySecurityHeaders } from "./securityHeaders";
+import { redirectRetiredPublicHost } from "./publicHostRedirect";
 import {
   getGeneratedImage,
   hashGeneratedImageToken,
@@ -125,20 +126,6 @@ const SHUTDOWN_GRACE_PERIOD_MS = 5_000;
 function getHttpRateLimiterGuardKey(req: express.Request): string {
   const clientIp = req.ip || req.socket.remoteAddress;
   return `${req.method}:${clientIp ? ipKeyGenerator(clientIp) : "unknown"}`;
-}
-
-function redirectRetiredPublicHost(
-  req: express.Request,
-  res: express.Response,
-  next: express.NextFunction
-) {
-  const hostname = req.hostname.toLowerCase();
-  if (hostname !== "leaderbot.live" && hostname !== "www.leaderbot.live") {
-    next();
-    return;
-  }
-
-  res.redirect(308, "https://app.leaderbot.live/");
 }
 
 const redisBackedHttpRateLimiterGuard = rateLimit({
