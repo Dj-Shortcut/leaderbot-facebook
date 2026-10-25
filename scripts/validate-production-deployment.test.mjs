@@ -2544,8 +2544,8 @@ describe("production deployment contract", () => {
     replaceFixtureText(
       root,
       "apps/image-gen/Dockerfile",
-      "ARG FFMPEG_VERSION=8.1.2-r0",
-      "ARG FFMPEG_VERSION=8.1.2",
+      "ARG FFMPEG_VERSION=8.1.3-r0",
+      "ARG FFMPEG_VERSION=8.1.3",
     );
 
     expect(() => validateProductionRepository(root)).toThrow(

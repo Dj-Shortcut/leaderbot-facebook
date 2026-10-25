@@ -7,6 +7,11 @@ import type { ChannelPlugin } from "openclaw/plugin-sdk/core";
 import { z } from "zod";
 import type { ResolvedMessengerAccount } from "./types.js";
 
+// OpenClaw bundles its Zod declarations; bridge the SDK's duplicate type identity.
+type OpenClawRefinementContext = Parameters<
+  typeof requireChannelOpenAllowFrom
+>[0]["ctx"];
+
 const DmPolicySchema = z.enum(["open", "allowlist", "pairing", "disabled"]);
 const UnknownSenderModeSchema = z.enum(["pairing", "leaderbot_free_tier"]);
 const MessengerLanguageSchema = z.enum(["nl", "en"]);
@@ -48,7 +53,7 @@ const MessengerAccountConfigSchema = z
       channel: "facebook",
       policy: value.dmPolicy,
       allowFrom: value.allowFrom,
-      ctx,
+      ctx: ctx as unknown as OpenClawRefinementContext,
       requireOpenAllowFrom,
     });
   });
@@ -64,13 +69,13 @@ export const MessengerConfigSchema = MessengerCommonConfigSchemaBase.extend({
       channel: "facebook",
       policy: value.dmPolicy,
       allowFrom: value.allowFrom,
-      ctx,
+      ctx: ctx as unknown as OpenClawRefinementContext,
       requireOpenAllowFrom,
     });
   });
 
 // OpenClaw 2026.7.x bundles Zod's type graph in its published SDK declarations.
-// The runtime schema still uses zod@4.4.3; bridge only the duplicate type identity.
+// The runtime schema uses the installed Zod package; bridge only the type identity.
 const MessengerConfigSchemaForOpenClaw =
   MessengerConfigSchema as unknown as Parameters<
     typeof buildChannelConfigSchema
