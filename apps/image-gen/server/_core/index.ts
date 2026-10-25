@@ -19,6 +19,7 @@ import { serveStatic } from "./vite";
 import { assertPrivacyConfig } from "./privacy";
 import { assertConversationIdentityConfig } from "./conversationIdentityConfig";
 import { applySecurityHeaders } from "./securityHeaders";
+import { redirectRetiredPublicHost } from "./publicHostRedirect";
 import {
   getGeneratedImage,
   hashGeneratedImageToken,
@@ -342,6 +343,7 @@ async function startServer() {
   const server = createServer(app);
   setupGlobalErrorHandlers(server);
 
+  app.use(redirectRetiredPublicHost);
   applySecurityHeaders(app);
   app.use(attachRequestTracing());
   app.use(redisBackedHttpRateLimiterGuard, createGlobalHttpRateLimiter());

@@ -42,7 +42,7 @@ FROM ${NODE_BASE_IMAGE} AS runtime
 WORKDIR /app
 ARG SOURCE_REVISION=unreviewed-local-build
 ARG NODE_BASE_IMAGE
-ARG FFMPEG_VERSION=8.1.2-r0
+ARG FFMPEG_VERSION=8.1.3-r0
 ENV NODE_ENV=production
 LABEL org.opencontainers.image.source="https://github.com/Dj-Shortcut/openclaw-facebook" \
       org.opencontainers.image.revision="${SOURCE_REVISION}" \

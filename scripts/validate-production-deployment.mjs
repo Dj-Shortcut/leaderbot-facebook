@@ -74,7 +74,7 @@ const PINNED_NODE_BASE_IMAGE =
   "node:24-alpine@sha256:d32cdf619f63fe0471182d08996dd516c6275bb5fd31ae06e55a570bd9e1ad43";
 const PINNED_GATEWAY_NODE_BASE_IMAGE =
   "node:24-bookworm-slim@sha256:a9f5f7c91a432850b2a8a7797adf5eadb6c733ceed61167806cee7ea7fbc29df";
-const PINNED_FFMPEG_VERSION = "8.1.2-r0";
+const PINNED_FFMPEG_VERSION = "8.1.3-r0";
 const PINNED_MYSQL_IMAGE =
   "mysql:8.4.11@sha256:1d6b6a8fcee8ff758ff151d017f5203cd06792a0e698f0a593c9dfcb14609cf0";
 const PINNED_REDIS_IMAGE =
@@ -771,7 +771,7 @@ function assertPinnedGatewayDockerfile(rootDir) {
     "@openclaw/codex": "2026.7.2-beta.7",
     ioredis: "6.0.0",
     openclaw: "2026.7.2-beta.7",
-    zod: "4.4.3",
+    zod: "4.6.7",
   };
   if (
     JSON.stringify(runtimePackage.dependencies) !==
