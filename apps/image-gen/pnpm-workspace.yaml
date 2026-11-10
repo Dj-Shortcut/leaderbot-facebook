@@ -11,3 +11,7 @@ overrides:
   lodash: ^4.17.23
   lodash-es: ^4.17.23
   qs: ^6.16.0
+  # GHSA-mrwp-f3q8-3g9p: strip sensitive headers on cross-realm redirects.
+  follow-redirects@<1.16.2: 1.16.2
+  # GHSA-g3hv-75wg-m249: bound glob preprocessing; keep the legacy v3 API.
+  minimatch@>=7.0.0 <11.0.1: 11.0.1
