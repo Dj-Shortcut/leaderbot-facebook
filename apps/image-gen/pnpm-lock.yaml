@@ -27,8 +27,8 @@ importers:
         specifier: ^10.76.2
         version: 10.76.2(@opentelemetry/core@2.12.0(@opentelemetry/api@1.9.1))
       '@trpc/server':
-        specifier: ^11.25.0
-        version: 11.25.0(@types/express@5.0.6)(@typescript/typescript6@6.0.2)
+        specifier: ^11.28.2
+        version: 11.28.2(@types/express@5.0.6)(@typescript/typescript6@6.0.2)
       axios:
         specifier: ^1.20.0
         version: 1.20.0
@@ -947,8 +947,8 @@ packages:
     peerDependencies:
       vite: ^5.2.0 || ^6 || ^7 || ^8
 
-  '@trpc/server@11.25.0':
-    resolution: {integrity: sha512-WnUlGgLdaRoOKbLKn/t3+6cnjPJndNKvJZYJ7RXSZwFOa1dam6Z8atf551KE0vz2vhyxRtcnk+58P7M/ztAjNw==}
+  '@trpc/server@11.28.2':
+    resolution: {integrity: sha512-7A55XS4c3xtxHFZQdLREckOYNuEY5sQXuEoZBniIZ5pNFcC5cLqm0rGg/a+2nqPfJOaTnznHf1g6MqKmw3O2zA==}
     peerDependencies:
       '@types/aws-lambda': '*'
       '@types/express': '*'
@@ -3468,7 +3468,7 @@ snapshots:
       tailwindcss: 4.3.3
       vite: 8.3.8(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)
 
-  '@trpc/server@11.25.0(@types/express@5.0.6)(@typescript/typescript6@6.0.2)':
+  '@trpc/server@11.28.2(@types/express@5.0.6)(@typescript/typescript6@6.0.2)':
     dependencies:
       typescript: '@typescript/typescript6@6.0.2'
     optionalDependencies:
